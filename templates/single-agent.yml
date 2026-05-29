@@ -1,9 +1,9 @@
 # SafeMAS template (generated from frontend/src/lib/templates.js).
 # Clean — no malicious elements. Entrance/exit are structural nodes wired
 # to an agent via an "io" edge.
-name: new-mas
+name: single-agent
 version: 1
-task: Solve the assigned task.
+task: Answer the user’s question.
 nodes:
   - id: in-1
     type: entrance
@@ -13,22 +13,33 @@ nodes:
       'y': 160
   - id: agent-1
     type: agent
-    label: Agent
+    label: Assistant
     role: assistant
     position:
-      x: 300
+      x: 330
       'y': 150
+  - id: tool-1
+    type: tool
+    label: Calculator
+    spec: 'def calc(expr: str) -> str'
+    position:
+      x: 330
+      'y': 330
   - id: out-1
     type: exit
     label: Exit
     position:
-      x: 560
+      x: 600
       'y': 160
 edges:
   - id: io-in
     source: in-1
     target: agent-1
     kind: io
+  - id: edge-1
+    source: tool-1
+    target: agent-1
+    kind: attach
   - id: io-out
     source: agent-1
     target: out-1

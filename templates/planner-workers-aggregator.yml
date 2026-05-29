@@ -1,44 +1,62 @@
-# SafeMAS template — fan-out / fan-in (no malicious elements).
-# Planner dispatches to two workers; an aggregator merges the results.
-# Exactly one entrance (Planner) and one exit (Aggregator).
+# SafeMAS template (generated from frontend/src/lib/templates.js).
+# Clean — no malicious elements. Entrance/exit are structural nodes wired
+# to an agent via an "io" edge.
 name: planner-workers-aggregator
 version: 1
 task: Research a topic and produce a concise summary.
-
 nodes:
+  - id: in-1
+    type: entrance
+    label: Entrance
+    position:
+      x: -120
+      'y': 180
   - id: agent-1
     type: agent
     label: Planner
     role: planner
-    entry: true
-    position: {x: 80, y: 180}
-
+    position:
+      x: 100
+      'y': 170
   - id: agent-2
     type: agent
     label: Worker A
     role: worker
-    position: {x: 360, y: 60}
-
+    position:
+      x: 380
+      'y': 50
   - id: agent-3
     type: agent
     label: Worker B
     role: worker
-    position: {x: 360, y: 300}
-
+    position:
+      x: 380
+      'y': 300
   - id: agent-4
     type: agent
     label: Aggregator
     role: finaliser
-    exit: true
-    position: {x: 660, y: 180}
-
+    position:
+      x: 660
+      'y': 170
   - id: tool-1
     type: tool
     label: Web Tool
     spec: 'def fetch(url: str) -> str'
-    position: {x: 360, y: -120}
-
+    position:
+      x: 380
+      'y': -130
+  - id: out-1
+    type: exit
+    label: Exit
+    position:
+      x: 900
+      'y': 180
 edges:
+  - id: io-in
+    source: in-1
+    target: agent-1
+    kind: io
   - id: edge-1
     source: agent-1
     target: agent-2
@@ -59,3 +77,7 @@ edges:
     source: tool-1
     target: agent-2
     kind: attach
+  - id: io-out
+    source: agent-4
+    target: out-1
+    kind: io

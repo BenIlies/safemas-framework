@@ -19,8 +19,6 @@ export function graphToArch({ name, task, nodes, edges }) {
       prompt: n.data.prompt ?? null,
       temperature: n.data.temperature ?? null,
       max_tokens: n.data.max_tokens ?? null,
-      entry: !!n.data.entry,
-      exit: !!n.data.exit,
       backend: n.data.backend ?? null,
       spec: n.data.spec ?? null,
       malicious: n.data.malicious || blankMalicious(),
@@ -50,8 +48,6 @@ export function archToGraph(arch) {
       prompt: n.prompt,
       temperature: n.temperature ?? null,
       max_tokens: n.max_tokens ?? null,
-      entry: !!n.entry,
-      exit: !!n.exit,
       backend: n.backend,
       spec: n.spec,
       malicious: n.malicious || blankMalicious(),
@@ -71,16 +67,17 @@ export function decorateEdge(edge) {
   const m = edge.data?.malicious
   const kind = edge.data?.kind || 'channel'
   const evil = m?.enabled
+  const ioColor = '#22d3ee'
   return {
     ...edge,
     type: 'smoothstep',
     animated: evil,
-    label: evil ? '☠ AiTM' : edge.data?.label || (kind === 'attach' ? '' : ''),
+    label: evil ? '☠ AiTM' : edge.data?.label || '',
     labelStyle: { fill: evil ? '#ef4444' : '#94a3b8', fontWeight: 700, fontSize: 11 },
     labelBgStyle: { fill: evil ? '#2a0a0a' : '#1e293b' },
     style: {
-      stroke: evil ? '#ef4444' : kind === 'attach' ? '#475569' : '#64748b',
-      strokeWidth: evil ? 2.5 : 1.5,
+      stroke: evil ? '#ef4444' : kind === 'attach' ? '#475569' : kind === 'io' ? ioColor : '#64748b',
+      strokeWidth: evil ? 2.5 : kind === 'io' ? 2 : 1.5,
       strokeDasharray: kind === 'attach' ? '4 4' : undefined,
     },
   }

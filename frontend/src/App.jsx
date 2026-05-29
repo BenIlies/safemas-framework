@@ -89,13 +89,23 @@ function Editor() {
 
   const deleteSelected = useCallback(() => {
     if (selKind === 'node') {
-      setNodes((ns) => ns.filter((n) => n.id !== selId))
+      const n = nodes.find((x) => x.id === selId)
+      if (!n) return
+      if (n.data.type === 'entrance' || n.data.type === 'exit') {
+        toast(`The ${n.data.type} can’t be deleted — move it or re-link it`, 'error')
+        return
+      }
+      if (n.data.type === 'agent' && nodes.filter((x) => x.data.type === 'agent').length <= 1) {
+        toast('A graph needs at least one agent', 'error')
+        return
+      }
+      setNodes((ns) => ns.filter((x) => x.id !== selId))
       setEdges((es) => es.filter((e) => e.source !== selId && e.target !== selId))
     } else if (selKind === 'edge') {
       setEdges((es) => es.filter((e) => e.id !== selId))
     }
     setSelId(null); setSelKind(null)
-  }, [selId, selKind, setNodes, setEdges])
+  }, [selId, selKind, nodes, setNodes, setEdges, toast])
 
   // ---- keyboard shortcuts ----
   useEffect(() => {
@@ -112,9 +122,11 @@ function Editor() {
 
   // ---- wiring edges ----
   const onConnect = useCallback((params) => {
-    const src = nodes.find((n) => n.id === params.source)
-    const tgt = nodes.find((n) => n.id === params.target)
-    const kind = src?.data.type === 'agent' && tgt?.data.type === 'agent' ? 'channel' : 'attach'
+    const s = nodes.find((n) => n.id === params.source)?.data.type
+    const t = nodes.find((n) => n.id === params.target)?.data.type
+    let kind = 'attach'
+    if (s === 'entrance' || t === 'exit') kind = 'io'
+    else if (s === 'agent' && t === 'agent') kind = 'channel'
     setEdges((es) => addEdge(
       decorateEdge({ ...params, id: nextId('edge'), data: { kind, label: '', malicious: blankMalicious() } }),
       es,
@@ -254,6 +266,7 @@ function Editor() {
             onNodeClick={(_, n) => { setSelId(n.id); setSelKind('node') }}
             onEdgeClick={(_, e) => { setSelId(e.id); setSelKind('edge') }}
             onPaneClick={() => { setSelId(null); setSelKind(null) }}
+            deleteKeyCode={null}
             fitView
             proOptions={{ hideAttribution: true }}
           >

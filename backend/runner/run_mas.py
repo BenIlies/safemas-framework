@@ -150,12 +150,19 @@ def main() -> int:
     agents = {i: n for i, n in nodes.items() if n["type"] == "agent"}
     channels: dict[str, list[dict]] = defaultdict(list)
     attachments: dict[str, list[tuple[dict, dict]]] = defaultdict(list)
+    entry_from_io: set[str] = set()  # agents wired from an entrance node
+    exit_from_io: set[str] = set()   # agents wired to an exit node
     for e in edges:
-        kind = e.get("kind", "channel")
         src, tgt = e["source"], e["target"]
-        if kind == "channel" and src in agents and tgt in agents:
+        s_type = nodes.get(src, {}).get("type")
+        t_type = nodes.get(tgt, {}).get("type")
+        if s_type == "entrance" and t_type == "agent":
+            entry_from_io.add(tgt)
+        elif t_type == "exit" and s_type == "agent":
+            exit_from_io.add(src)
+        elif s_type == "agent" and t_type == "agent":
             channels[src].append(e)
-        elif kind == "attach":
+        elif "memory" in (s_type, t_type) or "tool" in (s_type, t_type):
             agent_id = src if src in agents else tgt
             other = tgt if src in agents else src
             if other in nodes:
@@ -229,9 +236,15 @@ def main() -> int:
             final = run_agent(e["target"], msg, depth + 1)
         return final
 
-    entries = [i for i, n in agents.items() if n.get("entry")]
+    # Entry agents come from entrance nodes (or the deprecated entry flag); fall
+    # back to agents with no incoming channel.
+    entries = list(dict.fromkeys(
+        list(entry_from_io) + [i for i, n in agents.items() if n.get("entry")]
+    ))
     if not entries:
-        targets = {e["target"] for e in edges if e.get("kind", "channel") == "channel"}
+        targets = {e["target"] for e in edges
+                   if nodes.get(e["source"], {}).get("type") == "agent"
+                   and nodes.get(e["target"], {}).get("type") == "agent"}
         entries = [i for i in agents if i not in targets] or list(agents)[:1]
 
     last = ""
@@ -239,9 +252,11 @@ def main() -> int:
         visited.add(entry)
         last = run_agent(entry, task)
 
-    # The final answer is the exit agent's output; fall back to the last reached
-    # agent if no agent is flagged as the exit.
-    exits = [i for i, n in agents.items() if n.get("exit")]
+    # The final answer is the exit agent's output (from an exit node, or the
+    # deprecated exit flag); fall back to the last reached agent.
+    exits = list(dict.fromkeys(
+        list(exit_from_io) + [i for i, n in agents.items() if n.get("exit")]
+    ))
     if exits:
         final_answer = "\n".join(outputs.get(i, "") for i in exits if i in outputs) or last
     else:

@@ -29,7 +29,26 @@ export const NODE_TYPES = {
     attackLabel: 'Tool Poisoning',
     defaults: { spec: 'def tool(query: str) -> str' },
   },
+  // Structural flow markers. Not draggable from the palette and not deletable;
+  // every graph keeps exactly one of each, wired to an agent via an "io" edge.
+  entrance: {
+    label: 'Entrance',
+    icon: '▶',
+    color: '#38bdf8',
+    structural: true,
+    defaults: {},
+  },
+  exit: {
+    label: 'Exit',
+    icon: '⏹',
+    color: '#34d399',
+    structural: true,
+    defaults: {},
+  },
 }
+
+// Types that appear in the palette (the others are structural fixtures).
+export const PALETTE_TYPES = ['agent', 'memory', 'tool']
 
 // Channel (agent->agent) edges can be turned into Agent-in-the-Middle rewrites.
 export const EDGE_ATTACK = {

@@ -23,8 +23,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-NodeType = Literal["agent", "memory", "tool"]
-EdgeKind = Literal["channel", "attach"]
+NodeType = Literal["agent", "memory", "tool", "entrance", "exit"]
+EdgeKind = Literal["channel", "attach", "io"]
 AttackType = Literal[
     "prompt-injection",
     "aitm",
@@ -61,8 +61,11 @@ class Node(BaseModel):
     prompt: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    entry: bool = False  # entrance: receives the task
-    exit: bool = False   # exit: its output is the system's final answer
+    # Deprecated: entry/exit are now their own node types wired to an agent via an
+    # "io" edge. Kept optional so older saved YAML still loads (the runner honours
+    # them as a fallback).
+    entry: bool = False
+    exit: bool = False
 
     # memory-specific
     backend: Optional[str] = None  # e.g. in-memory, vector, redis

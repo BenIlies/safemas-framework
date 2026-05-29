@@ -15,6 +15,7 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
 
   const isEdge = selected.kind === 'edge'
   const data = selected.data
+  const isStructural = !isEdge && (data.type === 'entrance' || data.type === 'exit')
   const def = isEdge ? null : NODE_TYPES[data.type]
   const attackLabel = isEdge ? EDGE_ATTACK.attackLabel : def.attackLabel
   const attackType = isEdge ? EDGE_ATTACK.attack : def.attack
@@ -93,16 +94,16 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
               />
             </Field>
           </div>
-
-          <label className="checkbox">
-            <input type="checkbox" checked={!!data.entry} onChange={(e) => set({ entry: e.target.checked })} />
-            ▶ Entrance (receives the task)
-          </label>
-          <label className="checkbox">
-            <input type="checkbox" checked={!!data.exit} onChange={(e) => set({ exit: e.target.checked })} />
-            ⏹ Exit (produces the final answer)
-          </label>
         </>
+      )}
+
+      {!isEdge && (data.type === 'entrance' || data.type === 'exit') && (
+        <p className="io-note">
+          {data.type === 'entrance'
+            ? 'The entrance feeds the task to whichever agent it links to. Drag from its port to a different agent to re-route it.'
+            : 'The exit takes its final answer from whichever agent links into it. Drag an agent’s port here to re-route it.'}
+          <br />This node can’t be deleted — move or re-link it instead.
+        </p>
       )}
 
       {!isEdge && data.type === 'memory' && (
@@ -129,24 +130,26 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
         </Field>
       )}
 
-      <div className="evil-box">
-        <label className="checkbox evil-toggle">
-          <input type="checkbox" checked={!!data.malicious?.enabled} onChange={(e) => toggleEvil(e.target.checked)} />
-          <span>☠ Mark as malicious — <b>{attackLabel}</b></span>
-        </label>
-        {data.malicious?.enabled && (
-          <Field label="Attacker payload">
-            <textarea
-              rows={3}
-              placeholder={payloadHint(attackType)}
-              value={data.malicious.payload || ''}
-              onChange={(e) => setMal({ payload: e.target.value })}
-            />
-          </Field>
-        )}
-      </div>
+      {attackType && (
+        <div className="evil-box">
+          <label className="checkbox evil-toggle">
+            <input type="checkbox" checked={!!data.malicious?.enabled} onChange={(e) => toggleEvil(e.target.checked)} />
+            <span>☠ Mark as malicious — <b>{attackLabel}</b></span>
+          </label>
+          {data.malicious?.enabled && (
+            <Field label="Attacker payload">
+              <textarea
+                rows={3}
+                placeholder={payloadHint(attackType)}
+                value={data.malicious.payload || ''}
+                onChange={(e) => setMal({ payload: e.target.value })}
+              />
+            </Field>
+          )}
+        </div>
+      )}
 
-      <button className="btn danger" onClick={onDelete}>Delete element</button>
+      {!isStructural && <button className="btn danger" onClick={onDelete}>Delete element</button>}
     </div>
   )
 }

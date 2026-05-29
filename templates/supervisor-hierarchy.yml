@@ -1,37 +1,55 @@
-# SafeMAS template — a supervisor delegates to sub-agents and produces the
-# final result itself (it is both the entrance and the exit).
+# SafeMAS template (generated from frontend/src/lib/templates.js).
+# Clean — no malicious elements. Entrance/exit are structural nodes wired
+# to an agent via an "io" edge.
 name: supervisor-hierarchy
 version: 1
 task: Plan and execute a multi-step task.
-
 nodes:
+  - id: in-1
+    type: entrance
+    label: Entrance
+    position:
+      x: 60
+      'y': 60
   - id: agent-1
     type: agent
     label: Supervisor
     role: supervisor
-    entry: true
-    exit: true
-    position: {x: 360, y: 60}
-
+    position:
+      x: 360
+      'y': 60
   - id: agent-2
     type: agent
     label: Researcher
     role: worker
-    position: {x: 160, y: 280}
-
+    position:
+      x: 160
+      'y': 280
   - id: agent-3
     type: agent
     label: Writer
     role: worker
-    position: {x: 560, y: 280}
-
+    position:
+      x: 560
+      'y': 280
   - id: mem-1
     type: memory
     label: Scratchpad
     backend: in-memory
-    position: {x: 360, y: 460}
-
+    position:
+      x: 360
+      'y': 460
+  - id: out-1
+    type: exit
+    label: Exit
+    position:
+      x: 660
+      'y': 60
 edges:
+  - id: io-in
+    source: in-1
+    target: agent-1
+    kind: io
   - id: edge-1
     source: agent-1
     target: agent-2
@@ -48,3 +66,7 @@ edges:
     source: mem-1
     target: agent-3
     kind: attach
+  - id: io-out
+    source: agent-1
+    target: out-1
+    kind: io

@@ -1,48 +1,69 @@
-# SafeMAS template — a router dispatches to specialists; a collector merges them.
+# SafeMAS template (generated from frontend/src/lib/templates.js).
+# Clean — no malicious elements. Entrance/exit are structural nodes wired
+# to an agent via an "io" edge.
 name: router-specialists
 version: 1
 task: Handle a mixed request that may need code or math.
-
 nodes:
+  - id: in-1
+    type: entrance
+    label: Entrance
+    position:
+      x: -120
+      'y': 200
   - id: agent-1
     type: agent
     label: Router
     role: router
-    entry: true
-    position: {x: 80, y: 200}
-
+    position:
+      x: 100
+      'y': 190
   - id: agent-2
     type: agent
     label: Code Specialist
     role: coder
-    position: {x: 360, y: 80}
-
+    position:
+      x: 380
+      'y': 70
   - id: agent-3
     type: agent
     label: Math Specialist
     role: mathematician
-    position: {x: 360, y: 320}
-
+    position:
+      x: 380
+      'y': 310
   - id: agent-4
     type: agent
     label: Collector
     role: finaliser
-    exit: true
-    position: {x: 660, y: 200}
-
+    position:
+      x: 660
+      'y': 190
   - id: tool-1
     type: tool
     label: Python REPL
     spec: 'def run(code: str) -> str'
-    position: {x: 360, y: -60}
-
+    position:
+      x: 380
+      'y': -70
   - id: tool-2
     type: tool
     label: Calculator
     spec: 'def calc(expr: str) -> str'
-    position: {x: 360, y: 480}
-
+    position:
+      x: 380
+      'y': 470
+  - id: out-1
+    type: exit
+    label: Exit
+    position:
+      x: 900
+      'y': 200
 edges:
+  - id: io-in
+    source: in-1
+    target: agent-1
+    kind: io
   - id: edge-1
     source: agent-1
     target: agent-2
@@ -67,3 +88,7 @@ edges:
     source: tool-2
     target: agent-3
     kind: attach
+  - id: io-out
+    source: agent-4
+    target: out-1
+    kind: io
