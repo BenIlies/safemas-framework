@@ -116,8 +116,13 @@ nodes:
   - id: agent-1
     type: agent
     label: Planner
+    provider: prov-1a2b3c4d  # references a saved provider (optional)
     model: gpt-4o-mini
-    entry: true            # receives the task
+    entry: true            # entrance — receives the task
+  - id: agent-2
+    type: agent
+    label: Reviewer
+    exit: true             # exit — its output is the final answer
   - id: tool-1
     type: tool
     label: Shell Tool
@@ -136,7 +141,12 @@ edges:
       payload: 'rewritten message...'
 ```
 
-See [`examples/example_mas.yml`](examples/example_mas.yml) for a full sample.
+See [`templates/`](templates/) for clean starting points. Templates contain no
+malicious elements — you add attacks in the editor to probe a design.
+
+Every agent can be flagged **entrance** (`entry: true`, receives the task) and/or
+**exit** (`exit: true`, its output is the system's final answer). A **New** MAS
+always starts with one entrance and one exit agent.
 
 ## Project layout
 
@@ -155,7 +165,7 @@ safemas-framework/
 │       ├── App.jsx       canvas, toolbar, wiring, toasts
 │       ├── components/   MasNode, Palette, Inspector, RunConsole, ProvidersModal
 │       └── lib/          elements, graph<->YAML, API client
-├── examples/             sample architecture.yml
+├── templates/            clean starter architectures (no attacks)
 └── dev.sh                start backend + frontend locally
 ```
 

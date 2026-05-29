@@ -10,7 +10,7 @@ export const NODE_TYPES = {
     attackLabel: 'Prompt Injection',
     defaults: {
       provider: null, model: '', role: 'worker', prompt: '',
-      temperature: null, max_tokens: null, entry: false,
+      temperature: null, max_tokens: null, entry: false, exit: false,
     },
   },
   memory: {

@@ -1,0 +1,50 @@
+# SafeMAS template — reflection / self-critique (unrolled).
+# Generator drafts, Critic reviews, Finaliser produces the answer.
+name: reflection
+version: 1
+task: Draft and refine a short blog post.
+
+nodes:
+  - id: agent-1
+    type: agent
+    label: Generator
+    role: drafter
+    entry: true
+    position: {x: 80, y: 160}
+
+  - id: agent-2
+    type: agent
+    label: Critic
+    role: reviewer
+    position: {x: 360, y: 160}
+
+  - id: agent-3
+    type: agent
+    label: Finaliser
+    role: finaliser
+    exit: true
+    position: {x: 640, y: 160}
+
+  - id: mem-1
+    type: memory
+    label: Draft Store
+    backend: kv
+    position: {x: 360, y: 340}
+
+edges:
+  - id: edge-1
+    source: agent-1
+    target: agent-2
+    kind: channel
+  - id: edge-2
+    source: agent-2
+    target: agent-3
+    kind: channel
+  - id: edge-3
+    source: mem-1
+    target: agent-1
+    kind: attach
+  - id: edge-4
+    source: mem-1
+    target: agent-2
+    kind: attach

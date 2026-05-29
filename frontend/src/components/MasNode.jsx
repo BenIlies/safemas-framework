@@ -14,7 +14,8 @@ export default function MasNode({ data, selected }) {
     <div className={cls.join(' ')} style={{ '--node-color': def.color }}>
       <Handle type="target" position={Position.Left} className="mas-handle" />
 
-      {data.entry && <div className="mas-entry-tag">ENTRY</div>}
+      {data.entry && <div className="mas-entry-tag">▶ ENTRANCE</div>}
+      {data.exit && <div className="mas-exit-tag">EXIT ⏹</div>}
       {evil && <div className="mas-evil-badge" title={data.malicious.attack}>☠</div>}
 
       <div className="mas-node-head">

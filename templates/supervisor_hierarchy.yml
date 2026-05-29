@@ -1,0 +1,50 @@
+# SafeMAS template — a supervisor delegates to sub-agents and produces the
+# final result itself (it is both the entrance and the exit).
+name: supervisor-hierarchy
+version: 1
+task: Plan and execute a multi-step task.
+
+nodes:
+  - id: agent-1
+    type: agent
+    label: Supervisor
+    role: supervisor
+    entry: true
+    exit: true
+    position: {x: 360, y: 60}
+
+  - id: agent-2
+    type: agent
+    label: Researcher
+    role: worker
+    position: {x: 160, y: 280}
+
+  - id: agent-3
+    type: agent
+    label: Writer
+    role: worker
+    position: {x: 560, y: 280}
+
+  - id: mem-1
+    type: memory
+    label: Scratchpad
+    backend: in-memory
+    position: {x: 360, y: 460}
+
+edges:
+  - id: edge-1
+    source: agent-1
+    target: agent-2
+    kind: channel
+  - id: edge-2
+    source: agent-1
+    target: agent-3
+    kind: channel
+  - id: edge-3
+    source: mem-1
+    target: agent-2
+    kind: attach
+  - id: edge-4
+    source: mem-1
+    target: agent-3
+    kind: attach

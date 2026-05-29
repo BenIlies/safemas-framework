@@ -14,7 +14,7 @@ import ProvidersModal from './components/ProvidersModal.jsx'
 import { NODE_TYPES, blankMalicious } from './lib/elements.js'
 import { archToGraph, graphToArch, decorateEdge } from './lib/graph.js'
 import * as api from './lib/api.js'
-import { EXAMPLE } from './lib/example.js'
+import { TEMPLATES, STARTER, DEFAULT_TEMPLATE } from './lib/templates.js'
 
 const nodeTypes = { masNode: MasNode }
 let idSeq = 1
@@ -46,11 +46,16 @@ function Editor() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200)
   }, [])
 
-  // load example on first mount
-  useEffect(() => {
-    const g = archToGraph(EXAMPLE)
-    setNodes(g.nodes); setEdges(g.edges); setName(g.name); setTask(g.task)
+  // load a clean template on first mount
+  const loadArch = useCallback((a) => {
+    const g = archToGraph(a)
+    setNodes(g.nodes); setEdges(g.edges); setName(a.name); setTask(a.task || '')
+    setSelId(null); setSelKind(null)
     idSeq = 100
+  }, [setNodes, setEdges])
+
+  useEffect(() => {
+    loadArch(DEFAULT_TEMPLATE)
     api.health().then(setHealth).catch(() => {})
     refreshSaved()
     refreshProviders()
@@ -143,11 +148,13 @@ function Editor() {
   const doLoad = async (n) => {
     try {
       const a = await api.loadConfig(n)
-      const g = archToGraph(a)
-      setNodes(g.nodes); setEdges(g.edges); setName(a.name); setTask(a.task || '')
-      setSelId(null); setSelKind(null)
+      loadArch(a)
       toast(`Loaded “${a.name}”`)
     } catch (e) { toast('Load failed', 'error') }
+  }
+  const doTemplate = (id) => {
+    const t = TEMPLATES.find((x) => x.id === id)
+    if (t) { loadArch(t.arch); toast(`Template: ${t.label}`) }
   }
   const doDeleteSaved = async () => {
     if (!confirm(`Delete saved architecture “${name}”?`)) return
@@ -162,9 +169,10 @@ function Editor() {
     URL.revokeObjectURL(url)
     toast('Exported YAML')
   }
+  // A new MAS always starts with one entrance and one exit agent.
   const doNew = () => {
-    setNodes([]); setEdges([]); setName('untitled-mas'); setTask('Solve the assigned task.')
-    setSelId(null); setSelKind(null)
+    loadArch({ ...STARTER, name: 'untitled-mas' })
+    toast('New MAS — one entrance, one exit')
   }
 
   const doRun = async () => {
@@ -210,6 +218,10 @@ function Editor() {
 
         <div className="btn-group">
           <button className="btn" onClick={doNew}>New</button>
+          <select className="btn" value="" onChange={(e) => e.target.value && doTemplate(e.target.value)} title="Start from a clean template">
+            <option value="">Templates…</option>
+            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
           <select className="btn" value="" onChange={(e) => e.target.value && doLoad(e.target.value)} title="Load saved architecture">
             <option value="">Load…</option>
             {saved.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
@@ -293,7 +305,7 @@ function stripArch(a) {
     for (const [k, v] of Object.entries(o)) {
       if (v == null || v === '' || (Array.isArray(v) && !v.length)) continue
       if (k === 'malicious' && !v.enabled) continue
-      if (k === 'entry' && !v) continue
+      if ((k === 'entry' || k === 'exit') && !v) continue
       r[k] = v
     }
     return r

@@ -182,6 +182,7 @@ def main() -> int:
         return f"[tool:{res.get('label', res['id'])}] returned a normal result"
 
     visited: set[str] = set()
+    outputs: dict[str, str] = {}  # last output produced by each agent
 
     def run_agent(agent_id: str, incoming: str, depth: int = 0) -> str:
         if depth > 32:
@@ -210,6 +211,7 @@ def main() -> int:
             provider, model, system, user_input,
             agent.get("temperature"), agent.get("max_tokens"),
         )
+        outputs[agent_id] = output
         log(f"{GREY}    -> {output}{RESET}")
 
         final = output
@@ -232,12 +234,23 @@ def main() -> int:
         targets = {e["target"] for e in edges if e.get("kind", "channel") == "channel"}
         entries = [i for i in agents if i not in targets] or list(agents)[:1]
 
-    final_answer = ""
+    last = ""
     for entry in entries:
         visited.add(entry)
-        final_answer = run_agent(entry, task)
+        last = run_agent(entry, task)
+
+    # The final answer is the exit agent's output; fall back to the last reached
+    # agent if no agent is flagged as the exit.
+    exits = [i for i, n in agents.items() if n.get("exit")]
+    if exits:
+        final_answer = "\n".join(outputs.get(i, "") for i in exits if i in outputs) or last
+    else:
+        final_answer = last
 
     log("=" * 64)
+    if exits:
+        names = ", ".join(agents[i].get("label", i) for i in exits)
+        log(f"{GREY}exit agent(s): {names}{RESET}")
     log(f"{BOLD}final answer:{RESET} {GREEN}{final_answer}{RESET}")
     if attacks:
         log(f"{RED}{BOLD}{len(attacks)} attack(s) fired during execution.{RESET}")

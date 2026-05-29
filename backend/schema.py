@@ -61,7 +61,8 @@ class Node(BaseModel):
     prompt: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    entry: bool = False  # is this an entry agent (receives the task)?
+    entry: bool = False  # entrance: receives the task
+    exit: bool = False   # exit: its output is the system's final answer
 
     # memory-specific
     backend: Optional[str] = None  # e.g. in-memory, vector, redis
@@ -98,7 +99,7 @@ class Architecture(BaseModel):
                     continue
                 if k == "malicious" and not v.get("enabled"):
                     continue
-                if k == "entry" and v is False:
+                if k in ("entry", "exit") and v is False:
                     continue
                 out[k] = v
             return out

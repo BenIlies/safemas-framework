@@ -20,6 +20,7 @@ Endpoints
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -42,7 +43,20 @@ BASE = Path(__file__).resolve().parent
 CONFIG_DIR = BASE / "configs"
 RUNS_DIR = BASE / "runs"
 RUNNER_DIR = BASE / "runner"
-IMAGE_TAG = "safemas-runner:latest"
+
+
+def _runner_tag() -> str:
+    """Content-addressed image tag so a changed runner auto-rebuilds (and an
+    unchanged one is reused from cache)."""
+    h = hashlib.sha256()
+    for f in ("run_mas.py", "Dockerfile"):
+        p = RUNNER_DIR / f
+        if p.exists():
+            h.update(p.read_bytes())
+    return f"safemas-runner:{h.hexdigest()[:12]}"
+
+
+IMAGE_TAG = _runner_tag()
 
 # SAFEMAS_SANDBOX: "auto" (docker if present, else local), "docker", or "local".
 SANDBOX_MODE = os.environ.get("SAFEMAS_SANDBOX", "auto").lower()

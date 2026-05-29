@@ -96,7 +96,11 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
 
           <label className="checkbox">
             <input type="checkbox" checked={!!data.entry} onChange={(e) => set({ entry: e.target.checked })} />
-            Entry agent (receives the task)
+            ▶ Entrance (receives the task)
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={!!data.exit} onChange={(e) => set({ exit: e.target.checked })} />
+            ⏹ Exit (produces the final answer)
           </label>
         </>
       )}
