@@ -39,13 +39,22 @@ attack surfaces:
 
 ## Quick start
 
-### Option A — dev script (recommended)
+### Option A — Docker Compose (recommended)
+```bash
+docker compose up --build
+# open http://localhost:5173
+```
+This builds and runs both services. The backend mounts the host Docker socket so
+it can spawn the sandboxed runner container for each execution. Saved
+architectures and provider keys persist across restarts.
+
+### Option B — dev script
 ```bash
 ./dev.sh
 # Frontend: http://localhost:5173   Backend API: http://localhost:8000
 ```
 
-### Option B — manual
+### Option C — manual
 ```bash
 # backend
 cd backend
@@ -61,24 +70,41 @@ npm run dev
 
 Open <http://localhost:5173>. A demo architecture loads on first launch.
 
+> **Python 3.14 note:** `requirements.txt` uses lower-bound version pins so pip
+> picks prebuilt wheels on current interpreters (older exact pins failed to
+> compile `pydantic-core` on 3.14).
+
+## LLM providers (saved API keys)
+
+Click **🔑 Providers** to register an LLM endpoint once — pick a kind
+(OpenAI, Anthropic, OpenAI-compatible, or mock), paste the API key, and list its
+models. Then each agent simply **selects a provider by name** in the inspector;
+you never re-type the key.
+
+Keys are stored server-side in `backend/secrets.json` (gitignored, `chmod 600`)
+and are **never returned to the browser** — the API only reports `has_key: true`.
+Editing a provider shows a "leave blank to keep" hint so the saved key is
+preserved unless you deliberately overwrite it.
+
+Per-agent parameters you can set: **provider, model, role, system prompt,
+temperature, max tokens**, and the entry flag.
+
 ## Running an architecture
 
-The backend and frontend run as ordinary local processes. **Docker is used only
-as the sandbox for executing a MAS** — each run spins up a throwaway container.
+Click **▶ Run**. The backend executes the current design and streams the trace
+into the run console, applying every malicious element as a red `[ATTACK]` line.
 
-Click **▶ Run**. The backend writes the current design to `architecture.yml`,
-builds the runner image on first use, and executes it with:
+* **With Docker** (default): a throwaway container per run — memory/CPU capped,
+  and network is enabled only when an agent uses a provider that has a key
+  (otherwise `--network none`). The architecture and resolved providers are passed
+  via environment variables, so it works even when the backend itself runs in a
+  container and spawns the runner through the mounted Docker socket.
+* **Without Docker**: the backend transparently falls back to running the runner
+  as a local subprocess (clearly flagged in the log as *not* network-isolated).
+  Set `SAFEMAS_SANDBOX=local` to force this, or `docker` to require the sandbox.
 
-```
-docker run --rm --network none --memory 512m --cpus 1 \
-    -v architecture.yml:/mas/architecture.yml:ro safemas-runner:latest
-```
-
-The runner propagates the task through the topology and applies every malicious
-element, logging each as a red `[ATTACK]` line. **No API key is required** — agents
-fall back to a deterministic mock. Set `OPENAI_API_KEY` to use real LLM agents.
-
-> Requires a running Docker daemon. Editing, YAML preview and export work without it.
+**No API key is required** — agents with no provider fall back to a deterministic
+mock, so the whole system is runnable with zero credentials.
 
 ## The `architecture.yml` format
 
@@ -116,14 +142,18 @@ See [`examples/example_mas.yml`](examples/example_mas.yml) for a full sample.
 
 ```
 safemas-framework/
+├── docker-compose.yml    one-command stack (frontend + backend + socket)
 ├── backend/              FastAPI app
-│   ├── main.py           REST API (CRUD, export, run)
-│   ├── schema.py         Architecture data model
+│   ├── main.py           REST API (CRUD, providers, export, run)
+│   ├── schema.py         Architecture + Provider data models
+│   ├── providers.py      provider/key registry (secrets.json)
+│   ├── Dockerfile        backend image (ships Docker CLI)
 │   └── runner/           Dockerized MAS executor (Dockerfile + run_mas.py)
 ├── frontend/             React + Vite + React Flow editor
+│   ├── Dockerfile        build + nginx serve (proxies /api)
 │   └── src/
-│       ├── App.jsx       canvas, toolbar, wiring
-│       ├── components/   MasNode, Palette, Inspector, RunConsole
+│       ├── App.jsx       canvas, toolbar, wiring, toasts
+│       ├── components/   MasNode, Palette, Inspector, RunConsole, ProvidersModal
 │       └── lib/          elements, graph<->YAML, API client
 ├── examples/             sample architecture.yml
 └── dev.sh                start backend + frontend locally
@@ -137,8 +167,12 @@ safemas-framework/
 | GET    | `/api/configs/{name}` | load one                         |
 | PUT    | `/api/configs/{name}` | save / overwrite                 |
 | DELETE | `/api/configs/{name}` | delete                           |
+| GET    | `/api/providers`      | list providers (keys masked)     |
+| POST   | `/api/providers`      | create a provider                |
+| PUT    | `/api/providers/{id}` | update (blank key keeps existing)|
+| DELETE | `/api/providers/{id}` | delete a provider                |
 | POST   | `/api/export`         | architecture → YAML text         |
-| POST   | `/api/run`            | run in Docker → `{run_id}`       |
+| POST   | `/api/run`            | run (Docker or local) → `{run_id}` |
 | GET    | `/api/run/{run_id}`   | status + log tail                |
 
 ## Security note

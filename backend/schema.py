@@ -12,6 +12,10 @@ architecture, following the threat model:
 
 The canonical persisted form is YAML. The same structure round-trips to the
 React Flow graph the frontend renders, so "the architecture is the code".
+
+LLM credentials live in a separate :class:`Provider` registry (see
+``providers.py``) so the same architecture can be shared without leaking keys —
+an agent only references a provider by id.
 """
 from __future__ import annotations
 
@@ -27,6 +31,7 @@ AttackType = Literal[
     "memory-poisoning",
     "tool-poisoning",
 ]
+ProviderKind = Literal["openai", "anthropic", "openai-compatible", "mock"]
 
 
 class Position(BaseModel):
@@ -50,9 +55,12 @@ class Node(BaseModel):
     position: Position = Field(default_factory=Position)
 
     # agent-specific
+    provider: Optional[str] = None  # id referencing a Provider in the registry
     model: Optional[str] = None
     role: Optional[str] = None
     prompt: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
     entry: bool = False  # is this an entry agent (receives the task)?
 
     # memory-specific
@@ -102,3 +110,51 @@ class Architecture(BaseModel):
             "nodes": [clean(n.model_dump()) for n in self.nodes],
             "edges": [clean(e.model_dump()) for e in self.edges],
         }
+
+
+# --------------------------------------------------------------------------- #
+# Provider registry (LLM credentials)
+# --------------------------------------------------------------------------- #
+class Provider(BaseModel):
+    """A configured LLM endpoint. The ``api_key`` is stored server-side only and
+    never returned to the client (see :class:`ProviderPublic`)."""
+
+    id: str
+    name: str = "provider"
+    kind: ProviderKind = "openai"
+    base_url: str = ""           # for openai-compatible / self-hosted endpoints
+    api_key: str = ""            # secret — persisted locally, never serialised out
+    models: list[str] = Field(default_factory=list)
+
+
+class ProviderPublic(BaseModel):
+    """What the client sees: everything except the secret key."""
+
+    id: str
+    name: str
+    kind: ProviderKind
+    base_url: str = ""
+    models: list[str] = Field(default_factory=list)
+    has_key: bool = False
+
+    @classmethod
+    def of(cls, p: Provider) -> "ProviderPublic":
+        return cls(
+            id=p.id,
+            name=p.name,
+            kind=p.kind,
+            base_url=p.base_url,
+            models=p.models,
+            has_key=bool(p.api_key),
+        )
+
+
+class ProviderInput(BaseModel):
+    """Create/update payload. ``api_key`` is optional on update — when omitted or
+    blank the previously stored key is kept (so the UI never re-sends it)."""
+
+    name: str = "provider"
+    kind: ProviderKind = "openai"
+    base_url: str = ""
+    api_key: Optional[str] = None
+    models: list[str] = Field(default_factory=list)

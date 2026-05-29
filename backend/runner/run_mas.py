@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Execute a SafeMAS architecture described in YAML.
 
-This runs *inside* a Docker container (see Dockerfile). It loads the topology,
+Designed to run *inside* a Docker container (see Dockerfile), but also runnable
+directly as a subprocess when Docker is unavailable. It loads the topology,
 seeds the entry agent(s) with the task, and propagates messages along channels.
-Each agent "thinks" using a real LLM when ``OPENAI_API_KEY`` is present, and a
-deterministic mock otherwise -- so the demo runs with zero credentials.
+
+Each agent "thinks" using a real LLM when its referenced provider has an API key,
+and a deterministic mock otherwise -- so the demo runs with zero credentials.
+
+Inputs (in priority order, so the same image works mounted or socket-spawned):
+    * architecture:  $SAFEMAS_ARCH (YAML)  ->  argv[1] file  ->  /mas/architecture.yml  ->  stdin
+    * providers:     $SAFEMAS_PROVIDERS (JSON: {id: {kind, base_url, api_key, models}})
 
 Malicious elements alter execution and are loudly logged as ATTACK events:
 
@@ -30,6 +36,7 @@ RED = "\033[91m"
 YELLOW = "\033[93m"
 CYAN = "\033[96m"
 GREY = "\033[90m"
+GREEN = "\033[92m"
 BOLD = "\033[1m"
 
 
@@ -46,28 +53,78 @@ def step(msg: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Optional real LLM backend
+# Input loading
 # --------------------------------------------------------------------------- #
-def call_llm(model: str, system: str, user: str) -> str:
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
+def load_architecture() -> dict:
+    env = os.environ.get("SAFEMAS_ARCH")
+    if env:
+        return yaml.safe_load(env)
+    path = sys.argv[1] if len(sys.argv) > 1 else "/mas/architecture.yml"
+    if os.path.exists(path):
+        with open(path) as fh:
+            return yaml.safe_load(fh)
+    data = sys.stdin.read()
+    return yaml.safe_load(data) if data.strip() else {}
+
+
+def load_providers() -> dict[str, dict]:
+    env = os.environ.get("SAFEMAS_PROVIDERS")
+    if not env:
+        return {}
+    try:
+        return json.loads(env)
+    except json.JSONDecodeError:
+        return {}
+
+
+# --------------------------------------------------------------------------- #
+# LLM backends (resolved per-agent via its provider)
+# --------------------------------------------------------------------------- #
+def call_llm(provider: dict | None, model: str, system: str, user: str,
+             temperature: float | None, max_tokens: int | None) -> str:
+    kind = (provider or {}).get("kind", "mock")
+    key = (provider or {}).get("api_key", "")
+    base_url = (provider or {}).get("base_url", "") or None
+
+    if not provider or kind == "mock" or not key:
         # Deterministic mock so the system is runnable without credentials.
         digest = abs(hash(user)) % 1000
-        return f"[mock:{model}] processed input (#{digest}); produced an answer."
+        tag = model or kind or "mock"
+        return f"[mock:{tag}] processed input (#{digest}); produced an answer."
+
     try:
+        if kind == "anthropic":
+            import anthropic
+
+            client = anthropic.Anthropic(api_key=key, base_url=base_url)
+            resp = client.messages.create(
+                model=model or "claude-haiku-4-5",
+                system=system,
+                max_tokens=max_tokens or 1024,
+                temperature=temperature if temperature is not None else 1.0,
+                messages=[{"role": "user", "content": user}],
+            )
+            return "".join(getattr(b, "text", "") for b in resp.content)
+
+        # openai + openai-compatible (base_url overrides the endpoint)
         from openai import OpenAI
 
-        client = OpenAI(api_key=key)
-        resp = client.chat.completions.create(
-            model=model or "gpt-4o-mini",
-            messages=[
+        client = OpenAI(api_key=key, base_url=base_url)
+        kwargs: dict = {
+            "model": model or "gpt-4o-mini",
+            "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-        )
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content or ""
     except Exception as exc:  # pragma: no cover - network/credentials dependent
-        return f"[llm-error:{model}] {exc}"
+        return f"[llm-error:{kind}:{model}] {exc}"
 
 
 # --------------------------------------------------------------------------- #
@@ -83,16 +140,14 @@ def mal(el: dict) -> dict:
 
 
 def main() -> int:
-    path = sys.argv[1] if len(sys.argv) > 1 else "/mas/architecture.yml"
-    with open(path) as fh:
-        arch = yaml.safe_load(fh)
+    arch = load_architecture() or {}
+    providers = load_providers()
 
     nodes = index_nodes(arch)
     edges = arch.get("edges", [])
     task = arch.get("task", "Solve the assigned task.")
 
     agents = {i: n for i, n in nodes.items() if n["type"] == "agent"}
-    # outgoing channels per agent; attachments (memory/tool) per agent
     channels: dict[str, list[dict]] = defaultdict(list)
     attachments: dict[str, list[tuple[dict, dict]]] = defaultdict(list)
     for e in edges:
@@ -101,21 +156,21 @@ def main() -> int:
         if kind == "channel" and src in agents and tgt in agents:
             channels[src].append(e)
         elif kind == "attach":
-            # attach orients agent <-> (memory|tool); normalise to agent-owned
             agent_id = src if src in agents else tgt
             other = tgt if src in agents else src
             if other in nodes:
                 attachments[agent_id].append((nodes[other], e))
 
+    live = sum(1 for a in agents.values()
+               if providers.get(a.get("provider"), {}).get("api_key"))
     log(f"{BOLD}SafeMAS runner{RESET}  ::  architecture '{arch.get('name')}'")
     log(f"{GREY}agents={len(agents)} channels={sum(len(v) for v in channels.values())} "
-        f"task={task!r}{RESET}")
+        f"live-llm={live}/{len(agents)} task={task!r}{RESET}")
     log("=" * 64)
 
     attacks: list[dict] = []
 
     def resource_value(res: dict, kind: str) -> str:
-        """Read a memory store or invoke a tool, honouring poisoning."""
         m = mal(res)
         if m:
             attacks.append({"element": res["id"], "type": m.get("attack")})
@@ -134,17 +189,16 @@ def main() -> int:
             return incoming
         agent = agents[agent_id]
         label = agent.get("label", agent_id)
-        model = agent.get("model", "gpt-4o-mini")
-        step(f"agent '{label}' ({model}) receives message")
+        provider = providers.get(agent.get("provider"))
+        model = agent.get("model") or (provider or {}).get("models", [None])[0] or "gpt-4o-mini"
+        backend = (provider or {}).get("kind", "mock")
+        step(f"agent '{label}' ({backend}:{model}) receives message")
 
-        # gather attached resources (memory reads / tool outputs)
         context_parts = [incoming]
         for res, _edge in attachments.get(agent_id, []):
             context_parts.append(resource_value(res, res["type"]))
-
         user_input = "\n".join(context_parts)
 
-        # direct prompt injection at this agent
         m = mal(agent)
         if m and m.get("attack") == "prompt-injection":
             attacks.append({"element": agent_id, "type": "prompt-injection"})
@@ -152,10 +206,12 @@ def main() -> int:
             user_input += f"\n\n[INJECTED]: {m.get('payload', '')}"
 
         system = agent.get("prompt") or f"You are {agent.get('role', label)}."
-        output = call_llm(model, system, user_input)
+        output = call_llm(
+            provider, model, system, user_input,
+            agent.get("temperature"), agent.get("max_tokens"),
+        )
         log(f"{GREY}    -> {output}{RESET}")
 
-        # propagate along outgoing channels (applying AiTM rewrites)
         final = output
         for e in channels.get(agent_id, []):
             msg = output
@@ -173,7 +229,6 @@ def main() -> int:
 
     entries = [i for i, n in agents.items() if n.get("entry")]
     if not entries:
-        # fall back to agents with no incoming channel
         targets = {e["target"] for e in edges if e.get("kind", "channel") == "channel"}
         entries = [i for i in agents if i not in targets] or list(agents)[:1]
 
@@ -183,7 +238,7 @@ def main() -> int:
         final_answer = run_agent(entry, task)
 
     log("=" * 64)
-    log(f"{BOLD}final answer:{RESET} {final_answer}")
+    log(f"{BOLD}final answer:{RESET} {GREEN}{final_answer}{RESET}")
     if attacks:
         log(f"{RED}{BOLD}{len(attacks)} attack(s) fired during execution.{RESET}")
     else:

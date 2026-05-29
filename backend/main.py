@@ -1,7 +1,8 @@
 """SafeMAS backend.
 
-REST API for the visual editor: persist architectures as YAML, export them, and
-run them inside a Docker container via the runner image.
+REST API for the visual editor: persist architectures as YAML, manage LLM
+providers, export, and run architectures (in a Docker sandbox when available,
+otherwise as a local subprocess).
 
 Endpoints
     GET    /api/health
@@ -9,17 +10,22 @@ Endpoints
     GET    /api/configs/{name}          load one (as JSON graph)
     PUT    /api/configs/{name}          save / overwrite
     DELETE /api/configs/{name}          delete
+    GET    /api/providers               list providers (keys masked)
+    POST   /api/providers               create provider
+    PUT    /api/providers/{id}          update (blank key keeps existing)
+    DELETE /api/providers/{id}          delete
     POST   /api/export                  body: Architecture -> raw YAML text
-    POST   /api/run                      body: Architecture -> {run_id}
+    POST   /api/run                     body: Architecture -> {run_id}
     GET    /api/run/{run_id}            run status + log tail
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
-import tempfile
+import sys
 import threading
 import uuid
 from pathlib import Path
@@ -29,7 +35,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
-from schema import Architecture
+import providers as provider_store
+from schema import Architecture, ProviderInput, ProviderPublic
 
 BASE = Path(__file__).resolve().parent
 CONFIG_DIR = BASE / "configs"
@@ -37,10 +44,13 @@ RUNS_DIR = BASE / "runs"
 RUNNER_DIR = BASE / "runner"
 IMAGE_TAG = "safemas-runner:latest"
 
+# SAFEMAS_SANDBOX: "auto" (docker if present, else local), "docker", or "local".
+SANDBOX_MODE = os.environ.get("SAFEMAS_SANDBOX", "auto").lower()
+
 CONFIG_DIR.mkdir(exist_ok=True)
 RUNS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="SafeMAS", version="1.0.0")
+app = FastAPI(title="SafeMAS", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,12 +69,21 @@ def safe_name(name: str) -> str:
     return cleaned[:80]
 
 
+def docker_available() -> bool:
+    return shutil.which("docker") is not None and SANDBOX_MODE != "local"
+
+
 # --------------------------------------------------------------------------- #
-# Config CRUD
+# Health + Config CRUD
 # --------------------------------------------------------------------------- #
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "docker": shutil.which("docker") is not None}
+    has_docker = shutil.which("docker") is not None
+    if has_docker and SANDBOX_MODE != "local":
+        mode = "docker"
+    else:
+        mode = "local"
+    return {"ok": True, "docker": has_docker, "sandbox": mode}
 
 
 @app.get("/api/configs")
@@ -105,76 +124,119 @@ def export_yaml(arch: Architecture) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Run inside Docker
+# Provider registry (keys never leave the server)
+# --------------------------------------------------------------------------- #
+@app.get("/api/providers")
+def list_providers() -> list[ProviderPublic]:
+    return [ProviderPublic.of(p) for p in provider_store.all_providers()]
+
+
+@app.post("/api/providers")
+def create_provider(data: ProviderInput) -> ProviderPublic:
+    return ProviderPublic.of(provider_store.create(data))
+
+
+@app.put("/api/providers/{provider_id}")
+def update_provider(provider_id: str, data: ProviderInput) -> ProviderPublic:
+    updated = provider_store.update(provider_id, data)
+    if not updated:
+        raise HTTPException(404, "provider not found")
+    return ProviderPublic.of(updated)
+
+
+@app.delete("/api/providers/{provider_id}")
+def delete_provider(provider_id: str) -> dict:
+    return {"deleted": provider_store.delete(provider_id)}
+
+
+# --------------------------------------------------------------------------- #
+# Run (Docker sandbox, or local subprocess fallback)
 # --------------------------------------------------------------------------- #
 def ensure_image() -> bool:
     """Build the runner image on first use. Returns True if image is available."""
-    if shutil.which("docker") is None:
-        return False
     have = subprocess.run(
-        ["docker", "image", "inspect", IMAGE_TAG],
-        capture_output=True,
+        ["docker", "image", "inspect", IMAGE_TAG], capture_output=True
     )
     if have.returncode == 0:
         return True
     build = subprocess.run(
         ["docker", "build", "-t", IMAGE_TAG, str(RUNNER_DIR)],
-        capture_output=True,
-        text=True,
+        capture_output=True, text=True,
     )
     return build.returncode == 0
+
+
+def _arch_uses_live_llm(arch: Architecture, prov_map: dict) -> bool:
+    for n in arch.nodes:
+        if n.type == "agent" and n.provider:
+            if prov_map.get(n.provider, {}).get("api_key"):
+                return True
+    return False
+
+
+def _run_docker(arch_yaml: str, prov_json: str, needs_net: bool, logf) -> int:
+    cmd = [
+        "docker", "run", "--rm", "-i",
+        "--network", "bridge" if needs_net else "none",
+        "--memory", "512m", "--cpus", "1",
+        "-e", "SAFEMAS_ARCH",
+        "-e", "SAFEMAS_PROVIDERS",
+        IMAGE_TAG,
+    ]
+    env = {**os.environ, "SAFEMAS_ARCH": arch_yaml, "SAFEMAS_PROVIDERS": prov_json}
+    proc = subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, env=env)
+    return proc.returncode
+
+
+def _run_local(arch_yaml: str, prov_json: str, logf) -> int:
+    logf.write("[local] Docker sandbox unavailable — running runner as a local "
+               "subprocess (NOT network-isolated).\n")
+    logf.flush()
+    env = {**os.environ, "SAFEMAS_ARCH": arch_yaml, "SAFEMAS_PROVIDERS": prov_json}
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER_DIR / "run_mas.py")],
+        stdout=logf, stderr=subprocess.STDOUT, env=env,
+    )
+    return proc.returncode
 
 
 def _execute(run_id: str, arch: Architecture) -> None:
     run = RUNS[run_id]
     log_path = Path(run["log_path"])
-    workdir = Path(tempfile.mkdtemp(prefix="safemas-"))
-    arch_file = workdir / "architecture.yml"
-    arch_file.write_text(yaml.safe_dump(arch.to_yaml_dict(), sort_keys=False))
-
-    if not ensure_image():
-        log_path.write_text(
-            "[error] Docker is unavailable or the runner image failed to build.\n"
-            "Install Docker and ensure the daemon is running.\n"
-        )
-        run["status"] = "error"
-        return
+    prov_map = provider_store.resolved_map()
+    arch_yaml = yaml.safe_dump(arch.to_yaml_dict(), sort_keys=False)
+    prov_json = json.dumps(prov_map)
+    needs_net = _arch_uses_live_llm(arch, prov_map)
 
     run["status"] = "running"
-    cmd = [
-        "docker", "run", "--rm",
-        "--network", "none",           # sandbox: no network egress
-        "--memory", "512m", "--cpus", "1",
-        "-v", f"{arch_file}:/mas/architecture.yml:ro",
-    ]
-    if os.environ.get("OPENAI_API_KEY"):
-        cmd += ["-e", "OPENAI_API_KEY"]
-    cmd.append(IMAGE_TAG)
-
+    rc = 1
     with open(log_path, "w") as logf:
-        proc = subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, text=True)
+        try:
+            if docker_available() and ensure_image():
+                rc = _run_docker(arch_yaml, prov_json, needs_net, logf)
+            else:
+                rc = _run_local(arch_yaml, prov_json, logf)
+        except Exception as exc:  # pragma: no cover
+            logf.write(f"[error] execution failed: {exc}\n")
+            rc = 1
 
     # extract the machine-readable result line
-    text = log_path.read_text()
     result = None
-    for line in text.splitlines():
+    for line in log_path.read_text().splitlines():
         if line.startswith("__RESULT__ "):
-            import json
-
             try:
                 result = json.loads(line[len("__RESULT__ "):])
             except json.JSONDecodeError:
                 pass
     run["result"] = result
-    run["status"] = "done" if proc.returncode == 0 else "error"
-    shutil.rmtree(workdir, ignore_errors=True)
+    run["status"] = "done" if rc == 0 else "error"
 
 
 @app.post("/api/run")
 def run(arch: Architecture) -> dict:
     run_id = uuid.uuid4().hex[:12]
     log_path = RUNS_DIR / f"{run_id}.log"
-    log_path.write_text("[queued] preparing container...\n")
+    log_path.write_text("[queued] preparing execution...\n")
     RUNS[run_id] = {"status": "queued", "log_path": str(log_path), "result": None}
     threading.Thread(target=_execute, args=(run_id, arch), daemon=True).start()
     return {"run_id": run_id}

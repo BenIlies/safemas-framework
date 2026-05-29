@@ -22,14 +22,13 @@ export default function MasNode({ data, selected }) {
         <span className="mas-title">{data.label || def.label}</span>
       </div>
       <div className="mas-node-sub">
-        {data.type === 'agent' && <span>{data.model || 'gpt-4o-mini'}</span>}
+        {data.type === 'agent' && <span>{data.model || data._providerName || 'mock'}</span>}
         {data.type === 'memory' && <span>{data.backend || 'in-memory'}</span>}
         {data.type === 'tool' && <span>tool</span>}
       </div>
+      {data.type === 'agent' && data.role && <div className="mas-node-role">{data.role}</div>}
 
-      {evil && (
-        <div className="mas-evil-label">⚠ {def.attackLabel}</div>
-      )}
+      {evil && <div className="mas-evil-label">⚠ {def.attackLabel}</div>}
 
       <Handle type="source" position={Position.Right} className="mas-handle" />
     </div>

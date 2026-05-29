@@ -8,7 +8,10 @@ export const NODE_TYPES = {
     color: '#3b82f6',
     attack: 'prompt-injection',
     attackLabel: 'Prompt Injection',
-    defaults: { model: 'gpt-4o-mini', role: 'worker', prompt: '', entry: false },
+    defaults: {
+      provider: null, model: '', role: 'worker', prompt: '',
+      temperature: null, max_tokens: null, entry: false,
+    },
   },
   memory: {
     label: 'Memory',
@@ -34,14 +37,15 @@ export const EDGE_ATTACK = {
   attackLabel: 'AiTM Rewrite',
 }
 
-export const MODELS = [
-  'gpt-4o-mini',
-  'gpt-4o',
-  'claude-opus-4-8',
-  'claude-sonnet-4-6',
-  'claude-haiku-4-5',
-  'llama-3.3-70b',
-]
+// Provider kinds and the default model lists shown when none are configured.
+export const PROVIDER_KINDS = {
+  openai: { label: 'OpenAI', needsBaseUrl: false, models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'] },
+  anthropic: { label: 'Anthropic', needsBaseUrl: false, models: ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  'openai-compatible': { label: 'OpenAI-compatible', needsBaseUrl: true, models: ['llama-3.3-70b', 'mistral-large'] },
+  mock: { label: 'Mock (no key)', needsBaseUrl: false, models: ['mock'] },
+}
+
+export const MEMORY_BACKENDS = ['in-memory', 'vector', 'redis', 'sqlite', 'kv']
 
 export function blankMalicious() {
   return { enabled: false, attack: null, payload: '' }

@@ -1,0 +1,39 @@
+# One-command stack: `docker compose up --build`
+#   Frontend (nginx)  -> http://localhost:5173
+#   Backend  (FastAPI) is reached through the frontend's /api proxy.
+#
+# The backend mounts the host Docker socket so it can build the runner image and
+# spawn a fresh, sandboxed container per execution (docker-out-of-docker).
+services:
+  backend:
+    build: ./backend
+    environment:
+      # "auto" = use Docker if the socket is reachable, else run locally.
+      SAFEMAS_SANDBOX: auto
+      # Keep provider keys on the named volume (survives rebuilds).
+      SAFEMAS_SECRETS: /app/secrets/secrets.json
+    volumes:
+      # Let the backend talk to the host Docker daemon to spawn runner containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount the runner build context from the host so `docker build` (executed
+      # by the host daemon) sees the same files the backend container does.
+      - ./backend/runner:/app/runner
+      # Persist saved architectures and provider keys across restarts.
+      - ./backend/configs:/app/configs
+      - safemas-secrets:/app/secrets
+    # Keep secrets.json on the named volume.
+    working_dir: /app
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  safemas-secrets:

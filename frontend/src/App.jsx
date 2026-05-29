@@ -10,6 +10,7 @@ import MasNode from './components/MasNode.jsx'
 import Palette from './components/Palette.jsx'
 import Inspector from './components/Inspector.jsx'
 import RunConsole from './components/RunConsole.jsx'
+import ProvidersModal from './components/ProvidersModal.jsx'
 import { NODE_TYPES, blankMalicious } from './lib/elements.js'
 import { archToGraph, graphToArch, decorateEdge } from './lib/graph.js'
 import * as api from './lib/api.js'
@@ -29,21 +30,34 @@ function Editor() {
   const [selId, setSelId] = useState(null)
   const [selKind, setSelKind] = useState(null) // 'node' | 'edge'
   const [run, setRun] = useState(null)
+  const [running, setRunning] = useState(false)
   const [yamlOpen, setYamlOpen] = useState(false)
   const [saved, setSaved] = useState([])
-  const [docker, setDocker] = useState(true)
+  const [providers, setProviders] = useState([])
+  const [providersOpen, setProvidersOpen] = useState(false)
+  const [health, setHealth] = useState({ docker: true, sandbox: 'docker' })
+  const [toasts, setToasts] = useState([])
   const pollRef = useRef(null)
+  const toastSeq = useRef(0)
+
+  const toast = useCallback((msg, type = 'ok') => {
+    const id = ++toastSeq.current
+    setToasts((t) => [...t, { id, msg, type }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200)
+  }, [])
 
   // load example on first mount
   useEffect(() => {
     const g = archToGraph(EXAMPLE)
     setNodes(g.nodes); setEdges(g.edges); setName(g.name); setTask(g.task)
     idSeq = 100
-    api.health().then((h) => setDocker(!!h.docker))
+    api.health().then(setHealth).catch(() => {})
     refreshSaved()
+    refreshProviders()
   }, [])
 
   const refreshSaved = () => api.listConfigs().then(setSaved).catch(() => {})
+  const refreshProviders = () => api.listProviders().then(setProviders).catch(() => {})
 
   const arch = useMemo(() => graphToArch({ name, task, nodes, edges }), [name, task, nodes, edges])
 
@@ -78,6 +92,19 @@ function Editor() {
     setSelId(null); setSelKind(null)
   }, [selId, selKind, setNodes, setEdges])
 
+  // ---- keyboard shortcuts ----
+  useEffect(() => {
+    const onKey = (e) => {
+      const el = document.activeElement
+      const typing = el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)
+      if (typing) return
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selId) { e.preventDefault(); deleteSelected() }
+      else if (e.key === 'Escape') { setSelId(null); setSelKind(null) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selId, deleteSelected])
+
   // ---- wiring edges ----
   const onConnect = useCallback((params) => {
     const src = nodes.find((n) => n.id === params.source)
@@ -96,23 +123,35 @@ function Editor() {
     if (!type || !NODE_TYPES[type]) return
     const pos = rf.current.screenToFlowPosition({ x: event.clientX, y: event.clientY })
     const def = NODE_TYPES[type]
+    const id = nextId(type)
     setNodes((ns) => ns.concat({
-      id: nextId(type),
+      id,
       type: 'masNode',
       position: pos,
       data: { type, label: def.label, ...def.defaults, malicious: blankMalicious() },
     }))
+    setSelId(id); setSelKind('node')
   }, [setNodes])
 
   const onDragOver = useCallback((e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }, [])
 
   // ---- toolbar actions ----
-  const doSave = async () => { await api.saveConfig(name, arch); refreshSaved() }
+  const doSave = async () => {
+    try { await api.saveConfig(name, arch); refreshSaved(); toast(`Saved “${name}”`) }
+    catch (e) { toast(e.message || 'Save failed', 'error') }
+  }
   const doLoad = async (n) => {
-    const a = await api.loadConfig(n)
-    const g = archToGraph(a)
-    setNodes(g.nodes); setEdges(g.edges); setName(a.name); setTask(a.task || '')
-    setSelId(null); setSelKind(null)
+    try {
+      const a = await api.loadConfig(n)
+      const g = archToGraph(a)
+      setNodes(g.nodes); setEdges(g.edges); setName(a.name); setTask(a.task || '')
+      setSelId(null); setSelKind(null)
+      toast(`Loaded “${a.name}”`)
+    } catch (e) { toast('Load failed', 'error') }
+  }
+  const doDeleteSaved = async () => {
+    if (!confirm(`Delete saved architecture “${name}”?`)) return
+    await api.deleteConfig(name); refreshSaved(); toast(`Deleted “${name}”`)
   }
   const doExport = async () => {
     const text = await api.exportYaml(arch)
@@ -121,18 +160,29 @@ function Editor() {
     const a = document.createElement('a')
     a.href = url; a.download = `${name}.yml`; a.click()
     URL.revokeObjectURL(url)
+    toast('Exported YAML')
   }
-  const doNew = () => { setNodes([]); setEdges([]); setName('untitled-mas'); setTask('Solve the assigned task.'); setSelId(null) }
+  const doNew = () => {
+    setNodes([]); setEdges([]); setName('untitled-mas'); setTask('Solve the assigned task.')
+    setSelId(null); setSelKind(null)
+  }
 
   const doRun = async () => {
-    const { run_id } = await api.startRun(arch)
-    setRun({ run_id, status: 'queued', log: 'starting…' })
-    clearInterval(pollRef.current)
-    pollRef.current = setInterval(async () => {
-      const s = await api.runStatus(run_id)
-      setRun(s)
-      if (s.status === 'done' || s.status === 'error') clearInterval(pollRef.current)
-    }, 800)
+    if (running) return
+    setRunning(true)
+    try {
+      const { run_id } = await api.startRun(arch)
+      setRun({ run_id, status: 'queued', log: 'starting…' })
+      clearInterval(pollRef.current)
+      pollRef.current = setInterval(async () => {
+        const s = await api.runStatus(run_id)
+        setRun(s)
+        if (s.status === 'done' || s.status === 'error') {
+          clearInterval(pollRef.current)
+          setRunning(false)
+        }
+      }, 700)
+    } catch (e) { toast('Run failed to start', 'error'); setRunning(false) }
   }
   useEffect(() => () => clearInterval(pollRef.current), [])
 
@@ -142,24 +192,40 @@ function Editor() {
 
   const evilCount = nodes.filter((n) => n.data.malicious?.enabled).length +
     edges.filter((e) => e.data?.malicious?.enabled).length
+  const nameIsSaved = saved.some((s) => s.name === name)
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">🛰️ <b>SafeMAS</b> <span className="brand-sub">multi-agent system editor</span></div>
-        <input className="name-input" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="task-input" value={task} onChange={(e) => setTask(e.target.value)} placeholder="task / objective" />
+        <div className="field-inline">
+          <input className="name-input" value={name} onChange={(e) => setName(e.target.value)} title="Architecture name" />
+          <input className="task-input" value={task} onChange={(e) => setTask(e.target.value)} placeholder="task / objective" title="Task given to entry agents" />
+        </div>
         <div className="spacer" />
         {evilCount > 0 && <span className="evil-count">☠ {evilCount} malicious</span>}
-        <button className="btn" onClick={doNew}>New</button>
-        <select className="btn" value="" onChange={(e) => e.target.value && doLoad(e.target.value)}>
-          <option value="">Load…</option>
-          {saved.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
-        </select>
-        <button className="btn" onClick={doSave}>Save</button>
-        <button className="btn" onClick={() => setYamlOpen((v) => !v)}>YAML</button>
-        <button className="btn" onClick={doExport}>Export</button>
-        <button className="btn run" onClick={doRun} title={docker ? '' : 'Docker not detected'}>▶ Run</button>
+        <span className={`sandbox-pill sandbox-${health.sandbox}`} title="Execution sandbox">
+          {health.sandbox === 'docker' ? '🐳 docker' : '🖥 local'}
+        </span>
+
+        <div className="btn-group">
+          <button className="btn" onClick={doNew}>New</button>
+          <select className="btn" value="" onChange={(e) => e.target.value && doLoad(e.target.value)} title="Load saved architecture">
+            <option value="">Load…</option>
+            {saved.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+          </select>
+          <button className="btn" onClick={doSave}>Save</button>
+          {nameIsSaved && <button className="btn ghost-danger" onClick={doDeleteSaved} title="Delete this saved architecture">🗑</button>}
+        </div>
+
+        <div className="btn-group">
+          <button className="btn" onClick={() => setProvidersOpen(true)} title="Manage LLM providers & API keys">🔑 Providers</button>
+          <button className="btn" onClick={() => setYamlOpen((v) => !v)}>YAML</button>
+          <button className="btn" onClick={doExport}>Export</button>
+        </div>
+        <button className="btn run" onClick={doRun} disabled={running}>
+          {running ? '… running' : '▶ Run'}
+        </button>
       </header>
 
       <div className="body">
@@ -183,6 +249,9 @@ function Editor() {
             <Controls />
             <MiniMap nodeColor={(n) => (n.data.malicious?.enabled ? '#ef4444' : NODE_TYPES[n.data.type]?.color)} pannable />
           </ReactFlow>
+          {nodes.length === 0 && (
+            <div className="canvas-empty">Drag an element from the left to start building →</div>
+          )}
           {yamlOpen && (
             <div className="yaml-overlay">
               <div className="yaml-head">architecture.yml <button className="btn ghost" onClick={() => setYamlOpen(false)}>✕</button></div>
@@ -190,11 +259,29 @@ function Editor() {
             </div>
           )}
         </div>
-        <Inspector selected={selected} onChange={updateSelected} onDelete={deleteSelected} />
+        <Inspector
+          selected={selected}
+          providers={providers}
+          onChange={updateSelected}
+          onDelete={deleteSelected}
+          onManageProviders={() => setProvidersOpen(true)}
+        />
       </div>
 
       <RunConsole run={run} onClose={() => setRun(null)} />
-      {!docker && <div className="docker-warn">⚠ Docker not detected — runs will report an error. Editing/export still work.</div>}
+
+      {providersOpen && (
+        <ProvidersModal
+          providers={providers}
+          onSaved={refreshProviders}
+          onClose={() => setProvidersOpen(false)}
+          toast={toast}
+        />
+      )}
+
+      <div className="toasts">
+        {toasts.map((t) => <div key={t.id} className={`toast toast-${t.type}`}>{t.msg}</div>)}
+      </div>
     </div>
   )
 }
