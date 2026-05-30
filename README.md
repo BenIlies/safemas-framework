@@ -6,18 +6,15 @@ element as **malicious** to probe the safety of the architecture. The diagram
 *is* the code: every design round-trips to a single `architecture.yml`, and can
 be **run inside a Docker sandbox**.
 
-It is the interactive companion to the SafeMAS report (*"Report on the Safety of
-Automatically-Generated Multi-Agent System Architectures through ADAS"*), whose
-threat model maps directly onto the editable elements:
+Each element type can be turned adversarial, covering the main multi-agent
+attack surfaces:
 
-| Element  | Malicious mode      | Threat-model analogue                         |
+| Element  | Malicious mode      | What it models                                |
 |----------|---------------------|-----------------------------------------------|
-| Agent    | Prompt Injection    | direct prompt at one agent's input            |
+| Agent    | Prompt Injection    | direct prompt injected at one agent's input   |
 | Channel  | AiTM Rewrite        | Agent-in-the-Middle inter-agent message rewrite |
 | Memory   | Memory Poisoning    | poisoned long-term / knowledge base           |
 | Tool     | Tool Poisoning      | MCP / tool supply-chain compromise            |
-
-![architecture-as-code](examples/example_mas.yml)
 
 ---
 
@@ -65,6 +62,9 @@ npm run dev
 Open <http://localhost:5173>. A demo architecture loads on first launch.
 
 ## Running an architecture
+
+The backend and frontend run as ordinary local processes. **Docker is used only
+as the sandbox for executing a MAS** — each run spins up a throwaway container.
 
 Click **▶ Run**. The backend writes the current design to `architecture.yml`,
 builds the runner image on first use, and executes it with:
@@ -126,7 +126,6 @@ safemas-framework/
 │       ├── components/   MasNode, Palette, Inspector, RunConsole
 │       └── lib/          elements, graph<->YAML, API client
 ├── examples/             sample architecture.yml
-├── docker-compose.yml    run the backend in a container
 └── dev.sh                start backend + frontend locally
 ```
 

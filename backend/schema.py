@@ -3,7 +3,7 @@
 A multi-agent system is a graph of *nodes* (agents, memory stores, tools) wired
 together by *edges* (channels between agents, or attachments of memory/tools to
 an agent). Any element may be flagged ``malicious`` to test the safety of the
-architecture, mirroring the threat model in the SafeMAS report:
+architecture, following the threat model:
 
     agent   -> prompt-injection   (direct prompt at one agent)
     channel -> aitm               (agent-in-the-middle message rewrite)
