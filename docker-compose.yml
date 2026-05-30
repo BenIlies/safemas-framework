@@ -1,0 +1,17 @@
+# Runs the SafeMAS backend. The backend itself shells out to `docker run` to
+# execute architectures, so the host Docker socket is mounted in.
+#
+#   docker compose up backend      # API on http://localhost:8000
+#   (run the frontend with `npm run dev` in ./frontend for hot reload)
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/configs:/app/configs
+      - /var/run/docker.sock:/var/run/docker.sock   # lets backend spawn runner containers
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
