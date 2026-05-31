@@ -60,6 +60,11 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
     onSaved()
   }
 
+  const makeDefault = async (p) => {
+    try { await api.setDefaultProvider(p.id); toast(`“${p.name}” is now the default`); onSaved() }
+    catch (e) { toast(e.message || 'Failed to set default', 'error') }
+  }
+
   const kind = PROVIDER_KINDS[form.kind] || {}
   const editingExisting = editing && editing !== 'new'
   const existing = editingExisting && providers.find((p) => p.id === editing)
@@ -88,9 +93,11 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
                   {p.has_key
                     ? <span className="tag key-ok">key saved</span>
                     : <span className="tag key-missing">no key</span>}
+                  {p.default && <span className="tag key-ok">★ default</span>}
                 </div>
                 <div className="provider-row-models">{(p.models || []).join(', ') || '—'}</div>
                 <div className="provider-row-actions">
+                  {!p.default && <button className="btn small" title="New agents inherit the default provider" onClick={() => makeDefault(p)}>Set default</button>}
                   <button className="btn small" onClick={() => startEdit(p)}>Edit</button>
                   <button className="btn small danger" onClick={() => remove(p)}>Delete</button>
                 </div>

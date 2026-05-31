@@ -124,6 +124,8 @@ function Editor() {
   const hist = useRef({ past: [], future: [], tag: null, t: 0, applying: false })
   const stateRef = useRef({ nodes, edges, name, task })
   const dragStart = useRef(null)  // pre-drag snapshot + position, for move-undo
+  const defaultProviderRef = useRef(null)  // provider id new/loaded agents inherit
+  const prevProvCount = useRef(0)
 
   const toast = useCallback((msg, type = 'ok') => {
     const id = ++toastSeq.current
@@ -133,7 +135,13 @@ function Editor() {
 
   const loadArch = useCallback((a) => {
     const g = archToGraph(a)
-    setNodes(g.nodes); setEdges(g.edges); setName(a.name); setTask(a.task || '')
+    // Agents with no provider inherit the default (templates ship provider-less).
+    const def = defaultProviderRef.current
+    const nodes = def
+      ? g.nodes.map((n) => (n.data.type === 'agent' && !n.data.provider
+          ? { ...n, data: { ...n.data, provider: def } } : n))
+      : g.nodes
+    setNodes(nodes); setEdges(g.edges); setName(a.name); setTask(a.task || '')
     setSelId(null); setSelKind(null); setLinkFrom(null)
     hist.current = { past: [], future: [], tag: null, t: 0, applying: false }
     setHistory({ undo: 0, redo: 0 })
@@ -141,7 +149,25 @@ function Editor() {
   }, [setNodes, setEdges])
 
   const refreshSaved = useCallback(() => api.listConfigs().then(setSaved).catch(() => {}), [])
-  const refreshProviders = useCallback(() => api.listProviders().then(setProviders).catch(() => {}), [])
+  const refreshProviders = useCallback(() => api.listProviders().then((list) => {
+    setProviders(list)
+    if (!list.length) setProvidersOpen(true)   // force ≥1 provider: prompt when none exist
+  }).catch(() => {}), [])
+
+  // Keep the default-provider ref current, and when the first provider is
+  // configured, give it to every agent that doesn't have one (the editor's
+  // "first provider becomes the default for all agents" behaviour).
+  useEffect(() => {
+    const def = providers.find((p) => p.default)?.id || null
+    defaultProviderRef.current = def
+    if (prevProvCount.current === 0 && providers.length > 0 && def) {
+      setNodes((ns) => ns.map((n) => (
+        n.data.type === 'agent' && !n.data.provider
+          ? { ...n, data: { ...n.data, provider: def } } : n
+      )))
+    }
+    prevProvCount.current = providers.length
+  }, [providers, setNodes])
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => {})
@@ -348,9 +374,13 @@ function Editor() {
     const def = NODE_TYPES[type]
     const id = nextId(type)
     commit('add')
+    // A new agent inherits the default provider, so it produces real answers out
+    // of the box (rather than silently falling back to the mock).
+    const extra = type === 'agent' && defaultProviderRef.current
+      ? { provider: defaultProviderRef.current } : {}
     setNodes((ns) => ns.concat({
       id, type: 'masNode', position: pos,
-      data: { type, label: def.label, ...def.defaults, malicious: blankMalicious() },
+      data: { type, label: def.label, ...def.defaults, ...extra, malicious: blankMalicious() },
     }))
     setSelId(id); setSelKind('node')
   }, [setNodes, commit])
@@ -397,6 +427,11 @@ function Editor() {
 
   const doRun = async () => {
     if (running) return
+    if (!providers.length) {
+      toast('Add a provider first (🔑) — use the “Mock (no key)” kind to run keyless', 'error')
+      setProvidersOpen(true)
+      return
+    }
     setRunning(true)
     try {
       const { run_id } = await api.startRun(arch)

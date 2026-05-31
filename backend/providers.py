@@ -27,15 +27,21 @@ STORE.parent.mkdir(parents=True, exist_ok=True)
 _LOCK = threading.Lock()
 
 
-def _load() -> dict[str, Provider]:
+def _read() -> dict:
     if not STORE.exists():
-        return {}
+        return {"providers": [], "default": None}
     try:
-        raw = json.loads(STORE.read_text())
+        d = json.loads(STORE.read_text())
     except (json.JSONDecodeError, OSError):
-        return {}
+        return {"providers": [], "default": None}
+    d.setdefault("providers", [])
+    d.setdefault("default", None)
+    return d
+
+
+def _load() -> dict[str, Provider]:
     out: dict[str, Provider] = {}
-    for item in raw.get("providers", []):
+    for item in _read()["providers"]:
         try:
             p = Provider(**item)
             out[p.id] = p
@@ -44,8 +50,10 @@ def _load() -> dict[str, Provider]:
     return out
 
 
-def _save(providers: dict[str, Provider]) -> None:
-    payload = {"providers": [p.model_dump() for p in providers.values()]}
+def _write(providers: dict[str, Provider], default: str | None) -> None:
+    if default not in providers:                  # keep the default valid
+        default = next(iter(providers), None)
+    payload = {"providers": [p.model_dump() for p in providers.values()], "default": default}
     tmp = STORE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=2))
     tmp.replace(STORE)
@@ -53,6 +61,23 @@ def _save(providers: dict[str, Provider]) -> None:
         STORE.chmod(0o600)  # keys are sensitive
     except OSError:
         pass
+
+
+def get_default() -> str | None:
+    """The default provider id (the one new agents inherit). Falls back to the
+    first provider if the stored default is missing."""
+    d = _read()
+    ids = [p["id"] for p in d["providers"] if isinstance(p, dict) and "id" in p]
+    return d["default"] if d["default"] in ids else (ids[0] if ids else None)
+
+
+def set_default(provider_id: str) -> bool:
+    with _LOCK:
+        providers = _load()
+        if provider_id not in providers:
+            return False
+        _write(providers, provider_id)
+        return True
 
 
 def all_providers() -> list[Provider]:
@@ -79,7 +104,8 @@ def create(data: ProviderInput) -> Provider:
             models=data.models,
         )
         providers[pid] = p
-        _save(providers)
+        default = get_default()
+        _write(providers, default or pid)   # the first provider becomes the default
         return p
 
 
@@ -101,7 +127,7 @@ def update(provider_id: str, data: ProviderInput) -> Provider | None:
             models=data.models,
         )
         providers[provider_id] = updated
-        _save(providers)
+        _write(providers, get_default())
         return updated
 
 
@@ -109,8 +135,11 @@ def delete(provider_id: str) -> bool:
     with _LOCK:
         providers = _load()
         if provider_id in providers:
+            default = get_default()
             del providers[provider_id]
-            _save(providers)
+            if default == provider_id:                 # default deleted → reassign
+                default = next(iter(providers), None)
+            _write(providers, default)
             return True
         return False
 

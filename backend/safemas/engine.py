@@ -35,6 +35,12 @@ def step(msg: str) -> None:
     print(f"{CYAN}[exec]{RESET} {msg}", flush=True)
 
 
+def clip(s: str, n: int = 240) -> str:
+    """One-line, length-capped view of a message for the trace."""
+    s = " ".join((s or "").split())
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
 def load_providers() -> dict[str, dict]:
     env = os.environ.get("SAFEMAS_PROVIDERS")
     if not env:
@@ -65,9 +71,14 @@ def call_llm(provider: dict | None, model: str, system: str, user: str,
     base_url = (provider or {}).get("base_url", "") or None
 
     if engine == "mock" or not key:
-        digest = abs(hash(user)) % 1000
+        # No live LLM → a short, honest placeholder. The real message flow is
+        # visible in the trace via the per-agent `in ◂` / `out ▸` lines (the
+        # incoming message is logged in full-ish there, injected payloads included);
+        # the placeholder deliberately does not echo it, to avoid nesting it across
+        # every hop. Register a keyed provider for real responses.
         tag = model or (provider or {}).get("kind") or "mock"
-        return f"[mock:{tag}] processed input (#{digest}); produced an answer."
+        reason = "no API key" if (engine != "mock" and not key) else "mock provider"
+        return f"[mock:{tag} · {reason}] placeholder reply (no live LLM)"
 
     try:
         if engine == "anthropic":
@@ -121,6 +132,15 @@ def run_mas(mas, task: str | None = None) -> dict:
     log(f"{BOLD}SafeMAS runner{RESET}  ::  architecture '{mas.name}'")
     log(f"{GREY}agents={len(mas.agents)} channels={len(mas.channels)} "
         f"live-llm={live}/{len(mas.agents)} task={task!r}{RESET}")
+    if not live and mas.agents:
+        log(f"{YELLOW}{BOLD}⚠ no live LLM{RESET} {YELLOW}— no agent has a provider with an API "
+            f"key, so every agent uses the deterministic mock. The outputs below are "
+            f"placeholders, not real answers (the messages each agent sends/receives are "
+            f"still shown). Register a provider (🔑) and assign it to the agents for real "
+            f"responses.{RESET}")
+    elif live < len(mas.agents):
+        log(f"{YELLOW}note: {len(mas.agents) - live} of {len(mas.agents)} agents have no "
+            f"keyed provider and will run on the mock.{RESET}")
     log("=" * 64)
 
     attacks: list[dict] = []
@@ -165,7 +185,7 @@ def run_mas(mas, task: str | None = None) -> dict:
         provider = providers.get(agent.provider)
         model = agent.model or (provider or {}).get("models", [None])[0] or "gpt-4o-mini"
         backend = (provider or {}).get("kind", "mock")
-        step(f"agent '{agent.label}' ({backend}:{model}) receives message")
+        step(f"agent '{agent.label}' ({backend}:{model})")
 
         parts = [incoming]
         for res in attached.get(id(agent), []):
@@ -178,11 +198,12 @@ def run_mas(mas, task: str | None = None) -> dict:
             attack(f"agent '{agent.label}' compromised -> injected directive appended")
             user_input += f"\n\n[INJECTED]: {m.payload}"
 
+        log(f"{GREY}    in  ◂ {clip(user_input)}{RESET}")
         system = agent.prompt or f"You are {agent.role or agent.label}."
         output = call_llm(provider, model, system, user_input,
                           agent.temperature, agent.max_tokens)
         outputs[id(agent)] = output
-        log(f"{GREY}    -> {output}{RESET}")
+        log(f"{GREY}    out ▸ {clip(output)}{RESET}")
         return output
 
     def chosen_edges(agent, output: str) -> list:

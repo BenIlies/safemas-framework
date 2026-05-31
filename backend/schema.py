@@ -167,6 +167,7 @@ class ProviderPublic(BaseModel):
     base_url: str = ""
     models: list[str] = Field(default_factory=list)
     has_key: bool = False
+    default: bool = False   # the provider new agents inherit (set server-side)
 
     @classmethod
     def of(cls, p: Provider) -> "ProviderPublic":

@@ -269,12 +269,21 @@ def delete_campaign(cid: str) -> dict:
 # --------------------------------------------------------------------------- #
 @app.get("/api/providers")
 def list_providers() -> list[ProviderPublic]:
-    return [ProviderPublic.of(p) for p in provider_store.all_providers()]
+    default = provider_store.get_default()
+    out = []
+    for p in provider_store.all_providers():
+        pub = ProviderPublic.of(p)
+        pub.default = (p.id == default)
+        out.append(pub)
+    return out
 
 
 @app.post("/api/providers")
 def create_provider(data: ProviderInput) -> ProviderPublic:
-    return ProviderPublic.of(provider_store.create(data))
+    p = provider_store.create(data)
+    pub = ProviderPublic.of(p)
+    pub.default = (p.id == provider_store.get_default())
+    return pub
 
 
 @app.put("/api/providers/{provider_id}")
@@ -282,7 +291,16 @@ def update_provider(provider_id: str, data: ProviderInput) -> ProviderPublic:
     updated = provider_store.update(provider_id, data)
     if not updated:
         raise HTTPException(404, "provider not found")
-    return ProviderPublic.of(updated)
+    pub = ProviderPublic.of(updated)
+    pub.default = (updated.id == provider_store.get_default())
+    return pub
+
+
+@app.put("/api/providers/{provider_id}/default")
+def set_default_provider(provider_id: str) -> dict:
+    if not provider_store.set_default(provider_id):
+        raise HTTPException(404, "provider not found")
+    return {"default": provider_id}
 
 
 @app.delete("/api/providers/{provider_id}")

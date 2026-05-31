@@ -49,7 +49,7 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
                 <option value="">— mock (no provider) —</option>
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}{p.has_key ? '' : ' (no key)'}
+                    {p.name}{p.default ? ' ★ default' : ''}{p.has_key ? '' : ' (no key)'}
                   </option>
                 ))}
               </select>

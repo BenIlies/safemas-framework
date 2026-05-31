@@ -35,6 +35,9 @@ export async function updateProvider(id, p) {
 export async function deleteProvider(id) {
   return (await fetch(`/api/providers/${id}`, { method: 'DELETE' })).json()
 }
+export async function setDefaultProvider(id) {
+  return jsonOrThrow(await fetch(`/api/providers/${id}/default`, { method: 'PUT' }), 'set default failed')
+}
 
 // ---- templates (built-in MAS, served as DSL code) ----
 export async function listTemplates() {
