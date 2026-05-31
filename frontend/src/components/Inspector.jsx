@@ -1,31 +1,32 @@
 import { EDGE_ATTACK, MEMORY_BACKENDS, NODE_TYPES, PROVIDER_KINDS } from '../lib/elements.js'
 
-// Right panel: edit the selected node or edge, including its malicious flag.
-export default function Inspector({ selected, providers, onChange, onDelete, onManageProviders }) {
-  if (!selected) {
-    return (
-      <div className="inspector">
-        <div className="inspector-empty">
-          <div className="inspector-empty-icon">🖱️</div>
-          Select a node or link on the canvas to edit its properties.
-        </div>
-      </div>
-    )
-  }
+const EDGE_KIND_LABEL = {
+  channel: 'channel — agent → agent',
+  attach: 'attach — memory / tool → agent',
+  io: 'io — entrance / exit link',
+}
 
+// Right panel: edit the selected node or edge, including its malicious flag.
+// Only rendered when something is selected (App gates it), so `selected` is set.
+export default function Inspector({ selected, providers, onChange, onDelete, onManageProviders }) {
   const isEdge = selected.kind === 'edge'
   const data = selected.data
   const isStructural = !isEdge && (data.type === 'entrance' || data.type === 'exit')
   const def = isEdge ? null : NODE_TYPES[data.type]
+  // AiTM rewrites only make sense on agent→agent channels; attach/io edges
+  // carry no rewritable inter-agent message.
+  const edgeAttackable = isEdge && data.kind === 'channel'
   const attackLabel = isEdge ? EDGE_ATTACK.attackLabel : def.attackLabel
-  const attackType = isEdge ? EDGE_ATTACK.attack : def.attack
+  const attackType = isEdge ? (edgeAttackable ? EDGE_ATTACK.attack : null) : def.attack
 
   const set = (patch) => onChange({ ...data, ...patch })
   const setMal = (patch) => set({ malicious: { ...data.malicious, ...patch } })
   const toggleEvil = (enabled) => setMal({ enabled, attack: enabled ? attackType : null })
 
   const provider = !isEdge && providers.find((p) => p.id === data.provider)
-  const modelOptions = provider ? provider.models : PROVIDER_KINDS[data.providerKind]?.models || []
+  // With a provider chosen, suggest its models; otherwise the agent runs on the
+  // built-in mock, so suggest that.
+  const modelOptions = provider ? provider.models : PROVIDER_KINDS.mock.models
 
   return (
     <div className="inspector">
@@ -94,6 +95,16 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
               />
             </Field>
           </div>
+
+          <Field label="Join (multiple inputs)">
+            <select value={data.join || 'any'} onChange={(e) => set({ join: e.target.value })}>
+              <option value="any">any — run on the first input (relay)</option>
+              <option value="all">all — wait for every input, then aggregate (join)</option>
+            </select>
+            <span className="field-hint">
+              Use <b>all</b> on an aggregator (vote / merge) so it actually receives all upstream outputs.
+            </span>
+          </Field>
         </>
       )}
 
@@ -122,12 +133,58 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
       )}
 
       {isEdge && (
-        <Field label="Kind">
-          <select value={data.kind} onChange={(e) => set({ kind: e.target.value })}>
-            <option value="channel">channel (agent → agent)</option>
-            <option value="attach">attach (memory / tool → agent)</option>
-          </select>
-        </Field>
+        <>
+          <Field label="Kind">
+            <div className="kind-readout" title="Determined by what you connected — rewire to change it">
+              {EDGE_KIND_LABEL[data.kind] || data.kind}
+            </div>
+          </Field>
+          <Field label="Label">
+            <input
+              value={data.label || ''}
+              placeholder={data.kind === 'channel' ? 'what flows here — e.g. draft, critique, vote' : 'optional'}
+              onChange={(e) => set({ label: e.target.value })}
+            />
+          </Field>
+          {data.kind === 'channel' && (
+            <>
+              <Field label="Condition / guard (when)">
+                <input
+                  value={data.when || ''}
+                  placeholder='take only if output mentions… e.g. "code"'
+                  onChange={(e) => set({ when: e.target.value })}
+                />
+                <span className="field-hint">
+                  Give a source two or more guarded edges to make it a <b>router</b> — it takes the
+                  first edge whose guard matches the agent’s output (else a default / the first edge).
+                </span>
+              </Field>
+              <label className="checkbox">
+                <input type="checkbox" checked={!!data.loop} onChange={(e) => set({ loop: e.target.checked })} />
+                <span>↺ Feedback / loop edge — re-runs the target</span>
+              </label>
+              {data.loop && (
+                <div className="field-row">
+                  <Field label="Max iterations">
+                    <input
+                      type="number" min="1" step="1"
+                      value={data.max_iters ?? ''}
+                      placeholder="3"
+                      onChange={(e) => set({ max_iters: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                  </Field>
+                  <Field label="Stop when (until)">
+                    <input
+                      value={data.until || ''}
+                      placeholder='e.g. "approved"'
+                      onChange={(e) => set({ until: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {attackType && (

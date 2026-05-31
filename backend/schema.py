@@ -10,8 +10,10 @@ architecture, following the threat model:
     memory  -> memory-poisoning   (poisoned knowledge/long-term memory)
     tool    -> tool-poisoning     (MCP / tool supply-chain compromise)
 
-The canonical persisted form is YAML. The same structure round-trips to the
-React Flow graph the frontend renders, so "the architecture is the code".
+This dict is the editor's wire format. The **canonical persisted form is Python
+code** (the SafeMAS DSL — see the ``safemas`` package): the backend generates a
+self-executing ``.py`` from this structure on save and reads it back on load, so
+"the architecture *is* the code", not configuration.
 
 LLM credentials live in a separate :class:`Provider` registry (see
 ``providers.py``) so the same architecture can be shared without leaking keys —
@@ -19,7 +21,7 @@ an agent only references a provider by id.
 """
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -31,7 +33,15 @@ AttackType = Literal[
     "memory-poisoning",
     "tool-poisoning",
 ]
-ProviderKind = Literal["openai", "anthropic", "openai-compatible", "mock"]
+# Provider "kind" is a free-form preset id (e.g. openai, anthropic, google,
+# groq, mistral, openrouter, ollama, azure-openai, or any custom name) so SafeMAS
+# can address *any* LLM provider. How a provider is actually called is decided by
+# its ``api`` engine below, not by this label.
+ProviderKind = str
+# The client engine used to reach a provider. "openai" also covers every
+# OpenAI-compatible endpoint (via base_url); "anthropic" uses the Anthropic SDK;
+# "mock" forces the deterministic offline stub.
+ProviderApi = Literal["openai", "anthropic", "mock"]
 
 
 class Position(BaseModel):
@@ -61,6 +71,10 @@ class Node(BaseModel):
     prompt: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    # How the agent consumes multiple inbound channels: "any" (default) runs on
+    # the first message; "all" waits for every inbound channel and aggregates
+    # them in one call (a real join / aggregator).
+    join: Optional[str] = None
     # Deprecated: entry/exit are now their own node types wired to an agent via an
     # "io" edge. Kept optional so older saved YAML still loads (the runner honours
     # them as a fallback).
@@ -82,6 +96,17 @@ class Edge(BaseModel):
     target: str
     kind: EdgeKind = "channel"
     label: str = ""
+    # Control flow on a channel (all optional / backward compatible):
+    #   loop      – a feedback edge that re-runs its target, bounded by max_iters
+    #               and short-circuited when the source output contains `until`.
+    #   when      – a guard phrase; a node with guarded out-edges is a router that
+    #               takes the first edge whose guard matches the source output.
+    #   max_iters – cap on how many times a loop edge fires (None → engine default).
+    #   until     – stop a loop early once the source output contains this phrase.
+    loop: bool = False
+    when: str = ""
+    max_iters: Optional[int] = None
+    until: str = ""
     malicious: Malicious = Field(default_factory=Malicious)
 
 
@@ -89,36 +114,29 @@ class Architecture(BaseModel):
     name: str = "untitled-mas"
     version: int = 1
     task: str = "Solve the assigned task."
+    # Editor-only presentation hints, carried by templates (the MAS code sets
+    # them via ``MAS(..., group=, title=)``); empty for user architectures.
+    group: str = ""
+    title: str = ""
     nodes: list[Node] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
-
-    def to_yaml_dict(self) -> dict[str, Any]:
-        """Compact dict for YAML: drop empty/false fields for readability."""
-
-        def clean(d: dict[str, Any]) -> dict[str, Any]:
-            out: dict[str, Any] = {}
-            for k, v in d.items():
-                if v in (None, "", [], {}):
-                    continue
-                if k == "malicious" and not v.get("enabled"):
-                    continue
-                if k in ("entry", "exit") and v is False:
-                    continue
-                out[k] = v
-            return out
-
-        return {
-            "name": self.name,
-            "version": self.version,
-            "task": self.task,
-            "nodes": [clean(n.model_dump()) for n in self.nodes],
-            "edges": [clean(e.model_dump()) for e in self.edges],
-        }
 
 
 # --------------------------------------------------------------------------- #
 # Provider registry (LLM credentials)
 # --------------------------------------------------------------------------- #
+def _engine_for(kind: str, api: Optional[str]) -> str:
+    """Resolve the client engine for a provider, with a back-compat fallback for
+    providers saved before ``api`` existed (anthropic kind → anthropic engine)."""
+    if api in ("openai", "anthropic", "mock"):
+        return api
+    if kind == "anthropic":
+        return "anthropic"
+    if kind == "mock":
+        return "mock"
+    return "openai"
+
+
 class Provider(BaseModel):
     """A configured LLM endpoint. The ``api_key`` is stored server-side only and
     never returned to the client (see :class:`ProviderPublic`)."""
@@ -126,9 +144,17 @@ class Provider(BaseModel):
     id: str
     name: str = "provider"
     kind: ProviderKind = "openai"
+    # Client engine; see ProviderApi. Optional/None so that providers persisted
+    # before this field existed fall back to kind-based inference via ``engine``
+    # (an old kind="anthropic" entry must not be forced onto the openai client).
+    api: Optional[ProviderApi] = None
     base_url: str = ""           # for openai-compatible / self-hosted endpoints
     api_key: str = ""            # secret — persisted locally, never serialised out
     models: list[str] = Field(default_factory=list)
+
+    @property
+    def engine(self) -> str:
+        return _engine_for(self.kind, self.api)
 
 
 class ProviderPublic(BaseModel):
@@ -137,6 +163,7 @@ class ProviderPublic(BaseModel):
     id: str
     name: str
     kind: ProviderKind
+    api: ProviderApi = "openai"
     base_url: str = ""
     models: list[str] = Field(default_factory=list)
     has_key: bool = False
@@ -147,6 +174,7 @@ class ProviderPublic(BaseModel):
             id=p.id,
             name=p.name,
             kind=p.kind,
+            api=p.engine,
             base_url=p.base_url,
             models=p.models,
             has_key=bool(p.api_key),
@@ -159,6 +187,7 @@ class ProviderInput(BaseModel):
 
     name: str = "provider"
     kind: ProviderKind = "openai"
+    api: Optional[ProviderApi] = None  # inferred from kind when omitted
     base_url: str = ""
     api_key: Optional[str] = None
     models: list[str] = Field(default_factory=list)

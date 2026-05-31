@@ -1,14 +1,19 @@
-# Sandbox image that executes a SafeMAS architecture.
-# Build once; the backend runs a fresh container per execution. The architecture
-# and resolved providers are passed in via $SAFEMAS_ARCH / $SAFEMAS_PROVIDERS so
-# the image needs no host bind-mounts (works when spawned via the Docker socket).
+# Sandbox image that executes a SafeMAS architecture by running its DSL code.
+# Build context is the backend/ directory so the image can bundle the `safemas`
+# library beside the runner. Build once; the backend runs a fresh container per
+# execution. The generated code and resolved providers are passed in via
+# $SAFEMAS_CODE / $SAFEMAS_PROVIDERS, so the image needs no host bind-mounts
+# (works when spawned via the Docker socket).
+#
+#   docker build -t safemas-runner -f runner/Dockerfile .      (from backend/)
 FROM python:3.12-slim
 
-WORKDIR /mas
+WORKDIR /app
 
-# YAML parsing + LLM clients (OpenAI-compatible and Anthropic).
-RUN pip install --no-cache-dir pyyaml==6.0.2 openai==1.55.0 anthropic==0.39.0
+# LLM clients only (OpenAI-compatible + Anthropic). The DSL/engine is pure stdlib.
+RUN pip install --no-cache-dir openai==1.55.0 anthropic==0.39.0
 
-COPY run_mas.py /mas/run_mas.py
+COPY safemas /app/safemas
+COPY runner/run_mas.py /app/run_mas.py
 
-ENTRYPOINT ["python", "/mas/run_mas.py"]
+ENTRYPOINT ["python", "/app/run_mas.py"]

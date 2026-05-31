@@ -19,7 +19,7 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
   }, [onClose])
 
   const startNew = () => {
-    setForm({ ...empty(), models: PROVIDER_KINDS.openai.models.join(', ') })
+    setForm({ ...empty(), base_url: PROVIDER_KINDS.openai.baseUrl || '', models: PROVIDER_KINDS.openai.models.join(', ') })
     setEditing('new')
   }
   const startEdit = (p) => {
@@ -34,11 +34,14 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
     const payload = {
       name: form.name.trim(),
       kind: form.kind,
+      api: PROVIDER_KINDS[form.kind]?.api || 'openai',
       base_url: form.base_url.trim(),
       models: form.models.split(',').map((s) => s.trim()).filter(Boolean),
     }
-    // Only include api_key when the user typed one (blank = keep existing).
-    if (form.api_key) payload.api_key = form.api_key
+    // Only include api_key when the user typed one (blank = keep existing) and the
+    // selected provider actually uses a key — so a stale key isn't stored against a
+    // keyless backend (mock / ollama / vLLM).
+    if (form.api_key && PROVIDER_KINDS[form.kind]?.needsKey !== false) payload.api_key = form.api_key
     try {
       if (editing === 'new') await api.createProvider(payload)
       else await api.updateProvider(editing, payload)
@@ -105,21 +108,31 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
                 <input value={form.name} placeholder="My OpenAI key" onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </label>
               <label className="field">
-                <span className="field-label">Kind</span>
+                <span className="field-label">Provider</span>
                 <select value={form.kind} onChange={(e) => {
                   const k = e.target.value
-                  setForm({ ...form, kind: k, models: PROVIDER_KINDS[k].models.join(', ') })
+                  const preset = PROVIDER_KINDS[k]
+                  setForm({ ...form, kind: k, base_url: preset.baseUrl || '', models: (preset.models || []).join(', ') })
                 }}>
                   {Object.entries(PROVIDER_KINDS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
+                <span className="field-hint">
+                  Reached via the <b>{kind.api || 'openai'}</b> client
+                  {kind.api === 'openai' && kind.baseUrl ? ' (OpenAI-compatible endpoint)' : ''}.
+                  Not listed? Pick an “(custom)” option and set the Base URL + Models.
+                </span>
               </label>
-              {kind.needsBaseUrl && (
+              {form.kind !== 'mock' && (
                 <label className="field">
-                  <span className="field-label">Base URL</span>
-                  <input value={form.base_url} placeholder="https://api.example.com/v1" onChange={(e) => setForm({ ...form, base_url: e.target.value })} />
+                  <span className="field-label">Base URL{kind.needsBaseUrl ? '' : ' (optional)'}</span>
+                  <input
+                    value={form.base_url}
+                    placeholder={kind.baseUrl || (kind.needsBaseUrl ? 'https://your-endpoint/v1' : 'default endpoint — leave blank')}
+                    onChange={(e) => setForm({ ...form, base_url: e.target.value })}
+                  />
                 </label>
               )}
-              {form.kind !== 'mock' && (
+              {form.kind !== 'mock' && kind.needsKey !== false && (
                 <label className="field">
                   <span className="field-label">API key</span>
                   <input

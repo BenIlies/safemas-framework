@@ -36,8 +36,17 @@ export async function deleteProvider(id) {
   return (await fetch(`/api/providers/${id}`, { method: 'DELETE' })).json()
 }
 
+// ---- templates (built-in MAS, served as DSL code) ----
+export async function listTemplates() {
+  try { return await (await fetch('/api/templates')).json() } catch { return [] }
+}
+export async function loadTemplate(id) {
+  return jsonOrThrow(await fetch(`/api/templates/${encodeURIComponent(id)}`), 'template load failed')
+}
+
 // ---- export / run ----
-export async function exportYaml(arch) {
+// The architecture rendered as SafeMAS DSL Python (the canonical form).
+export async function exportCode(arch) {
   return (await fetch('/api/export', { method: 'POST', headers: J, body: JSON.stringify(arch) })).text()
 }
 export async function startRun(arch) {

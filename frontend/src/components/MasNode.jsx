@@ -23,13 +23,23 @@ export default function MasNode({ data, selected }) {
   }
 
   const evil = data.malicious?.enabled
+  // Execution-lens hints injected by the editor (see simulateExecution): the
+  // 1-based run order, or that the engine never reaches this node.
+  const order = typeof data.__order === 'number' ? data.__order : null
+  const runs = data.__runs || 0
+  const dead = !!data.__dead
   const cls = ['mas-node', `mas-${data.type}`]
   if (evil) cls.push('mas-evil')
+  if (dead) cls.push('mas-skipped')
   if (selected) cls.push('mas-selected')
 
   return (
     <div className={cls.join(' ')} style={{ '--node-color': def.color }}>
       <Handle type="target" position={Position.Left} className="mas-handle" />
+
+      {order !== null && <div className="mas-order" title={`runs #${order}`}>{order}</div>}
+      {dead && <div className="mas-order mas-order-skip" title="never executes at runtime">⊘</div>}
+      {runs > 1 && <div className="mas-runs" title={`runs ${runs}× (loop)`}>↻{runs}</div>}
 
       {evil && <div className="mas-evil-badge" title={data.malicious.attack}>☠</div>}
 
@@ -41,6 +51,7 @@ export default function MasNode({ data, selected }) {
         {data.type === 'agent' && <span>{data.model || 'mock'}</span>}
         {data.type === 'memory' && <span>{data.backend || 'in-memory'}</span>}
         {data.type === 'tool' && <span>tool</span>}
+        {data.type === 'agent' && data.join === 'all' && <span className="mas-join" title="waits for all inputs, then aggregates">⋈ join all</span>}
       </div>
       {data.type === 'agent' && data.role && <div className="mas-node-role">{data.role}</div>}
 

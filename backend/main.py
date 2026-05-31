@@ -1,20 +1,23 @@
 """SafeMAS backend.
 
-REST API for the visual editor: persist architectures as YAML, manage LLM
-providers, export, and run architectures (in a Docker sandbox when available,
-otherwise as a local subprocess).
+REST API for the visual editor. **A MAS is code**: architectures are persisted as
+self-executing Python (the SafeMAS DSL); the editor's JSON graph is just a view
+that the backend codegens to / parses from that code. Runs execute the generated
+code (in a Docker sandbox when available, otherwise a local subprocess).
 
 Endpoints
     GET    /api/health
     GET    /api/configs                 list saved architectures
-    GET    /api/configs/{name}          load one (as JSON graph)
-    PUT    /api/configs/{name}          save / overwrite
+    GET    /api/configs/{name}          load one (code -> JSON graph)
+    PUT    /api/configs/{name}          save / overwrite (JSON graph -> code)
     DELETE /api/configs/{name}          delete
+    GET    /api/templates               list built-in templates
+    GET    /api/templates/{id}          load a template (code -> JSON graph)
     GET    /api/providers               list providers (keys masked)
     POST   /api/providers               create provider
     PUT    /api/providers/{id}          update (blank key keeps existing)
     DELETE /api/providers/{id}          delete
-    POST   /api/export                  body: Architecture -> raw YAML text
+    POST   /api/export                  body: Architecture -> generated Python
     POST   /api/run                     body: Architecture -> {run_id}
     GET    /api/run/{run_id}            run status + log tail
 """
@@ -31,28 +34,33 @@ import threading
 import uuid
 from pathlib import Path
 
-import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 
+import campaigns as campaign_store
 import providers as provider_store
+import spec as spec_module
+from safemas.codegen import arch_to_code, code_to_arch
 from schema import Architecture, ProviderInput, ProviderPublic
 
 BASE = Path(__file__).resolve().parent
 CONFIG_DIR = BASE / "configs"
 RUNS_DIR = BASE / "runs"
 RUNNER_DIR = BASE / "runner"
+TEMPLATE_DIR = BASE.parent / "templates"
 
 
 def _runner_tag() -> str:
-    """Content-addressed image tag so a changed runner auto-rebuilds (and an
-    unchanged one is reused from cache)."""
+    """Content-addressed image tag so a changed runner (or library) auto-rebuilds
+    and an unchanged one is reused from cache."""
     h = hashlib.sha256()
-    for f in ("run_mas.py", "Dockerfile"):
-        p = RUNNER_DIR / f
-        if p.exists():
-            h.update(p.read_bytes())
+    for f in (RUNNER_DIR / "run_mas.py", RUNNER_DIR / "Dockerfile"):
+        if f.exists():
+            h.update(f.read_bytes())
+    for f in sorted((BASE / "safemas").glob("*.py")):
+        h.update(f.read_bytes())
     return f"safemas-runner:{h.hexdigest()[:12]}"
 
 
@@ -64,13 +72,35 @@ SANDBOX_MODE = os.environ.get("SAFEMAS_SANDBOX", "auto").lower()
 CONFIG_DIR.mkdir(exist_ok=True)
 RUNS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="SafeMAS", version="2.0.0")
+app = FastAPI(
+    title="SafeMAS",
+    version="3.0.0",
+    description=(
+        "Author multi-agent systems **as code** (the `safemas` DSL), run them, and "
+        "benchmark their robustness to prompt-injection / poisoning / AiTM attacks. "
+        "Call `GET /api/spec` for the machine-readable format + architecture catalogue, "
+        "then drive benchmark runs with the `/api/campaigns` endpoints."
+    ),
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class CampaignInput(BaseModel):
+    """Start a benchmark campaign over one architecture. Provide either a built-in
+    ``template_id`` or an inline ``arch`` graph."""
+
+    name: str = ""
+    template_id: str = ""
+    arch: Architecture | None = None
+    task: str = ""
+    attacks: list[str] = Field(default_factory=list)  # restrict to these attack types; [] = all
+    limit: int | None = None                          # cap the number of tests
+    concurrency: int | None = None                    # parallel workers (default ~2×CPU, max 32)
 
 # in-memory run registry: run_id -> {status, log_path, result}
 RUNS: dict[str, dict] = {}
@@ -88,53 +118,150 @@ def docker_available() -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# Health + Config CRUD
+# Health + Config CRUD  (architectures persisted as SafeMAS DSL .py files)
 # --------------------------------------------------------------------------- #
 @app.get("/api/health")
 def health() -> dict:
     has_docker = shutil.which("docker") is not None
-    if has_docker and SANDBOX_MODE != "local":
-        mode = "docker"
-    else:
-        mode = "local"
+    mode = "docker" if has_docker and SANDBOX_MODE != "local" else "local"
     return {"ok": True, "docker": has_docker, "sandbox": mode}
 
 
 @app.get("/api/configs")
 def list_configs() -> list[dict]:
-    out = []
-    for p in sorted(CONFIG_DIR.glob("*.yml")):
-        out.append({"name": p.stem, "modified": p.stat().st_mtime})
-    return out
+    return [
+        {"name": p.stem, "modified": p.stat().st_mtime}
+        for p in sorted(CONFIG_DIR.glob("*.py"))
+    ]
 
 
 @app.get("/api/configs/{name}")
 def load_config(name: str) -> Architecture:
-    p = CONFIG_DIR / f"{safe_name(name)}.yml"
+    p = CONFIG_DIR / f"{safe_name(name)}.py"
     if not p.exists():
         raise HTTPException(404, "not found")
-    data = yaml.safe_load(p.read_text()) or {}
-    return Architecture(**data)
+    try:
+        return Architecture(**code_to_arch(p.read_text()))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
 
 
 @app.put("/api/configs/{name}")
 def save_config(name: str, arch: Architecture) -> dict:
-    p = CONFIG_DIR / f"{safe_name(name)}.yml"
-    p.write_text(yaml.safe_dump(arch.to_yaml_dict(), sort_keys=False))
+    p = CONFIG_DIR / f"{safe_name(name)}.py"
+    p.write_text(arch_to_code(arch.model_dump()))
     return {"saved": p.stem}
 
 
 @app.delete("/api/configs/{name}")
 def delete_config(name: str) -> dict:
-    p = CONFIG_DIR / f"{safe_name(name)}.yml"
+    p = CONFIG_DIR / f"{safe_name(name)}.py"
     if p.exists():
         p.unlink()
     return {"deleted": safe_name(name)}
 
 
 @app.post("/api/export", response_class=PlainTextResponse)
-def export_yaml(arch: Architecture) -> str:
-    return yaml.safe_dump(arch.to_yaml_dict(), sort_keys=False)
+def export_code(arch: Architecture) -> str:
+    """The architecture as SafeMAS DSL Python — what the editor shows as the live
+    code preview and what 'Export' downloads."""
+    return arch_to_code(arch.model_dump())
+
+
+# --------------------------------------------------------------------------- #
+# Built-in templates (themselves SafeMAS DSL .py files in templates/)
+# --------------------------------------------------------------------------- #
+def _load_template(p: Path) -> Architecture:
+    return Architecture(**code_to_arch(p.read_text()))
+
+
+@app.get("/api/templates")
+def list_templates() -> list[dict]:
+    """List templates with their menu grouping/label (read from the code)."""
+    out = []
+    for p in sorted(TEMPLATE_DIR.glob("*.py")):
+        try:
+            a = _load_template(p)
+        except ValueError:
+            continue
+        out.append({
+            "id": p.stem,
+            "group": a.group or "Templates",
+            "label": a.title or a.name,
+        })
+    return out
+
+
+@app.get("/api/templates/{template_id}")
+def load_template(template_id: str) -> Architecture:
+    p = TEMPLATE_DIR / f"{safe_name(template_id)}.py"
+    if not p.exists():
+        raise HTTPException(404, "template not found")
+    try:
+        return _load_template(p)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+# --------------------------------------------------------------------------- #
+# Spec — machine-readable docs for external campaign drivers
+# --------------------------------------------------------------------------- #
+@app.get("/api/spec")
+def spec() -> dict:
+    return spec_module.build_spec(list_templates())
+
+
+# --------------------------------------------------------------------------- #
+# Campaigns — benchmark an architecture against many attacks, in parallel
+# --------------------------------------------------------------------------- #
+def _resolve_arch(inp: CampaignInput) -> Architecture:
+    if inp.arch is not None:
+        return inp.arch
+    if inp.template_id:
+        return load_template(inp.template_id)
+    raise HTTPException(422, "provide either `arch` or `template_id`")
+
+
+@app.post("/api/campaigns")
+def start_campaign(inp: CampaignInput) -> dict:
+    arch = _resolve_arch(inp)
+    cid = campaign_store.create_campaign(
+        name=inp.name, arch=arch.model_dump(), task=inp.task or None,
+        attacks=inp.attacks or None, limit=inp.limit, concurrency=inp.concurrency,
+    )
+    return {"campaign_id": cid, **campaign_store.summary(campaign_store.CAMPAIGNS[cid])}
+
+
+@app.get("/api/campaigns")
+def list_campaigns() -> list[dict]:
+    return [campaign_store.summary(c) for c in campaign_store.CAMPAIGNS.values()]
+
+
+def _get_campaign(cid: str) -> dict:
+    c = campaign_store.CAMPAIGNS.get(cid)
+    if not c:
+        raise HTTPException(404, "unknown campaign")
+    return c
+
+
+@app.get("/api/campaigns/{cid}")
+def campaign_status(cid: str) -> dict:
+    return campaign_store.summary(_get_campaign(cid))
+
+
+@app.get("/api/campaigns/{cid}/tests")
+def campaign_tests(cid: str) -> list[dict]:
+    return campaign_store.test_rows(_get_campaign(cid))
+
+
+@app.get("/api/campaigns/{cid}/log", response_class=PlainTextResponse)
+def campaign_log(cid: str) -> str:
+    return "\n".join(_get_campaign(cid)["log"])
+
+
+@app.delete("/api/campaigns/{cid}")
+def delete_campaign(cid: str) -> dict:
+    return {"deleted": campaign_store.delete(cid)}
 
 
 # --------------------------------------------------------------------------- #
@@ -164,61 +291,57 @@ def delete_provider(provider_id: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Run (Docker sandbox, or local subprocess fallback)
+# Run — generate the DSL code and execute it (sandbox, or local fallback)
 # --------------------------------------------------------------------------- #
 def ensure_image() -> bool:
-    """Build the runner image on first use. Returns True if image is available."""
-    have = subprocess.run(
-        ["docker", "image", "inspect", IMAGE_TAG], capture_output=True
-    )
+    """Build the runner image on first use. Returns True if the image is available.
+    The build context is ``backend/`` so the image can bundle the safemas library
+    alongside the runner."""
+    have = subprocess.run(["docker", "image", "inspect", IMAGE_TAG], capture_output=True)
     if have.returncode == 0:
         return True
     build = subprocess.run(
-        ["docker", "build", "-t", IMAGE_TAG, str(RUNNER_DIR)],
+        ["docker", "build", "-t", IMAGE_TAG, "-f", str(RUNNER_DIR / "Dockerfile"), str(BASE)],
         capture_output=True, text=True,
     )
     return build.returncode == 0
 
 
 def _arch_uses_live_llm(arch: Architecture, prov_map: dict) -> bool:
-    for n in arch.nodes:
-        if n.type == "agent" and n.provider:
-            if prov_map.get(n.provider, {}).get("api_key"):
-                return True
-    return False
+    return any(
+        n.type == "agent" and n.provider and prov_map.get(n.provider, {}).get("api_key")
+        for n in arch.nodes
+    )
 
 
-def _run_docker(arch_yaml: str, prov_json: str, needs_net: bool, logf) -> int:
+def _run_docker(code: str, prov_json: str, needs_net: bool, logf) -> int:
     cmd = [
         "docker", "run", "--rm", "-i",
         "--network", "bridge" if needs_net else "none",
         "--memory", "512m", "--cpus", "1",
-        "-e", "SAFEMAS_ARCH",
-        "-e", "SAFEMAS_PROVIDERS",
+        "-e", "SAFEMAS_CODE", "-e", "SAFEMAS_PROVIDERS",
         IMAGE_TAG,
     ]
-    env = {**os.environ, "SAFEMAS_ARCH": arch_yaml, "SAFEMAS_PROVIDERS": prov_json}
-    proc = subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, env=env)
-    return proc.returncode
+    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json}
+    return subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, env=env).returncode
 
 
-def _run_local(arch_yaml: str, prov_json: str, logf) -> int:
-    logf.write("[local] Docker sandbox unavailable — running runner as a local "
-               "subprocess (NOT network-isolated).\n")
+def _run_local(code: str, prov_json: str, logf) -> int:
+    logf.write("[local] Docker sandbox unavailable — running the generated MAS code "
+               "as a local subprocess (NOT network-isolated).\n")
     logf.flush()
-    env = {**os.environ, "SAFEMAS_ARCH": arch_yaml, "SAFEMAS_PROVIDERS": prov_json}
-    proc = subprocess.run(
+    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json}
+    return subprocess.run(
         [sys.executable, str(RUNNER_DIR / "run_mas.py")],
         stdout=logf, stderr=subprocess.STDOUT, env=env,
-    )
-    return proc.returncode
+    ).returncode
 
 
 def _execute(run_id: str, arch: Architecture) -> None:
     run = RUNS[run_id]
     log_path = Path(run["log_path"])
     prov_map = provider_store.resolved_map()
-    arch_yaml = yaml.safe_dump(arch.to_yaml_dict(), sort_keys=False)
+    code = arch_to_code(arch.model_dump())
     prov_json = json.dumps(prov_map)
     needs_net = _arch_uses_live_llm(arch, prov_map)
 
@@ -227,14 +350,13 @@ def _execute(run_id: str, arch: Architecture) -> None:
     with open(log_path, "w") as logf:
         try:
             if docker_available() and ensure_image():
-                rc = _run_docker(arch_yaml, prov_json, needs_net, logf)
+                rc = _run_docker(code, prov_json, needs_net, logf)
             else:
-                rc = _run_local(arch_yaml, prov_json, logf)
+                rc = _run_local(code, prov_json, logf)
         except Exception as exc:  # pragma: no cover
             logf.write(f"[error] execution failed: {exc}\n")
             rc = 1
 
-    # extract the machine-readable result line
     result = None
     for line in log_path.read_text().splitlines():
         if line.startswith("__RESULT__ "):
@@ -267,9 +389,4 @@ def run_status(run_id: str) -> dict:
         log = "\n".join(
             l for l in p.read_text().splitlines() if not l.startswith("__RESULT__")
         )
-    return {
-        "run_id": run_id,
-        "status": run["status"],
-        "log": log,
-        "result": run["result"],
-    }
+    return {"run_id": run_id, "status": run["status"], "log": log, "result": run["result"]}

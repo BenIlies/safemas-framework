@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 # Start backend (FastAPI :8000) and frontend (Vite :5173) for local development.
 set -e

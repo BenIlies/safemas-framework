@@ -18,7 +18,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from schema import Provider, ProviderInput
+from schema import Provider, ProviderInput, _engine_for
 
 BASE = Path(__file__).resolve().parent
 # Override with SAFEMAS_SECRETS (e.g. a mounted volume path) for persistence.
@@ -73,6 +73,7 @@ def create(data: ProviderInput) -> Provider:
             id=pid,
             name=data.name,
             kind=data.kind,
+            api=_engine_for(data.kind, data.api),
             base_url=data.base_url,
             api_key=data.api_key or "",
             models=data.models,
@@ -94,6 +95,7 @@ def update(provider_id: str, data: ProviderInput) -> Provider | None:
             id=provider_id,
             name=data.name,
             kind=data.kind,
+            api=_engine_for(data.kind, data.api),
             base_url=data.base_url,
             api_key=key,
             models=data.models,
@@ -116,13 +118,14 @@ def delete(provider_id: str) -> bool:
 def resolved_map() -> dict[str, dict]:
     """Provider map (including keys) for handing to the runner at execution time.
 
-    Shape: ``{id: {kind, base_url, api_key, models}}``. Stays server-side; only
-    crosses into the sandboxed runner via env.
+    Shape: ``{id: {kind, api, base_url, api_key, models}}``. Stays server-side;
+    only crosses into the sandboxed runner via env.
     """
     with _LOCK:
         return {
             p.id: {
                 "kind": p.kind,
+                "api": p.engine,
                 "base_url": p.base_url,
                 "api_key": p.api_key,
                 "models": p.models,
