@@ -10,6 +10,7 @@ import FloatingEdge from './components/FloatingEdge.jsx'
 import Inspector from './components/Inspector.jsx'
 import RunConsole from './components/RunConsole.jsx'
 import ProvidersModal from './components/ProvidersModal.jsx'
+import PcapModal from './components/PcapModal.jsx'
 import ContextMenu from './components/ContextMenu.jsx'
 import Diagnostics from './components/Diagnostics.jsx'
 import { simulateExecution } from './lib/simulate.js'
@@ -114,6 +115,7 @@ function Editor() {
   const [templates, setTemplates] = useState([])    // built-in templates (from the backend)
   const [providers, setProviders] = useState([])
   const [providersOpen, setProvidersOpen] = useState(false)
+  const [pcapOpen, setPcapOpen] = useState(false)   // scenario-trace (pcap) modal
   const [health, setHealth] = useState({ docker: true, sandbox: 'docker' })
   const [toasts, setToasts] = useState([])
   const [history, setHistory] = useState({ undo: 0, redo: 0 })  // depths, for menu enable
@@ -715,6 +717,9 @@ function Editor() {
         <span className={`sandbox-pill sandbox-${health.sandbox}`} title="Execution sandbox">
           {health.sandbox === 'docker' ? '🐳 docker' : '🖥 local'}
         </span>
+        <button className="btn" onClick={() => setPcapOpen(true)} title="Analyze a scenario log: detect the architecture + compromised node and view the per-node information flow">
+          🔬 PCAP
+        </button>
         <button className="btn run" onClick={doRun} disabled={running}>
           {running ? '… running' : '▶ Run'}
         </button>
@@ -803,6 +808,10 @@ function Editor() {
           onClose={() => setProvidersOpen(false)}
           toast={toast}
         />
+      )}
+
+      {pcapOpen && (
+        <PcapModal onLoadArch={loadArch} onClose={() => setPcapOpen(false)} toast={toast} />
       )}
 
       {menu && menuItems.length > 0 && (
