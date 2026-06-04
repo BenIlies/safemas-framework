@@ -1,0 +1,152 @@
+{
+  "name": "camel-role-play",
+  "version": 1,
+  "task": "Cooperatively solve a task through instructor / assistant role-play.",
+  "group": "Debate & collaboration",
+  "title": "CAMEL role-play (Li 2023)",
+  "nodes": [
+    {
+      "id": "in-1",
+      "type": "entrance",
+      "label": "Entrance",
+      "position": {
+        "x": -180,
+        "y": 180
+      }
+    },
+    {
+      "id": "task-specifier",
+      "type": "agent",
+      "label": "Task Specifier",
+      "position": {
+        "x": 140,
+        "y": 180
+      },
+      "provider": null,
+      "model": null,
+      "role": "specifier",
+      "prompt": "Rewrite the vague idea into one concrete, specific task.",
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "ai-user",
+      "type": "agent",
+      "label": "AI User",
+      "position": {
+        "x": 450,
+        "y": 60
+      },
+      "provider": null,
+      "model": null,
+      "role": "instructor",
+      "prompt": "Give one instruction at a time; never solve the task yourself.",
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "ai-assistant",
+      "type": "agent",
+      "label": "AI Assistant",
+      "position": {
+        "x": 450,
+        "y": 320
+      },
+      "provider": null,
+      "model": null,
+      "role": "executor",
+      "prompt": "Respond to each instruction with a concrete solution.",
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "out-1",
+      "type": "exit",
+      "label": "Exit",
+      "position": {
+        "x": 780,
+        "y": 300
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "io-in-1",
+      "source": "in-1",
+      "target": "task-specifier",
+      "kind": "io"
+    },
+    {
+      "id": "e1",
+      "source": "task-specifier",
+      "target": "ai-user",
+      "kind": "channel",
+      "label": "specified task",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e2",
+      "source": "ai-user",
+      "target": "ai-assistant",
+      "kind": "channel",
+      "label": "instruction",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e3",
+      "source": "ai-assistant",
+      "target": "ai-user",
+      "kind": "channel",
+      "label": "solution",
+      "loop": true,
+      "when": "",
+      "max_iters": 3,
+      "until": "task complete",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "io-out-1",
+      "source": "ai-assistant",
+      "target": "out-1",
+      "kind": "io"
+    }
+  ]
+}

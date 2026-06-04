@@ -1,25 +1,26 @@
 """SafeMAS backend.
 
-REST API for the visual editor. **A MAS is code**: architectures are persisted as
-self-executing Python (the SafeMAS DSL); the editor's JSON graph is just a view
-that the backend codegens to / parses from that code. Runs execute the generated
-code (in a Docker sandbox when available, otherwise a local subprocess).
+REST API for the visual editor. An architecture is a JSON graph ({name, task,
+nodes[], edges[]}) — the single source of truth. Runs execute it on the LangGraph
+runtime (:mod:`safemas.graph_runtime`) in a Docker sandbox when available,
+otherwise a local subprocess. There is no DSL / codegen step.
 
 Endpoints
     GET    /api/health
-    GET    /api/configs                 list saved architectures
-    GET    /api/configs/{name}          load one (code -> JSON graph)
-    PUT    /api/configs/{name}          save / overwrite (JSON graph -> code)
+    GET    /api/configs                 list saved architectures (JSON)
+    GET    /api/configs/{name}          load one
+    PUT    /api/configs/{name}          save / overwrite
     DELETE /api/configs/{name}          delete
     GET    /api/templates               list built-in templates
-    GET    /api/templates/{id}          load a template (code -> JSON graph)
+    GET    /api/templates/{id}          load a template (JSON graph)
+    POST   /api/templates/{id}/run      run a template with task/provider/compromise/resource overrides
     GET    /api/providers               list providers (keys masked)
     POST   /api/providers               create provider
     PUT    /api/providers/{id}          update (blank key keeps existing)
     DELETE /api/providers/{id}          delete
-    POST   /api/export                  body: Architecture -> generated Python
     POST   /api/run                     body: Architecture -> {run_id}
     GET    /api/run/{run_id}            run status + log tail
+    GET    /api/run/{run_id}/scn        structured scenario log
 """
 from __future__ import annotations
 
@@ -33,6 +34,7 @@ import sys
 import threading
 import uuid
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,7 +44,6 @@ from pydantic import BaseModel, Field
 import campaigns as campaign_store
 import providers as provider_store
 import spec as spec_module
-from safemas.codegen import arch_to_code, code_to_arch
 from schema import Architecture, ProviderInput, ProviderPublic
 
 BASE = Path(__file__).resolve().parent
@@ -74,12 +75,13 @@ RUNS_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(
     title="SafeMAS",
-    version="3.0.0",
+    version="4.0.0",
     description=(
-        "Author multi-agent systems **as code** (the `safemas` DSL), run them, and "
-        "benchmark their robustness to prompt-injection / poisoning / AiTM attacks. "
-        "Call `GET /api/spec` for the machine-readable format + architecture catalogue, "
-        "then drive benchmark runs with the `/api/campaigns` endpoints."
+        "Author multi-agent systems as JSON, run them on a LangGraph runtime with "
+        "real tool-calling agents, and benchmark their robustness to prompt-injection "
+        "/ poisoning / AiTM attacks. Call `GET /api/spec` for the machine-readable "
+        "format + architecture catalogue, then drive runs with `/api/templates/{id}/run` "
+        "or campaigns with `/api/campaigns`."
     ),
 )
 app.add_middleware(
@@ -131,58 +133,51 @@ def health() -> dict:
 def list_configs() -> list[dict]:
     return [
         {"name": p.stem, "modified": p.stat().st_mtime}
-        for p in sorted(CONFIG_DIR.glob("*.py"))
+        for p in sorted(CONFIG_DIR.glob("*.json"))
     ]
 
 
 @app.get("/api/configs/{name}")
 def load_config(name: str) -> Architecture:
-    p = CONFIG_DIR / f"{safe_name(name)}.py"
+    p = CONFIG_DIR / f"{safe_name(name)}.json"
     if not p.exists():
         raise HTTPException(404, "not found")
     try:
-        return Architecture(**code_to_arch(p.read_text()))
-    except ValueError as exc:
+        return Architecture(**json.loads(p.read_text()))
+    except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(422, str(exc))
 
 
 @app.put("/api/configs/{name}")
 def save_config(name: str, arch: Architecture) -> dict:
-    p = CONFIG_DIR / f"{safe_name(name)}.py"
-    p.write_text(arch_to_code(arch.model_dump()))
+    p = CONFIG_DIR / f"{safe_name(name)}.json"
+    p.write_text(json.dumps(arch.model_dump(), indent=2))
     return {"saved": p.stem}
 
 
 @app.delete("/api/configs/{name}")
 def delete_config(name: str) -> dict:
-    p = CONFIG_DIR / f"{safe_name(name)}.py"
+    p = CONFIG_DIR / f"{safe_name(name)}.json"
     if p.exists():
         p.unlink()
     return {"deleted": safe_name(name)}
 
 
-@app.post("/api/export", response_class=PlainTextResponse)
-def export_code(arch: Architecture) -> str:
-    """The architecture as SafeMAS DSL Python — what the editor shows as the live
-    code preview and what 'Export' downloads."""
-    return arch_to_code(arch.model_dump())
-
-
 # --------------------------------------------------------------------------- #
-# Built-in templates (themselves SafeMAS DSL .py files in templates/)
+# Built-in templates (architecture JSON files in templates/)
 # --------------------------------------------------------------------------- #
 def _load_template(p: Path) -> Architecture:
-    return Architecture(**code_to_arch(p.read_text()))
+    return Architecture(**json.loads(p.read_text()))
 
 
 @app.get("/api/templates")
 def list_templates() -> list[dict]:
-    """List templates with their menu grouping/label (read from the code)."""
+    """List templates with their menu grouping/label."""
     out = []
-    for p in sorted(TEMPLATE_DIR.glob("*.py")):
+    for p in sorted(TEMPLATE_DIR.glob("*.json")):
         try:
             a = _load_template(p)
-        except ValueError:
+        except (json.JSONDecodeError, ValueError):
             continue
         out.append({
             "id": p.stem,
@@ -194,12 +189,12 @@ def list_templates() -> list[dict]:
 
 @app.get("/api/templates/{template_id}")
 def load_template(template_id: str) -> Architecture:
-    p = TEMPLATE_DIR / f"{safe_name(template_id)}.py"
+    p = TEMPLATE_DIR / f"{safe_name(template_id)}.json"
     if not p.exists():
         raise HTTPException(404, "template not found")
     try:
         return _load_template(p)
-    except ValueError as exc:
+    except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(422, str(exc))
 
 
@@ -342,25 +337,25 @@ def _arch_uses_live_llm(arch: Architecture, prov_map: dict) -> bool:
     )
 
 
-def _run_docker(code: str, prov_json: str, needs_net: bool, logf) -> int:
+def _run_docker(arch_json: str, prov_json: str, needs_net: bool, logf) -> int:
     cmd = [
         "docker", "run", "--rm", "-i",
         "--network", "bridge" if needs_net else "none",
         "--memory", "512m", "--cpus", "1",
         # Unbuffered stdout so streamed tokens reach the log file as they arrive.
         "-e", "PYTHONUNBUFFERED=1",
-        "-e", "SAFEMAS_CODE", "-e", "SAFEMAS_PROVIDERS",
+        "-e", "SAFEMAS_ARCH", "-e", "SAFEMAS_PROVIDERS",
         IMAGE_TAG,
     ]
-    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json}
+    env = {**os.environ, "SAFEMAS_ARCH": arch_json, "SAFEMAS_PROVIDERS": prov_json}
     return subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, env=env).returncode
 
 
-def _run_local(code: str, prov_json: str, logf) -> int:
-    logf.write("[local] Docker sandbox unavailable — running the generated MAS code "
+def _run_local(arch_json: str, prov_json: str, logf) -> int:
+    logf.write("[local] Docker sandbox unavailable — running the architecture "
                "as a local subprocess (NOT network-isolated).\n")
     logf.flush()
-    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json,
+    env = {**os.environ, "SAFEMAS_ARCH": arch_json, "SAFEMAS_PROVIDERS": prov_json,
            "PYTHONUNBUFFERED": "1"}
     return subprocess.run(
         [sys.executable, str(RUNNER_DIR / "run_mas.py")],
@@ -372,7 +367,7 @@ def _execute(run_id: str, arch: Architecture) -> None:
     run = RUNS[run_id]
     log_path = Path(run["log_path"])
     prov_map = provider_store.resolved_map()
-    code = arch_to_code(arch.model_dump())
+    arch_json = json.dumps(arch.model_dump())
     prov_json = json.dumps(prov_map)
     needs_net = _arch_uses_live_llm(arch, prov_map)
 
@@ -381,9 +376,9 @@ def _execute(run_id: str, arch: Architecture) -> None:
     with open(log_path, "w") as logf:
         try:
             if docker_available() and ensure_image():
-                rc = _run_docker(code, prov_json, needs_net, logf)
+                rc = _run_docker(arch_json, prov_json, needs_net, logf)
             else:
-                rc = _run_local(code, prov_json, logf)
+                rc = _run_local(arch_json, prov_json, logf)
         except Exception as exc:  # pragma: no cover
             logf.write(f"[error] execution failed: {exc}\n")
             rc = 1
@@ -406,8 +401,8 @@ def _execute(run_id: str, arch: Architecture) -> None:
     run["status"] = "done" if rc == 0 else "error"
 
 
-@app.post("/api/run")
-def run(arch: Architecture) -> dict:
+def _start_run(arch: Architecture) -> str:
+    """Register a run for ``arch`` and kick off execution in a thread. Returns id."""
     run_id = uuid.uuid4().hex[:12]
     log_path = RUNS_DIR / f"{run_id}.log"
     log_path.write_text("[queued] preparing execution...\n")
@@ -417,7 +412,57 @@ def run(arch: Architecture) -> dict:
         "has_scn": False, "result": None,
     }
     threading.Thread(target=_execute, args=(run_id, arch), daemon=True).start()
-    return {"run_id": run_id}
+    return run_id
+
+
+@app.post("/api/run")
+def run(arch: Architecture) -> dict:
+    return {"run_id": _start_run(arch)}
+
+
+class CompromiseInput(BaseModel):
+    node: str                                   # id of the node to compromise
+    attack: Optional[str] = None                # defaults to the node type's attack
+    payload: str = ""
+
+
+class TemplateRunInput(BaseModel):
+    """Run a stored template without rebuilding its graph: override the task,
+    assign a provider/model to its agents, optionally compromise one node, and
+    set what tools/memories return (``resources``: node-id → content)."""
+    task: Optional[str] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    compromise: Optional[CompromiseInput] = None
+    resources: dict[str, str] = Field(default_factory=dict)
+
+
+@app.post("/api/templates/{template_id}/run")
+def run_template(template_id: str, body: TemplateRunInput) -> dict:
+    """Convenience runner: load a template, apply task / provider / compromise /
+    resource overrides on the *instance* (never the template file), and run it."""
+    arch = load_template(template_id)  # reuses the 404/422 handling
+    data = arch.model_dump()
+
+    if body.task is not None:
+        data["task"] = body.task
+    for n in data["nodes"]:
+        if n["type"] == "agent":
+            if body.provider is not None:
+                n["provider"] = body.provider
+            if body.model is not None:
+                n["model"] = body.model
+        if n["id"] in body.resources and n["type"] in ("tool", "memory"):
+            n["content"] = body.resources[n["id"]]
+
+    if body.compromise:
+        target = next((n for n in data["nodes"] if n["id"] == body.compromise.node), None)
+        if target is None:
+            raise HTTPException(422, f"compromise node '{body.compromise.node}' not in template")
+        target["malicious"] = {"enabled": True, "attack": body.compromise.attack,
+                               "payload": body.compromise.payload}
+
+    return {"run_id": _start_run(Architecture(**data))}
 
 
 @app.get("/api/run/{run_id}")

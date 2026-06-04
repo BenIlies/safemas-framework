@@ -1,0 +1,221 @@
+{
+  "name": "dylan",
+  "version": 1,
+  "task": "Collaborate over rounds while pruning low-contribution agents.",
+  "group": "Population & layered",
+  "title": "DyLAN (Liu 2024)",
+  "nodes": [
+    {
+      "id": "in-1",
+      "type": "entrance",
+      "label": "Entrance",
+      "position": {
+        "x": -220,
+        "y": 180
+      }
+    },
+    {
+      "id": "solver-1",
+      "type": "agent",
+      "label": "Solver 1",
+      "position": {
+        "x": 180,
+        "y": 30
+      },
+      "provider": null,
+      "model": null,
+      "role": "solver",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "solver-2",
+      "type": "agent",
+      "label": "Solver 2",
+      "position": {
+        "x": 180,
+        "y": 180
+      },
+      "provider": null,
+      "model": null,
+      "role": "solver",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "solver-3",
+      "type": "agent",
+      "label": "Solver 3",
+      "position": {
+        "x": 180,
+        "y": 330
+      },
+      "provider": null,
+      "model": null,
+      "role": "solver",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "llm-ranker",
+      "type": "agent",
+      "label": "LLM Ranker",
+      "position": {
+        "x": 470,
+        "y": 470
+      },
+      "provider": null,
+      "model": null,
+      "role": "ranker",
+      "prompt": "Rate this round\u2019s responses and keep only the top-ranked agents.",
+      "temperature": null,
+      "max_tokens": null,
+      "join": "all",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "out-1",
+      "type": "exit",
+      "label": "Exit",
+      "position": {
+        "x": 840,
+        "y": 180
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "io-in-1",
+      "source": "in-1",
+      "target": "solver-1",
+      "kind": "io"
+    },
+    {
+      "id": "e1",
+      "source": "solver-1",
+      "target": "solver-2",
+      "kind": "channel",
+      "label": "peer context",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e2",
+      "source": "solver-2",
+      "target": "solver-3",
+      "kind": "channel",
+      "label": "peer context",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e3",
+      "source": "solver-1",
+      "target": "llm-ranker",
+      "kind": "channel",
+      "label": "rate",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e4",
+      "source": "solver-2",
+      "target": "llm-ranker",
+      "kind": "channel",
+      "label": "rate",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e5",
+      "source": "solver-3",
+      "target": "llm-ranker",
+      "kind": "channel",
+      "label": "rate",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e6",
+      "source": "llm-ranker",
+      "target": "solver-1",
+      "kind": "channel",
+      "label": "keep / prune",
+      "loop": true,
+      "when": "",
+      "max_iters": 1,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "io-out-1",
+      "source": "llm-ranker",
+      "target": "out-1",
+      "kind": "io"
+    }
+  ]
+}

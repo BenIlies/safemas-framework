@@ -10,11 +10,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# LLM clients only (OpenAI-compatible + Anthropic). The DSL/engine is pure stdlib.
-# httpx is pinned <0.28 on purpose: httpx 0.28 removed the `proxies` constructor
-# arg that openai==1.55.0 / anthropic==0.39.0 still pass, which otherwise fails at
-# client init with "Client.__init__() got an unexpected keyword argument 'proxies'".
-RUN pip install --no-cache-dir "httpx<0.28" openai==1.55.0 anthropic==0.39.0
+# LangGraph runtime + LangChain chat clients (OpenAI-compatible + Anthropic).
+# We let these pull mutually-consistent openai/anthropic/httpx versions (modern
+# openai fixed the httpx-0.28 `proxies` incompatibility, so no pin is needed).
+RUN pip install --no-cache-dir \
+        langgraph>=0.2.50 \
+        langchain-core>=0.3.0 \
+        langchain-openai>=0.2.0 \
+        langchain-anthropic>=0.2.0
 
 COPY safemas /app/safemas
 COPY runner/run_mas.py /app/run_mas.py

@@ -118,18 +118,41 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
       )}
 
       {!isEdge && data.type === 'memory' && (
-        <Field label="Backend">
-          <input list="mem-backends" value={data.backend || ''} onChange={(e) => set({ backend: e.target.value })} />
-          <datalist id="mem-backends">
-            {MEMORY_BACKENDS.map((b) => <option key={b} value={b} />)}
-          </datalist>
-        </Field>
+        <>
+          <Field label="Backend">
+            <input list="mem-backends" value={data.backend || ''} onChange={(e) => set({ backend: e.target.value })} />
+            <datalist id="mem-backends">
+              {MEMORY_BACKENDS.map((b) => <option key={b} value={b} />)}
+            </datalist>
+          </Field>
+          <Field label="Stored content (what a read returns)">
+            <textarea rows={4} value={data.content || ''}
+              placeholder="Leave empty for a neutral placeholder, or paste the data this memory holds (e.g. an AgentDojo inbox / notes dump)."
+              onChange={(e) => set({ content: e.target.value })} />
+            <span className="field-hint">Returned to any agent that reads this memory. Empty → the engine’s neutral “(clean, empty)” placeholder.</span>
+          </Field>
+        </>
       )}
 
       {!isEdge && data.type === 'tool' && (
-        <Field label="Spec / signature">
-          <textarea rows={3} value={data.spec || ''} onChange={(e) => set({ spec: e.target.value })} />
-        </Field>
+        <>
+          <Field label="Spec / signature">
+            <textarea rows={3} value={data.spec || ''}
+              placeholder="e.g. get_calendar(query) → the user's calendar events"
+              onChange={(e) => set({ spec: e.target.value })} />
+            <span className="field-hint">
+              Shown to the model as the tool's description for function-calling. Attach this tool to an
+              agent (drag from its port), and attach <b>several</b> tools to one agent for a multi-step
+              tool sequence — the model chooses which to call, with arguments, in a loop.
+            </span>
+          </Field>
+          <Field label="Returns (what the tool yields)">
+            <textarea rows={4} value={data.content || ''}
+              placeholder="Leave empty for a neutral placeholder, or paste the tool's result (e.g. an AgentDojo calendar / search result)."
+              onChange={(e) => set({ content: e.target.value })} />
+            <span className="field-hint">Returned whenever an agent calls this tool. Empty → the engine’s neutral “returned a normal result” placeholder.</span>
+          </Field>
+        </>
       )}
 
       {isEdge && (

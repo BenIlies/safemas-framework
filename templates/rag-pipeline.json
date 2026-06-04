@@ -1,0 +1,99 @@
+{
+  "name": "rag-pipeline",
+  "version": 1,
+  "task": "Answer a question using the knowledge base.",
+  "group": "Workflows",
+  "title": "RAG (retriever + knowledge base)",
+  "nodes": [
+    {
+      "id": "in-1",
+      "type": "entrance",
+      "label": "Entrance",
+      "position": {
+        "x": -120,
+        "y": 160
+      }
+    },
+    {
+      "id": "retriever",
+      "type": "agent",
+      "label": "Retriever",
+      "position": {
+        "x": 100,
+        "y": 150
+      },
+      "provider": null,
+      "model": null,
+      "role": "retriever",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "answerer",
+      "type": "agent",
+      "label": "Answerer",
+      "position": {
+        "x": 360,
+        "y": 150
+      },
+      "provider": null,
+      "model": null,
+      "role": "finaliser",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "out-1",
+      "type": "exit",
+      "label": "Exit",
+      "position": {
+        "x": 600,
+        "y": 160
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "io-in-1",
+      "source": "in-1",
+      "target": "retriever",
+      "kind": "io"
+    },
+    {
+      "id": "e1",
+      "source": "retriever",
+      "target": "answerer",
+      "kind": "channel",
+      "label": "retrieved context",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "io-out-1",
+      "source": "answerer",
+      "target": "out-1",
+      "kind": "io"
+    }
+  ]
+}

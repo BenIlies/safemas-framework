@@ -87,6 +87,11 @@ class Node(BaseModel):
     # tool-specific
     spec: Optional[str] = None  # tool description / signature
 
+    # resource (tool/memory) payload: what the resource yields when an agent uses
+    # it (a tool's return value, a memory's stored content) — e.g. an AgentDojo
+    # calendar/email dump. Empty => the engine's neutral placeholder.
+    content: Optional[str] = None
+
     malicious: Malicious = Field(default_factory=Malicious)
 
 

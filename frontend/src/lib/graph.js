@@ -23,6 +23,7 @@ export function graphToArch({ name, task, nodes, edges }) {
       join: n.data.join ?? null,
       backend: n.data.backend ?? null,
       spec: n.data.spec ?? null,
+      content: n.data.content ?? null,
       malicious: n.data.malicious || blankMalicious(),
     })),
     edges: edges.map((e) => ({
@@ -57,6 +58,7 @@ export function archToGraph(arch) {
       join: n.join ?? null,
       backend: n.backend,
       spec: n.spec,
+      content: n.content ?? null,
       malicious: n.malicious || blankMalicious(),
     },
   }))

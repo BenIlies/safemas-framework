@@ -1,0 +1,189 @@
+{
+  "name": "router-specialists",
+  "version": 1,
+  "task": "Handle a mixed request that may need code or math.",
+  "group": "Workflows",
+  "title": "Router \u2192 specialists",
+  "nodes": [
+    {
+      "id": "in-1",
+      "type": "entrance",
+      "label": "Entrance",
+      "position": {
+        "x": -120,
+        "y": 200
+      }
+    },
+    {
+      "id": "router",
+      "type": "agent",
+      "label": "Router",
+      "position": {
+        "x": 100,
+        "y": 190
+      },
+      "provider": null,
+      "model": null,
+      "role": "router",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "code-specialist",
+      "type": "agent",
+      "label": "Code Specialist",
+      "position": {
+        "x": 380,
+        "y": 70
+      },
+      "provider": null,
+      "model": null,
+      "role": "coder",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "math-specialist",
+      "type": "agent",
+      "label": "Math Specialist",
+      "position": {
+        "x": 380,
+        "y": 310
+      },
+      "provider": null,
+      "model": null,
+      "role": "mathematician",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "collector",
+      "type": "agent",
+      "label": "Collector",
+      "position": {
+        "x": 660,
+        "y": 190
+      },
+      "provider": null,
+      "model": null,
+      "role": "finaliser",
+      "prompt": null,
+      "temperature": null,
+      "max_tokens": null,
+      "join": "any",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "out-1",
+      "type": "exit",
+      "label": "Exit",
+      "position": {
+        "x": 900,
+        "y": 200
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "io-in-1",
+      "source": "in-1",
+      "target": "router",
+      "kind": "io"
+    },
+    {
+      "id": "e1",
+      "source": "router",
+      "target": "code-specialist",
+      "kind": "channel",
+      "label": "route: code",
+      "loop": false,
+      "when": "code",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e2",
+      "source": "router",
+      "target": "math-specialist",
+      "kind": "channel",
+      "label": "route: math",
+      "loop": false,
+      "when": "math",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e3",
+      "source": "code-specialist",
+      "target": "collector",
+      "kind": "channel",
+      "label": "answer",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "e4",
+      "source": "math-specialist",
+      "target": "collector",
+      "kind": "channel",
+      "label": "answer",
+      "loop": false,
+      "when": "",
+      "max_iters": null,
+      "until": "",
+      "malicious": {
+        "enabled": false,
+        "attack": null,
+        "payload": ""
+      }
+    },
+    {
+      "id": "io-out-1",
+      "source": "collector",
+      "target": "out-1",
+      "kind": "io"
+    }
+  ]
+}

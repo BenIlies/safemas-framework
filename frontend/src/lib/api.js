@@ -47,11 +47,7 @@ export async function loadTemplate(id) {
   return jsonOrThrow(await fetch(`/api/templates/${encodeURIComponent(id)}`), 'template load failed')
 }
 
-// ---- export / run ----
-// The architecture rendered as SafeMAS DSL Python (the canonical form).
-export async function exportCode(arch) {
-  return (await fetch('/api/export', { method: 'POST', headers: J, body: JSON.stringify(arch) })).text()
-}
+// ---- run ----
 export async function startRun(arch) {
   return (await fetch('/api/run', { method: 'POST', headers: J, body: JSON.stringify(arch) })).json()
 }

@@ -40,7 +40,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import providers as provider_store
-from safemas.codegen import arch_to_code
 
 BASE = Path(__file__).resolve().parent
 RUNNER = BASE / "runner" / "run_mas.py"
@@ -150,8 +149,7 @@ def _inject(arch: dict, attack: dict) -> dict:
 # Running + scoring one test
 # --------------------------------------------------------------------------- #
 def _run_one(arch: dict, task: str | None, prov_json: str) -> tuple[dict | None, dict | None, str]:
-    code = arch_to_code(arch)
-    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json}
+    env = {**os.environ, "SAFEMAS_ARCH": json.dumps(arch), "SAFEMAS_PROVIDERS": prov_json}
     if task:
         env["SAFEMAS_TASK"] = task
     try:

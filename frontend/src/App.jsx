@@ -108,8 +108,8 @@ function Editor() {
   const [linkCursor, setLinkCursor] = useState(null)  // { x, y } in canvas-local px
   const [run, setRun] = useState(null)
   const [running, setRunning] = useState(false)
-  const [codeOpen, setCodeOpen] = useState(false)   // the live Python (DSL) preview
-  const [code, setCode] = useState('')              // generated code shown in the preview
+  const [codeOpen, setCodeOpen] = useState(false)   // the live architecture-JSON preview
+  const [code, setCode] = useState('')              // JSON shown in the preview
   const [execView, setExecView] = useState(false)   // execution lens: run order + diagnostics
   const [saved, setSaved] = useState([])
   const [templates, setTemplates] = useState([])    // built-in templates (from the backend)
@@ -417,13 +417,13 @@ function Editor() {
     if (!confirm(`Delete saved architecture “${name}”?`)) return
     await api.deleteConfig(name); refreshSaved(); toast(`Deleted “${name}”`)
   }
-  const doExport = async () => {
-    const text = await api.exportCode(arch)
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/x-python' }))
+  const doExport = () => {
+    const text = JSON.stringify(arch, null, 2)
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
     const a = document.createElement('a')
-    a.href = url; a.download = `${name}.py`; a.click()
+    a.href = url; a.download = `${name}.json`; a.click()
     URL.revokeObjectURL(url)
-    toast('Exported architecture.py')
+    toast('Exported architecture.json')
   }
   // A new MAS always starts with one entrance and one exit agent.
   const doNew = () => { loadArch({ ...STARTER, name: 'untitled-mas' }); toast('New MAS — one entrance, one exit') }
@@ -458,13 +458,13 @@ function Editor() {
     } catch { toast('No scenario log for this run', 'error') }
   }, [toast])
 
-  // Live code preview: fetch the generated DSL from the backend while the panel
-  // is open (debounced so it follows edits without a request per keystroke).
+  // Live JSON preview: the architecture IS the JSON, so render it directly
+  // (debounced so it follows edits without re-stringifying on every keystroke).
   useEffect(() => {
     if (!codeOpen) return undefined
     let cancelled = false
     const t = setTimeout(() => {
-      api.exportCode(arch).then((txt) => { if (!cancelled) setCode(txt) }).catch(() => {})
+      if (!cancelled) setCode(JSON.stringify(arch, null, 2))
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
   }, [codeOpen, arch])
@@ -537,7 +537,7 @@ function Editor() {
           { icon: '💾', label: 'Save', hint: 'Ctrl S', onClick: doSave },
           ...(nameIsSaved ? [{ icon: '🗑', label: `Delete “${name}”`, danger: true, onClick: doDeleteSaved }] : []),
           { separator: true },
-          { icon: '⬇', label: 'Export architecture.py', onClick: doExport },
+          { icon: '⬇', label: 'Export architecture.json', onClick: doExport },
           { separator: true },
           { icon: '🔑', label: 'Providers…', onClick: () => setProvidersOpen(true) },
         ]
@@ -555,7 +555,7 @@ function Editor() {
       case 'view':
         return [
           { icon: '◳', label: execView ? 'Hide execution lens' : 'Show execution lens (run order + diagnostics)', onClick: () => setExecView((v) => !v) },
-          { icon: '🐍', label: codeOpen ? 'Hide code' : 'Show code (architecture.py)', onClick: () => setCodeOpen((v) => !v) },
+          { icon: '🧩', label: codeOpen ? 'Hide JSON' : 'Show architecture JSON', onClick: () => setCodeOpen((v) => !v) },
           { icon: '⤢', label: 'Fit view', onClick: () => rf.current?.fitView({ duration: 300 }) },
         ]
       case 'templates':
@@ -790,7 +790,7 @@ function Editor() {
           )}
           {codeOpen && (
             <div className="yaml-overlay">
-              <div className="yaml-head">architecture.py <button className="btn ghost" onClick={() => setCodeOpen(false)}>✕</button></div>
+              <div className="yaml-head">architecture.json <button className="btn ghost" onClick={() => setCodeOpen(false)}>✕</button></div>
               <pre>{code || '# generating…'}</pre>
             </div>
           )}

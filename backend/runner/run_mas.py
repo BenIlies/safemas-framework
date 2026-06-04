@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""Execute a SafeMAS architecture by *running its code*.
+"""Execute a SafeMAS architecture on the LangGraph runtime.
 
-The architecture is SafeMAS DSL Python (see the ``safemas`` package). This thin
-runner takes that source and executes it as ``__main__`` — so the file's
-``if __name__ == "__main__": mas.run()`` fires and the multi-agent system runs,
-exactly as if you had typed ``python architecture.py``.
+The architecture is the editor's JSON ({name, task, nodes[], edges[]}). This thin
+runner hands it to ``safemas.graph_runtime.run_arch``, which builds the run
+(real tool-calling agents + the multi-agent topology) and prints the trace.
 
 Designed to run *inside* a Docker container (see Dockerfile), but also runnable
 directly as a subprocess when Docker is unavailable.
 
-Inputs (in priority order, so the same image works mounted or socket-spawned):
-    * code:       $SAFEMAS_CODE  ->  argv[1] file  ->  /mas/architecture.py  ->  stdin
+Inputs:
+    * arch:       $SAFEMAS_ARCH  (JSON)  ->  argv[1] .json file  ->  stdin
     * providers:  $SAFEMAS_PROVIDERS (JSON: {id: {api, kind, base_url, api_key, models}})
-    * task:       $SAFEMAS_TASK (optional override; otherwise the code's task)
+    * task:       $SAFEMAS_TASK (optional override; otherwise the arch's task)
 
-The engine prints a human-readable trace plus a machine-readable ``__RESULT__``
-JSON line the backend parses.
+The runtime prints a human-readable trace plus machine-readable ``__RESULT__``
+and ``__SCN__`` JSON lines the backend parses.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -32,24 +32,28 @@ for candidate in (HERE, HERE.parent):
         break
 
 
-def load_code() -> str:
-    env = os.environ.get("SAFEMAS_CODE")
+def load_arch() -> dict | None:
+    env = os.environ.get("SAFEMAS_ARCH")
     if env:
-        return env
-    path = sys.argv[1] if len(sys.argv) > 1 else "/mas/architecture.py"
+        return json.loads(env)
+    path = sys.argv[1] if len(sys.argv) > 1 else "/mas/architecture.json"
     if os.path.exists(path):
-        return Path(path).read_text()
-    return sys.stdin.read()
+        return json.loads(Path(path).read_text())
+    data = sys.stdin.read()
+    return json.loads(data) if data.strip() else None
 
 
 def main() -> int:
-    code = load_code()
-    if not code.strip():
-        print("[error] no architecture code provided", flush=True)
+    try:
+        arch = load_arch()
+    except json.JSONDecodeError as exc:
+        print(f"[error] invalid architecture JSON: {exc}", flush=True)
         return 1
-    # Execute as a real program so `if __name__ == '__main__': mas.run()` fires.
-    g = {"__name__": "__main__", "__builtins__": __builtins__}
-    exec(compile(code, "architecture.py", "exec"), g)
+    if not arch or not arch.get("nodes"):
+        print("[error] no architecture provided", flush=True)
+        return 1
+    from safemas.graph_runtime import run_arch
+    run_arch(arch, os.environ.get("SAFEMAS_TASK"))
     return 0
 
 
