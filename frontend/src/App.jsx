@@ -116,6 +116,7 @@ function Editor() {
   const [providers, setProviders] = useState([])
   const [providersOpen, setProvidersOpen] = useState(false)
   const [pcapOpen, setPcapOpen] = useState(false)   // scenario-trace (pcap) modal
+  const [pcapScn, setPcapScn] = useState(null)      // scenario log preloaded from a run
   const [health, setHealth] = useState({ docker: true, sandbox: 'docker' })
   const [toasts, setToasts] = useState([])
   const [history, setHistory] = useState({ undo: 0, redo: 0 })  // depths, for menu enable
@@ -448,6 +449,15 @@ function Editor() {
   }
   useEffect(() => () => clearInterval(pollRef.current), [])
 
+  // Pull a finished run's structured scenario log into the PCAP analyzer.
+  const analyzeRunInPcap = useCallback(async (runId) => {
+    try {
+      const scn = await api.runScn(runId)
+      setPcapScn(scn)
+      setPcapOpen(true)
+    } catch { toast('No scenario log for this run', 'error') }
+  }, [toast])
+
   // Live code preview: fetch the generated DSL from the backend while the panel
   // is open (debounced so it follows edits without a request per keystroke).
   useEffect(() => {
@@ -717,8 +727,8 @@ function Editor() {
         <span className={`sandbox-pill sandbox-${health.sandbox}`} title="Execution sandbox">
           {health.sandbox === 'docker' ? '🐳 docker' : '🖥 local'}
         </span>
-        <button className="btn" onClick={() => setPcapOpen(true)} title="Analyze a scenario log: detect the architecture + compromised node and view the per-node information flow">
-          🔬 PCAP
+        <button className="btn" onClick={() => { setPcapScn(null); setPcapOpen(true) }} title="Step through a recorded run trace: each agent's input/output, the messages between nodes, and any attack">
+          🔬 Trace
         </button>
         <button className="btn run" onClick={doRun} disabled={running}>
           {running ? '… running' : '▶ Run'}
@@ -799,7 +809,7 @@ function Editor() {
         )}
       </div>
 
-      <RunConsole run={run} onClose={() => setRun(null)} />
+      <RunConsole run={run} onAnalyze={analyzeRunInPcap} />
 
       {providersOpen && (
         <ProvidersModal
@@ -811,7 +821,8 @@ function Editor() {
       )}
 
       {pcapOpen && (
-        <PcapModal onLoadArch={loadArch} onClose={() => setPcapOpen(false)} toast={toast} />
+        <PcapModal onLoadArch={loadArch} onClose={() => setPcapOpen(false)} toast={toast}
+          initialScn={pcapScn} initialName={pcapScn ? `run ${run?.run_id || ''}` : ''} />
       )}
 
       {menu && menuItems.length > 0 && (

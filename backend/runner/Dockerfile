@@ -11,7 +11,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # LLM clients only (OpenAI-compatible + Anthropic). The DSL/engine is pure stdlib.
-RUN pip install --no-cache-dir openai==1.55.0 anthropic==0.39.0
+# httpx is pinned <0.28 on purpose: httpx 0.28 removed the `proxies` constructor
+# arg that openai==1.55.0 / anthropic==0.39.0 still pass, which otherwise fails at
+# client init with "Client.__init__() got an unexpected keyword argument 'proxies'".
+RUN pip install --no-cache-dir "httpx<0.28" openai==1.55.0 anthropic==0.39.0
 
 COPY safemas /app/safemas
 COPY runner/run_mas.py /app/run_mas.py

@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { Markdown } from '../lib/markdown.jsx'
 
-// PCAP log analyzer. Upload a sa_bridge scenario log (scn_*.json) produced offline;
-// the analyzer detects the architecture and which node (if any) is compromised, loads
-// the architecture onto the editor canvas (compromised node flagged), and shows the
-// information flow plus what happened inside each node. No execution happens here.
-
-const clip = (s, n = 240) => {
-  const t = String(s ?? '').replace(/\s+/g, ' ').trim()
-  return t.length <= n ? t : t.slice(0, n - 1) + '…'
-}
+// Trace walkthrough (formerly "PCAP"). Upload a sa_bridge scenario log (scn_*.json) — or open a
+// finished run — and step through the trace one event at a time: each agent's input,
+// reasoning, tool calls, the messages flowing between nodes, any attack that fired,
+// and the final answer, in the order they happened. The architecture is also loaded
+// onto the canvas (compromised node flagged). No execution happens here.
 
 // Match safemas.model.slug so we can map a compromised element id back to a node label.
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -59,7 +56,7 @@ function reconstructArch(scn) {
   return { name: (scn.config && scn.config.arch) || 'detected-arch', version: 1, task: (runStart.task) || '', nodes, edges }
 }
 
-export default function PcapModal({ onLoadArch, onClose, toast }) {
+export default function PcapModal({ onLoadArch, onClose, toast, initialScn, initialName }) {
   const [scn, setScn] = useState(null)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
@@ -72,10 +69,8 @@ export default function PcapModal({ onLoadArch, onClose, toast }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const ingest = (text, name) => {
+  const load = (data, name) => {
     setError('')
-    let data
-    try { data = JSON.parse(text) } catch { setError('Not valid JSON. Upload a sa_bridge scenario log (scn_*.json).'); return }
     if (!data || !data.trace || !Array.isArray(data.trace.events)) {
       setError('This file has no trace.events — expected a sa_bridge scenario log (scn_*.json).'); return
     }
@@ -91,6 +86,15 @@ export default function PcapModal({ onLoadArch, onClose, toast }) {
     }
   }
 
+  // A scenario log handed in directly (e.g. from a just-finished run).
+  useEffect(() => { if (initialScn) load(initialScn, initialName) }, [initialScn])
+
+  const ingest = (text, name) => {
+    let data
+    try { data = JSON.parse(text) } catch { setError('Not valid JSON. Upload a sa_bridge scenario log (scn_*.json).'); return }
+    load(data, name)
+  }
+
   const onFile = (file) => {
     if (!file) return
     const r = new FileReader()
@@ -102,36 +106,41 @@ export default function PcapModal({ onLoadArch, onClose, toast }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal pcap-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span>🔬 PCAP — log analyzer</span>
-          <button className="btn ghost" onClick={onClose}>✕</button>
+          <span className="pcap-head-title">🔬 Trace — step-by-step walkthrough{scn ? <span className="muted"> · {fileName}</span> : null}</span>
+          <div className="pcap-head-actions">
+            {scn && <button className="btn small" onClick={() => { setScn(null); setError('') }}>↑ Load another</button>}
+            <button className="btn ghost" onClick={onClose}>✕</button>
+          </div>
         </div>
 
         <div className="modal-body">
-          <p className="modal-hint">
-            Upload a SafeMAS scenario log (a <code>scn_*.json</code> produced by sa_bridge
-            scenario capture). The analyzer detects the architecture and which node is
-            compromised, loads it onto the canvas, and shows the information flow inside each node.
-          </p>
-
-          <div
-            className={`pcap-drop${dragOver ? ' over' : ''}`}
-            onClick={() => inputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); onFile(e.dataTransfer.files?.[0]) }}
-          >
-            <input ref={inputRef} type="file" accept=".json,application/json" hidden
-              onChange={(e) => onFile(e.target.files?.[0])} />
-            <div className="pcap-drop-icon">📂</div>
-            <div>{fileName ? <b>{fileName}</b> : 'Drop a scn_*.json here, or click to choose'}</div>
-          </div>
-
-          {error && <div className="pcap-error">⚠ {error}</div>}
+          {!scn && (
+            <>
+              <p className="modal-hint">
+                Open a SafeMAS scenario log (a <code>scn_*.json</code>, or a finished run's
+                “Open trace”) and step through the trace event-by-event: each agent's
+                input, reasoning and output, the messages between nodes, and any attack.
+              </p>
+              <div
+                className={`pcap-drop${dragOver ? ' over' : ''}`}
+                onClick={() => inputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); onFile(e.dataTransfer.files?.[0]) }}
+              >
+                <input ref={inputRef} type="file" accept=".json,application/json" hidden
+                  onChange={(e) => onFile(e.target.files?.[0])} />
+                <div className="pcap-drop-icon">📂</div>
+                <div>Drop a scn_*.json here, or click to choose</div>
+              </div>
+              {error && <div className="pcap-error">⚠ {error}</div>}
+            </>
+          )}
 
           {scn && (
             <>
-              <button className="btn small" onClick={() => onLoadArch(reconstructArch(scn))}>↻ Reload architecture onto canvas</button>
-              <PcapResult scn={scn} />
+              <ScenarioSummary scn={scn} onReload={() => onLoadArch(reconstructArch(scn))} />
+              <TracePlayer scn={scn} />
             </>
           )}
         </div>
@@ -140,97 +149,201 @@ export default function PcapModal({ onLoadArch, onClose, toast }) {
   )
 }
 
-// ---- rendered trace ------------------------------------------------------
-function PcapResult({ scn }) {
+// ---- compact summary -----------------------------------------------------
+function ScenarioSummary({ scn, onReload }) {
   const cfg = scn.config || {}
   const v = scn.verdict || {}
   const mal = scn.compromised || []
-  const events = scn.trace?.events || []
-  const held = v.attack_succeeded === false
   const breached = v.attack_succeeded === true
+  const held = v.attack_succeeded === false
+  return (
+    <div className="pcap-summary">
+      <div className="pcap-summary-row">
+        <span><b>{cfg.arch}</b> <span className="tag">{cfg.condition || 'clean'}</span>
+          {cfg.model ? <span className="muted"> · {cfg.model}</span> : null}</span>
+        <button className="btn small" onClick={onReload}>↻ Reload onto canvas</button>
+      </div>
+      {mal.length === 0
+        ? <div className="pcap-goal">✓ no compromised node</div>
+        : mal.map((c, i) => <div key={i} className="pcap-mal">☠ compromised: <b>{c.element}</b> ({c.type})</div>)}
+      {v.attack_succeeded != null && (
+        <div className={`pcap-verdict ${breached ? 'breached' : held ? 'held' : ''}`}>
+          task done: <b>{String(v.utility)}</b> · attack succeeded: <b>{String(v.attack_succeeded)}</b> · {breached ? 'S_safe = 0 (breached)' : 'S_safe = 1 (held)'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- step model ----------------------------------------------------------
+const KIND_META = {
+  run_start: { icon: '🚀', label: 'Run started' },
+  seed:      { icon: '🌱', label: 'Task seeded' },
+  node_enter:{ icon: '▸',  label: 'Agent activated' },
+  llm_call:  { icon: '💬', label: 'Agent responds' },
+  tool_call: { icon: '🔧', label: 'Tool call' },
+  channel:   { icon: '→',  label: 'Message' },
+  attack:    { icon: '⚠',  label: 'Attack' },
+  node_exit: { icon: '◂',  label: 'Agent output' },
+  final:     { icon: '🏁', label: 'Final answer' },
+}
+
+function stepHeadline(e) {
+  switch (e.kind) {
+    case 'seed': return `Task seeded → ${e.agent}`
+    case 'node_enter': return `${e.agent} activated`
+    case 'llm_call': return `${e.agent} responds`
+    case 'tool_call': return `${e.agent} → ${e.function}()`
+    case 'channel': return `${e.src} → ${e.tgt}${e.label ? `  (${e.label})` : ''}`
+    case 'attack': return `Attack on ${e.element}`
+    case 'node_exit': return `${e.agent} output`
+    case 'final': return `Final answer → ${(e.exits || []).join(', ') || 'exit'}`
+    default: return e.arch ? `Run started — ${e.arch}` : 'Run started'
+  }
+}
+
+const stepAgent = (e) => e.agent || (e.kind === 'channel' ? `${e.src}→${e.tgt}` : '')
+const isEvil = (e) => e.kind === 'attack' || e.aitm === true || e.poisoned === true || !!e.injected
+
+// ---- the player ----------------------------------------------------------
+function TracePlayer({ scn }) {
+  const events = scn.trace?.events || []
+  const [i, setI] = useState(0)
+  useEffect(() => { setI(0) }, [scn])
+
+  const go = (n) => setI((cur) => Math.max(0, Math.min(events.length - 1, cur + n)))
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); go(1) }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(-1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [events.length])
+
+  const railRef = useRef(null)
+  useEffect(() => {
+    const el = railRef.current?.querySelector('.step-rail-item.active')
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [i])
+
+  if (!events.length) return <div className="pcap-note">This trace has no events.</div>
+  const e = events[i]
+  const meta = KIND_META[e.kind] || { icon: '•', label: e.kind }
 
   return (
-    <div className="pcap-result">
-      <div className="pcap-summary">
-        <div><b>{cfg.arch}</b> · {cfg.user_task}{cfg.injection_task ? ` × ${cfg.injection_task}` : ''} · <span className="tag">{cfg.condition || 'clean'}</span>{cfg.poison_mode ? <> <span className="tag">{cfg.poison_mode}</span></> : null}</div>
-        {mal.length === 0
-          ? <div className="pcap-goal">✓ no compromised node detected</div>
-          : mal.map((c, i) => <div key={i} className="pcap-mal">☠ compromised node: <b>{c.element}</b> ({c.type})</div>)}
-        {cfg.injection_goal && <div className="pcap-goal">🎯 attacker goal: {cfg.injection_goal}</div>}
-        {v.attack_succeeded != null && (
-          <div className={`pcap-verdict ${breached ? 'breached' : held ? 'held' : ''}`}>
-            utility (task done): <b>{String(v.utility)}</b> · attack succeeded: <b>{String(v.attack_succeeded)}</b> · {breached ? 'S_safe = 0 (breached)' : 'S_safe = 1 (held)'}
-          </div>
-        )}
-        <div className="pcap-note">Architecture loaded onto the canvas — close this panel to view it (the compromised node is highlighted red).</div>
-      </div>
-
-      <div className="pcap-section-title">FLOW — information between nodes (⚠ = attack)</div>
-      <div className="pcap-flow">
-        {events.map((e) => {
-          if (e.kind === 'seed') return <Row key={e.seq} e={e} arrow={`· → ${e.agent}`} kind="seed" info={clip(e.message, 90)} />
-          if (e.kind === 'channel') return <Row key={e.seq} e={e} arrow={`${e.src} → ${e.tgt}`} kind={`chan${e.label ? ':' + e.label : ''}`} info={clip(e.message, 90)} evil={e.aitm} />
-          if (e.kind === 'tool_call') return <Row key={e.seq} e={e} arrow={`${e.agent} ⟳`} kind={e.poisoned ? 'tool ☠' : e.error ? 'tool ✗' : 'tool'} info={`${e.function}(${clip(e.args, 40)}) → ${clip(e.result, 50)}`} evil={e.poisoned} />
-          if (e.kind === 'attack') return <Row key={e.seq} e={e} arrow={`⚠ ${e.element}`} kind={e.type} info={`[${e.vector}] ${clip(e.payload, 70)}`} evil />
-          if (e.kind === 'final') return <Row key={e.seq} e={e} arrow={`→ ${(e.exits || []).join(',') || 'exit'}`} kind="FINAL" info={clip(e.answer, 90)} fin />
-          return null
+    <div className="trace-player">
+      <div className="step-rail" ref={railRef}>
+        {events.map((ev, idx) => {
+          const m = KIND_META[ev.kind] || { icon: '•' }
+          return (
+            <button
+              key={ev.seq ?? idx}
+              className={`step-rail-item${idx === i ? ' active' : ''}${isEvil(ev) ? ' evil' : ''}`}
+              onClick={() => setI(idx)}
+            >
+              <span className="step-rail-icon">{m.icon}</span>
+              <span className="step-rail-text">{stepHeadline(ev)}</span>
+              <span className="step-rail-t">{(ev.t ?? 0).toFixed?.(1) ?? ev.t}s</span>
+            </button>
+          )
         })}
       </div>
 
-      <div className="pcap-section-title">NODE INTERNALS — input, reasoning, tools, output</div>
-      <div className="pcap-nodes">
-        {groupNodes(events).map((g, i) => (
-          <div key={i} className="pcap-node">
-            <div className="pcap-node-head">▸ {g.agent} <span className="muted">role={g.role || '-'} · tools={(g.tools || []).length}</span></div>
-            <div className="pcap-kv"><span>system</span><div>{clip(g.system, 220)}</div></div>
-            <div className="pcap-kv"><span>input</span><div>{clip(g.incoming, 220)}</div></div>
-            {g.injected && <div className="pcap-kv evil"><span>⚠ injected</span><div>{clip(g.injected, 220)}</div></div>}
-            {g.llm.map((c, j) => (
-              <div key={j} className="pcap-llm">
-                {c.reasoning && <div className="pcap-kv muted"><span>think</span><div>{clip(c.reasoning, 220)}</div></div>}
-                {c.content && <div className="pcap-kv"><span>say</span><div>{clip(c.content, 220)}</div></div>}
-                {(c.tool_calls || []).map((tc, k) => <div key={k} className="pcap-kv call"><span>→ call</span><div>{tc.function}({clip(JSON.stringify(tc.args), 80)})</div></div>)}
-              </div>
-            ))}
-            {g.tools_out.map((t, j) => (
-              <div key={j} className={`pcap-kv ${t.poisoned ? 'evil' : 'muted'}`}><span>tool{t.poisoned ? ' ☠' : ''}</span><div>{t.function} → {clip(t.result, 160)}</div></div>
-            ))}
-            <div className="pcap-kv out"><span>out ▸</span><div>{clip(g.output, 220)}</div></div>
+      <div className="step-detail">
+        <div className={`step-detail-head${isEvil(e) ? ' evil' : ''}`}>
+          <span className="step-detail-icon">{meta.icon}</span>
+          <div>
+            <div className="step-detail-title">{stepHeadline(e)}</div>
+            <div className="step-detail-sub">{meta.label} · {(e.t ?? 0).toFixed?.(2) ?? e.t}s</div>
           </div>
-        ))}
+        </div>
+
+        <div className="step-detail-body">
+          <StepFields e={e} />
+        </div>
+
+        <div className="step-nav">
+          <button className="btn small" disabled={i === 0} onClick={() => go(-1)}>← Previous</button>
+          <span className="step-nav-count">Step {i + 1} / {events.length}</span>
+          <button className="btn small" disabled={i === events.length - 1} onClick={() => go(1)}>Next →</button>
+        </div>
       </div>
     </div>
   )
 }
 
-function Row({ e, arrow, kind, info, evil, fin }) {
+// `md` renders the value as Markdown (agent prose: think / say / output / answer /
+// messages). Without it the value is shown verbatim in a monospace block — right
+// for structured/literal fields (tool args, payloads, ids).
+function Field({ label, value, tone, md }) {
+  if (value == null || value === '') return null
   return (
-    <div className={`pcap-row${evil ? ' evil' : ''}${fin ? ' fin' : ''}`}>
-      <span className="pcap-seq">{e.seq}</span>
-      <span className="pcap-t">{(e.t ?? 0).toFixed?.(2) ?? e.t}s</span>
-      <span className="pcap-arrow">{arrow}</span>
-      <span className="pcap-kind">{kind}</span>
-      <span className="pcap-info">{info}</span>
+    <div className={`step-field${tone ? ' ' + tone : ''}`}>
+      <div className="step-field-label">{label}</div>
+      {md
+        ? <div className="step-field-val md-val"><Markdown text={value} /></div>
+        : <pre className="step-field-val">{String(value)}</pre>}
     </div>
   )
 }
 
-function groupNodes(events) {
-  const groups = []
-  let cur = null
-  for (const e of events) {
-    if (e.kind === 'node_enter') {
-      cur = { agent: e.agent, role: e.role, system: e.system, incoming: e.incoming, injected: e.injected, tools: e.tools, llm: [], tools_out: [], output: '' }
-      groups.push(cur)
-    } else if (!cur) {
-      continue
-    } else if (e.kind === 'llm_call') {
-      cur.llm.push({ reasoning: e.reasoning, content: e.content, tool_calls: e.tool_calls })
-    } else if (e.kind === 'tool_call') {
-      cur.tools_out.push({ function: e.function, result: e.result, poisoned: e.poisoned, error: e.error })
-    } else if (e.kind === 'node_exit') {
-      cur.output = e.output
-    }
+// Render the right fields for the current event kind. Full text (scrollable),
+// not clipped — the whole point is to read what each agent actually said.
+function StepFields({ e }) {
+  switch (e.kind) {
+    case 'run_start':
+      return <>
+        <Field label="architecture" value={e.arch} />
+        <Field label="task" value={e.task} />
+        <Field label="entries" value={(e.entries || []).join(', ')} />
+        <Field label="exits" value={(e.exits || []).join(', ')} />
+        {(e.compromised || []).length > 0 &&
+          <Field label="compromised" tone="evil" value={(e.compromised || []).map((c) => `${c.element} (${c.type})`).join('\n')} />}
+      </>
+    case 'seed':
+      return <Field label="message" md value={e.message} />
+    case 'node_enter':
+      return <>
+        <Field label="role" value={e.role} />
+        {(e.tools || []).length > 0 && <Field label="tools" value={(e.tools || []).join(', ')} />}
+        <Field label="system" md value={e.system} />
+        <Field label="input ◂" md value={e.incoming} />
+        <Field label="⚠ injected" tone="evil" md value={e.injected} />
+      </>
+    case 'llm_call':
+      return <>
+        <Field label="think" tone="muted" md value={e.reasoning} />
+        <Field label="say" tone="out" md value={e.content} />
+        {(e.tool_calls || []).length > 0 &&
+          <Field label="→ calls" tone="call" value={(e.tool_calls || []).map((t) => `${t.function}(${JSON.stringify(t.args)})`).join('\n')} />}
+      </>
+    case 'tool_call':
+      return <>
+        <Field label="function" tone={e.poisoned ? 'evil' : null} value={`${e.function}(${JSON.stringify(e.args || {})})`} />
+        <Field label={e.poisoned ? 'result ☠' : e.error ? 'result ✗' : 'result'} tone={e.poisoned ? 'evil' : null} value={e.result} />
+      </>
+    case 'channel':
+      return <>
+        {e.aitm && <Field label="⚠ AiTM" tone="evil" value="message intercepted and rewritten in flight" />}
+        {e.aitm && <Field label="original" md value={e.original} />}
+        <Field label={e.aitm ? 'rewritten ▸' : 'message ▸'} tone={e.aitm ? 'evil' : 'out'} md value={e.message} />
+      </>
+    case 'attack':
+      return <>
+        <Field label="element" tone="evil" value={e.element} />
+        <Field label="type" tone="evil" value={e.type} />
+        <Field label="vector" value={e.vector} />
+        <Field label="payload" tone="evil" value={e.payload} />
+      </>
+    case 'node_exit':
+      return <Field label="output ▸" tone="out" md value={e.output} />
+    case 'final':
+      return <>
+        <Field label="exits" value={(e.exits || []).join(', ')} />
+        <Field label="answer" tone="out" md value={e.answer} />
+      </>
+    default:
+      return <Field label={e.kind} value={JSON.stringify(e, null, 2)} />
   }
-  return groups
 }

@@ -16,7 +16,25 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 from collections import defaultdict, deque
+
+# Reasoning models (MiniMax-M2, DeepSeek-R1, QwQ, …) wrap their chain-of-thought
+# in <think>…</think> inline in the reply. We keep the full text as the agent's
+# output, but split the scratchpad out for the structured scenario log so PCAP can
+# show "think" and "say" separately (as it does for sa_bridge captures).
+_THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
+
+
+def split_reasoning(s: str) -> tuple[str | None, str]:
+    s = s or ""
+    m = _THINK_RE.search(s)
+    if not m:
+        return None, s
+    reasoning = m.group(1).strip()
+    content = (s[: m.start()] + s[m.end():]).strip()
+    return reasoning, content
 
 RESET, RED, YELLOW, CYAN, GREY, GREEN, BOLD = (
     "\033[0m", "\033[91m", "\033[93m", "\033[96m", "\033[90m", "\033[92m", "\033[1m",
@@ -65,7 +83,15 @@ def provider_engine(provider: dict | None) -> str:
 
 
 def call_llm(provider: dict | None, model: str, system: str, user: str,
-             temperature: float | None, max_tokens: int | None) -> str:
+             temperature: float | None, max_tokens: int | None,
+             on_delta=None) -> str:
+    """Call the agent's LLM and return its full reply.
+
+    Responses are *streamed*: as each token arrives it is handed to ``on_delta``
+    (when provided) so the trace grows live instead of blocking until the whole
+    answer — important for reasoning models that emit a long hidden think pass
+    before any visible content. The accumulated text is still returned in full.
+    """
     engine = provider_engine(provider)
     key = (provider or {}).get("api_key", "")
     base_url = (provider or {}).get("base_url", "") or None
@@ -78,21 +104,29 @@ def call_llm(provider: dict | None, model: str, system: str, user: str,
         # every hop. Register a keyed provider for real responses.
         tag = model or (provider or {}).get("kind") or "mock"
         reason = "no API key" if (engine != "mock" and not key) else "mock provider"
-        return f"[mock:{tag} · {reason}] placeholder reply (no live LLM)"
+        out = f"[mock:{tag} · {reason}] placeholder reply (no live LLM)"
+        if on_delta:
+            on_delta(out)
+        return out
 
     try:
         if engine == "anthropic":
             import anthropic
 
             client = anthropic.Anthropic(api_key=key, base_url=base_url)
-            resp = client.messages.create(
+            with client.messages.stream(
                 model=model or "claude-haiku-4-5",
                 system=system,
                 max_tokens=max_tokens or 1024,
                 temperature=temperature if temperature is not None else 1.0,
                 messages=[{"role": "user", "content": user}],
-            )
-            return "".join(getattr(b, "text", "") for b in resp.content)
+            ) as stream:
+                parts = []
+                for piece in stream.text_stream:
+                    parts.append(piece)
+                    if on_delta:
+                        on_delta(piece)
+                return "".join(parts)
 
         from openai import OpenAI
 
@@ -103,13 +137,37 @@ def call_llm(provider: dict | None, model: str, system: str, user: str,
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            "stream": True,
         }
         if temperature is not None:
             kwargs["temperature"] = temperature
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        resp = client.chat.completions.create(**kwargs)
-        return resp.choices[0].message.content or ""
+        content_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        for chunk in client.chat.completions.create(**kwargs):
+            if not chunk.choices:
+                continue
+            d = chunk.choices[0].delta
+            # Some OpenAI-compatible reasoning endpoints stream the think pass in a
+            # separate `reasoning_content` channel rather than inline <think> tags.
+            rc = getattr(d, "reasoning_content", None)
+            if rc:
+                reasoning_parts.append(rc)
+                if on_delta:
+                    on_delta(rc)
+            c = getattr(d, "content", None)
+            if c:
+                content_parts.append(c)
+                if on_delta:
+                    on_delta(c)
+        content = "".join(content_parts)
+        reasoning = "".join(reasoning_parts)
+        # Fold a separate reasoning channel back into the returned text as a
+        # <think> block so the rest of the pipeline (and the scn log) see it.
+        if reasoning and "<think>" not in content:
+            content = f"<think>{reasoning}</think>\n{content}"
+        return content
     except Exception as exc:  # pragma: no cover - network/credentials dependent
         return f"[llm-error:{engine}:{model}] {exc}"
 
@@ -145,11 +203,38 @@ def run_mas(mas, task: str | None = None) -> dict:
 
     attacks: list[dict] = []
 
+    # ---- structured scenario log (consumed by the PCAP analyzer) -------------
+    # Mirrors the sa_bridge scn_*.json shape: a timed, sequenced event stream the
+    # frontend replays as flow + per-node internals. Emitted as one __SCN__ line.
+    _t0 = time.monotonic()
+    events: list[dict] = []
+    _seq = [0]
+
+    def emit(kind: str, **fields) -> None:
+        _seq[0] += 1
+        events.append({"seq": _seq[0], "t": round(time.monotonic() - _t0, 3),
+                       "kind": kind, **fields})
+
+    # Configured-adversarial elements (known up front, before anything fires).
+    compromised: list[dict] = []
+    for _a in mas.agents:
+        if _a.malicious.enabled:
+            compromised.append({"element": _a.id, "type": _a.malicious.attack})
+    for _ch in mas.channels:
+        if _ch.malicious.enabled:
+            compromised.append({"element": f"{_ch.src.id}->{_ch.tgt.id}",
+                                "type": _ch.malicious.attack})
+    for _att in mas.attachments:
+        _r = _att.resource
+        if getattr(_r, "malicious", None) and _r.malicious.enabled:
+            compromised.append({"element": _r.id, "type": _r.malicious.attack})
+
     def resource_value(res) -> str:
         kind = "memory" if hasattr(res, "backend") else "tool"
         m = res.malicious
         if m.enabled:
             attacks.append({"element": res.id, "type": m.attack})
+            emit("attack", element=res.id, type=m.attack, vector=kind, payload=m.payload)
             attack(f"{kind} '{res.label}' is poisoned -> returns attacker "
                    f"payload: {m.payload!r}")
             return m.payload
@@ -187,23 +272,42 @@ def run_mas(mas, task: str | None = None) -> dict:
         backend = (provider or {}).get("kind", "mock")
         step(f"agent '{agent.label}' ({backend}:{model})")
 
+        system = agent.prompt or f"You are {agent.role or agent.label}."
+        m = agent.malicious
+        injected = m.payload if (m.enabled and m.attack == "prompt-injection") else None
+        res_list = attached.get(id(agent), [])
+        emit("node_enter", agent=agent.label, role=getattr(agent, "role", None),
+             system=system, incoming=incoming, injected=injected,
+             tools=[getattr(r, "label", "") for r in res_list])
+
         parts = [incoming]
-        for res in attached.get(id(agent), []):
-            parts.append(resource_value(res))
+        for res in res_list:
+            val = resource_value(res)
+            parts.append(val)
+            emit("tool_call", agent=agent.label, function=getattr(res, "label", ""),
+                 args={}, result=val, poisoned=res.malicious.enabled, error=False)
         user_input = "\n".join(parts)
 
-        m = agent.malicious
-        if m.enabled and m.attack == "prompt-injection":
+        if injected is not None:
             attacks.append({"element": agent.id, "type": "prompt-injection"})
+            emit("attack", element=agent.id, type="prompt-injection",
+                 vector="agent", payload=m.payload)
             attack(f"agent '{agent.label}' compromised -> injected directive appended")
             user_input += f"\n\n[INJECTED]: {m.payload}"
 
         log(f"{GREY}    in  ◂ {clip(user_input)}{RESET}")
-        system = agent.prompt or f"You are {agent.role or agent.label}."
+        # Stream the reply live so the trace fills in token-by-token instead of
+        # blocking on the whole (often long) reasoning pass.
+        print(f"{GREY}    out ▸ {RESET}", end="", flush=True)
         output = call_llm(provider, model, system, user_input,
-                          agent.temperature, agent.max_tokens)
+                          agent.temperature, agent.max_tokens,
+                          on_delta=lambda piece: print(piece, end="", flush=True))
+        print("", flush=True)  # close the streamed line
         outputs[id(agent)] = output
-        log(f"{GREY}    out ▸ {clip(output)}{RESET}")
+        reasoning, content = split_reasoning(output)
+        emit("llm_call", agent=agent.label, iter=runs[id(agent)] - 1,
+             reasoning=reasoning, content=content, tool_calls=[])
+        emit("node_exit", agent=agent.label, output=output)
         return output
 
     def chosen_edges(agent, output: str) -> list:
@@ -242,11 +346,17 @@ def run_mas(mas, task: str | None = None) -> dict:
         """Send a message along channel ``ch`` (applying any AiTM rewrite), gating
         on the target's join policy."""
         cm = ch.malicious
-        if cm.enabled and cm.attack == "aitm":
+        original = None
+        aitm = bool(cm.enabled and cm.attack == "aitm")
+        if aitm:
             attacks.append({"element": f"{ch.src.id}->{ch.tgt.id}", "type": "aitm"})
+            emit("attack", element=f"{ch.src.id}->{ch.tgt.id}", type="aitm",
+                 vector="channel", payload=cm.payload)
             attack(f"channel {ch.src.label} -> {ch.tgt.label} intercepted (AiTM) "
                    f"-> message rewritten to: {cm.payload!r}")
-            msg = cm.payload
+            original, msg = msg, cm.payload
+        emit("channel", src=ch.src.label, tgt=ch.tgt.label, label=ch.label or "",
+             message=msg, aitm=aitm, original=original)
         tgt = ch.tgt
         if (getattr(tgt, "join", "any") or "any") == "all":
             needed = in_channels.get(id(tgt), [])
@@ -267,7 +377,13 @@ def run_mas(mas, task: str | None = None) -> dict:
     if not entries:
         targets = {id(ch.tgt) for ch in mas.channels if not ch.loop}
         entries = [a for a in mas.agents if id(a) not in targets] or mas.agents[:1]
+
+    exits = list(dict.fromkeys(mas.exits))
+    emit("run_start", arch=mas.name, task=task, compromised=compromised,
+         entries=[a.label for a in entries], exits=[a.label for a in exits],
+         poison_mode=None)
     for entry in entries:
+        emit("seed", agent=entry.label, message=task)
         queue.append((entry, task))
 
     steps = 0
@@ -286,13 +402,14 @@ def run_mas(mas, task: str | None = None) -> dict:
         for ch in chosen_edges(agent, last):
             enqueue_delivery(ch, last)
 
-    exits = list(dict.fromkeys(mas.exits))
     if exits:
         final_answer = "\n".join(
             outputs[id(a)] for a in exits if id(a) in outputs
         ) or last
     else:
         final_answer = last
+
+    emit("final", answer=final_answer, exits=[a.label for a in exits])
 
     log("=" * 64)
     if exits:
@@ -311,4 +428,30 @@ def run_mas(mas, task: str | None = None) -> dict:
         "agents": len(mas.agents),
     }
     print("__RESULT__ " + json.dumps(result), flush=True)
+
+    first_model = next((a.model for a in mas.agents if a.model), None) \
+        or next((providers.get(a.provider, {}).get("models", [None])[0]
+                 for a in mas.agents), None)
+    scn = {
+        "config": {
+            "arch": mas.name,
+            "user_task": None,
+            "user_prompt": task,
+            "injection_task": None,
+            "condition": "compromised" if compromised else "clean",
+            "compromise": compromised[0]["element"] if compromised else None,
+            "poison_mode": None,
+            "model": first_model,
+            "injection_goal": None,
+            "env_injection_vectors": [],
+        },
+        "compromised": compromised,
+        "verdict": {
+            "utility": None,
+            "security": len(attacks) == 0,
+            "attack_succeeded": True if attacks else None,
+        },
+        "trace": {"events": events},
+    }
+    print("__SCN__ " + json.dumps(scn), flush=True)
     return result

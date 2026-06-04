@@ -58,6 +58,12 @@ export async function startRun(arch) {
 export async function runStatus(runId) {
   return (await fetch(`/api/run/${runId}`)).json()
 }
+// The run's structured scenario log (PCAP scn_*.json format). Throws if absent.
+export async function runScn(runId) {
+  const r = await fetch(`/api/run/${runId}/scn`)
+  if (!r.ok) throw new Error('no scenario log for this run')
+  return r.json()
+}
 export async function health() {
   try { return await (await fetch('/api/health')).json() } catch { return { ok: false } }
 }

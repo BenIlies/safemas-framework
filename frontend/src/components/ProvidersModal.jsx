@@ -86,20 +86,37 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
           <div className="provider-list">
             {providers.length === 0 && <div className="empty-row">No providers yet.</div>}
             {providers.map((p) => (
-              <div key={p.id} className="provider-row">
-                <div className="provider-row-main">
-                  <b>{p.name}</b>
-                  <span className="tag">{PROVIDER_KINDS[p.kind]?.label || p.kind}</span>
-                  {p.has_key
-                    ? <span className="tag key-ok">key saved</span>
-                    : <span className="tag key-missing">no key</span>}
-                  {p.default && <span className="tag key-ok">★ default</span>}
+              <div key={p.id} className={`provider-card${p.default ? ' is-default' : ''}`}>
+                <div className="provider-card-icon">{(p.name || '?').trim().charAt(0).toUpperCase()}</div>
+                <div className="provider-card-info">
+                  <div className="provider-card-name">
+                    <span className="provider-card-title">{p.name}</span>
+                    {p.default && <span className="provider-badge">default</span>}
+                  </div>
+                  <div className="provider-card-meta">
+                    <span>{PROVIDER_KINDS[p.kind]?.label || p.kind}</span>
+                    <span className="dot">·</span>
+                    <span className={p.has_key ? 'key-ok' : 'key-missing'}>
+                      <span className="key-dot" /> {p.has_key ? 'key saved' : 'no key'}
+                    </span>
+                  </div>
+                  {(p.models || []).length > 0 && (
+                    <div className="provider-card-models">
+                      {p.models.map((m) => <span key={m} className="model-chip">{m}</span>)}
+                    </div>
+                  )}
                 </div>
-                <div className="provider-row-models">{(p.models || []).join(', ') || '—'}</div>
-                <div className="provider-row-actions">
-                  {!p.default && <button className="btn small" title="New agents inherit the default provider" onClick={() => makeDefault(p)}>Set default</button>}
-                  <button className="btn small" onClick={() => startEdit(p)}>Edit</button>
-                  <button className="btn small danger" onClick={() => remove(p)}>Delete</button>
+                <div className="provider-card-actions">
+                  <button
+                    className={`icon-btn star${p.default ? ' active' : ''}`}
+                    title={p.default ? 'Default provider' : 'Set as default'}
+                    disabled={p.default}
+                    onClick={() => makeDefault(p)}
+                  >
+                    {p.default ? '★' : '☆'}
+                  </button>
+                  <button className="icon-btn" title="Edit" onClick={() => startEdit(p)}>✎</button>
+                  <button className="icon-btn danger" title="Delete" onClick={() => remove(p)}>🗑</button>
                 </div>
               </div>
             ))}

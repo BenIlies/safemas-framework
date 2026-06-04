@@ -88,7 +88,18 @@ def _load_persisted() -> None:
 def delete(cid: str) -> str:
     CAMPAIGNS.pop(cid, None)
     (CAMP_DIR / f"{cid}.json").unlink(missing_ok=True)
+    scn_dir = CAMP_DIR / cid
+    if scn_dir.is_dir():
+        for f in scn_dir.glob("*.json"):
+            f.unlink(missing_ok=True)
+        scn_dir.rmdir()
     return cid
+
+
+def test_scn(cid: str, idx: int) -> dict | None:
+    """The structured scenario log for one campaign test (PCAP scn_*.json format)."""
+    p = CAMP_DIR / cid / f"test-{idx}.scn.json"
+    return json.loads(p.read_text()) if p.exists() else None
 
 
 # --------------------------------------------------------------------------- #
@@ -138,7 +149,7 @@ def _inject(arch: dict, attack: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # Running + scoring one test
 # --------------------------------------------------------------------------- #
-def _run_one(arch: dict, task: str | None, prov_json: str) -> tuple[dict | None, str]:
+def _run_one(arch: dict, task: str | None, prov_json: str) -> tuple[dict | None, dict | None, str]:
     code = arch_to_code(arch)
     env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json}
     if task:
@@ -148,15 +159,23 @@ def _run_one(arch: dict, task: str | None, prov_json: str) -> tuple[dict | None,
                            text=True, env=env, timeout=180)
         out = p.stdout
     except subprocess.TimeoutExpired:
-        return None, "[timeout]"
-    result = None
+        return None, None, "[timeout]"
+    result = scn = None
+    trace_lines = []
     for line in out.splitlines():
         if line.startswith("__RESULT__ "):
             try:
                 result = json.loads(line[len("__RESULT__ "):])
             except json.JSONDecodeError:
                 pass
-    return result, ANSI.sub("", out)
+        elif line.startswith("__SCN__ "):
+            try:
+                scn = json.loads(line[len("__SCN__ "):])
+            except json.JSONDecodeError:
+                pass
+        else:
+            trace_lines.append(line)
+    return result, scn, ANSI.sub("", "\n".join(trace_lines))
 
 
 def _score(test: dict, result: dict | None) -> dict:
@@ -211,17 +230,23 @@ def _run_campaign(cid: str) -> None:
     def work(idx: int) -> None:
         t = camp["tests"][idx]
         status, score, trace = "done", None, ""
+        scn = None
         try:
             arch = camp["_arch"] if t["attack"] is None else _inject(camp["_arch"], t["attack"])
-            result, out = _run_one(arch, camp["task"], prov_json)
+            result, scn, out = _run_one(arch, camp["task"], prov_json)
             score = _score(t, result)
             trace = "\n".join(out.splitlines()[-40:])
         except Exception as exc:  # one test failing must not abort the campaign
             status, trace = "error", f"[error] {exc}"
+        if scn is not None:
+            scn_dir = CAMP_DIR / cid
+            scn_dir.mkdir(exist_ok=True)
+            (scn_dir / f"test-{idx}.scn.json").write_text(json.dumps(scn, indent=2))
         with lock:
             t["status"] = status
             t["result"] = score
             t["trace"] = trace
+            t["has_scn"] = scn is not None
             camp["completed"] += 1
             line = f'[{camp["completed"]}/{camp["total"]}] {t["label"]}  '
             line += (f'safe={score["safe"]} task_ok={score["task_ok"]}'
@@ -282,10 +307,11 @@ def summary(camp: dict) -> dict:
 
 def test_rows(camp: dict) -> list[dict]:
     return [
-        {"id": t["id"], "label": t["label"], "status": t["status"],
+        {"idx": i, "id": t["id"], "label": t["label"], "status": t["status"],
          "attack": t["attack"]["attack"] if t["attack"] else None,
+         "has_scn": t.get("has_scn", False),
          **(t["result"] or {})}
-        for t in camp["tests"]
+        for i, t in enumerate(camp["tests"])
     ]
 
 

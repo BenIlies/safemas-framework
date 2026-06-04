@@ -259,6 +259,16 @@ def campaign_log(cid: str) -> str:
     return "\n".join(_get_campaign(cid)["log"])
 
 
+@app.get("/api/campaigns/{cid}/tests/{idx}/scn")
+def campaign_test_scn(cid: str, idx: int) -> dict:
+    """One campaign test's scenario log (PCAP scn_*.json format)."""
+    _get_campaign(cid)
+    scn = campaign_store.test_scn(cid, idx)
+    if scn is None:
+        raise HTTPException(404, "no scenario log for this test")
+    return scn
+
+
 @app.delete("/api/campaigns/{cid}")
 def delete_campaign(cid: str) -> dict:
     return {"deleted": campaign_store.delete(cid)}
@@ -337,6 +347,8 @@ def _run_docker(code: str, prov_json: str, needs_net: bool, logf) -> int:
         "docker", "run", "--rm", "-i",
         "--network", "bridge" if needs_net else "none",
         "--memory", "512m", "--cpus", "1",
+        # Unbuffered stdout so streamed tokens reach the log file as they arrive.
+        "-e", "PYTHONUNBUFFERED=1",
         "-e", "SAFEMAS_CODE", "-e", "SAFEMAS_PROVIDERS",
         IMAGE_TAG,
     ]
@@ -348,7 +360,8 @@ def _run_local(code: str, prov_json: str, logf) -> int:
     logf.write("[local] Docker sandbox unavailable — running the generated MAS code "
                "as a local subprocess (NOT network-isolated).\n")
     logf.flush()
-    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json}
+    env = {**os.environ, "SAFEMAS_CODE": code, "SAFEMAS_PROVIDERS": prov_json,
+           "PYTHONUNBUFFERED": "1"}
     return subprocess.run(
         [sys.executable, str(RUNNER_DIR / "run_mas.py")],
         stdout=logf, stderr=subprocess.STDOUT, env=env,
@@ -382,6 +395,13 @@ def _execute(run_id: str, arch: Architecture) -> None:
                 result = json.loads(line[len("__RESULT__ "):])
             except json.JSONDecodeError:
                 pass
+        elif line.startswith("__SCN__ "):
+            try:
+                scn = json.loads(line[len("__SCN__ "):])
+                Path(run["scn_path"]).write_text(json.dumps(scn, indent=2))
+                run["has_scn"] = True
+            except (json.JSONDecodeError, OSError):
+                pass
     run["result"] = result
     run["status"] = "done" if rc == 0 else "error"
 
@@ -391,7 +411,11 @@ def run(arch: Architecture) -> dict:
     run_id = uuid.uuid4().hex[:12]
     log_path = RUNS_DIR / f"{run_id}.log"
     log_path.write_text("[queued] preparing execution...\n")
-    RUNS[run_id] = {"status": "queued", "log_path": str(log_path), "result": None}
+    RUNS[run_id] = {
+        "status": "queued", "log_path": str(log_path),
+        "scn_path": str(RUNS_DIR / f"{run_id}.scn.json"),
+        "has_scn": False, "result": None,
+    }
     threading.Thread(target=_execute, args=(run_id, arch), daemon=True).start()
     return {"run_id": run_id}
 
@@ -405,6 +429,21 @@ def run_status(run_id: str) -> dict:
     p = Path(run["log_path"])
     if p.exists():
         log = "\n".join(
-            l for l in p.read_text().splitlines() if not l.startswith("__RESULT__")
+            l for l in p.read_text().splitlines()
+            if not l.startswith("__RESULT__") and not l.startswith("__SCN__")
         )
-    return {"run_id": run_id, "status": run["status"], "log": log, "result": run["result"]}
+    return {"run_id": run_id, "status": run["status"], "log": log,
+            "result": run["result"], "has_scn": run.get("has_scn", False)}
+
+
+@app.get("/api/run/{run_id}/scn")
+def run_scn(run_id: str) -> dict:
+    """The structured scenario log for a run (the PCAP analyzer's scn_*.json
+    format). 404 until the run finishes and emits one."""
+    run = RUNS.get(run_id)
+    if not run:
+        raise HTTPException(404, "unknown run")
+    p = Path(run.get("scn_path", ""))
+    if not p.exists():
+        raise HTTPException(404, "no scenario log for this run yet")
+    return json.loads(p.read_text())
