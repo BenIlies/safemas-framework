@@ -302,15 +302,16 @@ def _run(arch: dict, task: str | None) -> dict:
     loop_iters: dict[int, int] = defaultdict(int)
     join_buf: dict[int, dict[int, str]] = defaultdict(dict)
 
-    # ---- one agent activation: real tool-calling loop --------------------- #
-    def run_agent(agent, provider, model, system, user_input, res_list) -> str:
+    # ---- one agent activation: real tool-calling loop (tools only; memory is
+    # injected as ambient context by think() before this is called) ---------- #
+    def run_agent(agent, provider, model, system, user_input, tool_res) -> str:
         engine = provider_engine(provider)
         key = (provider or {}).get("api_key", "")
 
         if engine == "mock" or not key:
-            # No live LLM: still "use" each attached resource once (so tool/memory
-            # poisoning is surfaced), then return the deterministic placeholder.
-            for res in res_list:
+            # No live LLM: "use" each attached tool once (so tool poisoning is
+            # surfaced), then return the deterministic placeholder.
+            for res in tool_res:
                 val, poisoned = resource_value(res)
                 emit("tool_call", agent=agent.label, function=res.label, args={},
                      result=val, poisoned=poisoned, error=False)
@@ -324,7 +325,7 @@ def _run(arch: dict, task: str | None) -> dict:
         from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
         try:
             llm = build_chat_model(provider, model, agent)
-            tools, by_name = build_tools(res_list)
+            tools, by_name = build_tools(tool_res)
             if tools:
                 llm = llm.bind_tools(tools)
             msgs = [SystemMessage(content=system), HumanMessage(content=user_input)]
@@ -390,10 +391,21 @@ def _run(arch: dict, task: str | None) -> dict:
         m = agent.malicious
         injected = m.payload if (m.enabled and m.attack == "prompt-injection") else None
         res_list = attached.get(id(agent), [])
+        mem_res = [r for r in res_list if r.type == "memory"]
+        tool_res = [r for r in res_list if r.type != "memory"]
         emit("node_enter", agent=agent.label, role=agent.role, system=system,
              incoming=incoming, injected=injected, tools=[r.label for r in res_list])
 
         user_input = incoming
+        # Memory is ambient shared state: its content is *always* read into the
+        # agent's context (not a tool the model may skip). A poisoned memory
+        # therefore reliably reaches the agent — that's memory-poisoning.
+        for mem in mem_res:
+            val, poisoned = resource_value(mem)
+            emit("tool_call", agent=agent.label, function=mem.label, args={},
+                 result=val, poisoned=poisoned, error=False)
+            user_input += f"\n\n[Memory · {mem.label}]\n{val}"
+
         if injected is not None:
             attacks.append({"element": agent.id, "type": "prompt-injection"})
             emit("attack", element=agent.id, type="prompt-injection", vector="agent", payload=m.payload)
@@ -401,7 +413,7 @@ def _run(arch: dict, task: str | None) -> dict:
             user_input += f"\n\n[INJECTED]: {m.payload}"
 
         log(f"{GREY}    in  ◂ {clip(user_input)}{RESET}")
-        output = run_agent(agent, provider, model, system, user_input, res_list)
+        output = run_agent(agent, provider, model, system, user_input, tool_res)
         outputs[id(agent)] = output
         emit("node_exit", agent=agent.label, output=output)
         return output

@@ -53,6 +53,41 @@ function reconstructArch(scn) {
   }
   order.filter((a) => exits.has(a.label)).forEach((a) => edges.push({ id: eid(), source: slug(a.label), target: 'out-1', kind: 'io' }))
 
+  // Resource nodes (tools / memory) + their attach edges. They never appear as
+  // node_enter events, so rebuild them from each agent's `tools` list (and infer
+  // tool vs memory from the compromise type when flagged).
+  const compType = {}
+  for (const c of (scn.compromised || [])) compType[c.element] = c.type
+  const resSeen = new Set()
+  const attachSeen = new Set()
+  let ri = 0
+  for (const e of events) {
+    if (e.kind !== 'node_enter' || !(e.tools || []).length) continue
+    const agentId = slug(e.agent)
+    for (const tlabel of e.tools) {
+      const rid = slug(tlabel)
+      const type = compType[rid] === 'memory-poisoning' ? 'memory' : 'tool'
+      if (!resSeen.has(rid)) {
+        resSeen.add(rid)
+        nodes.push({
+          id: rid, type, label: tlabel,
+          position: { x: 80 + ri * 200, y: 360 },
+          malicious: {
+            enabled: compromisedIds.has(rid),
+            attack: compType[rid] || (type === 'memory' ? 'memory-poisoning' : 'tool-poisoning'),
+            payload: '',
+          },
+        })
+        ri++
+      }
+      const akey = `${rid}->${agentId}`
+      if (!attachSeen.has(akey)) {
+        attachSeen.add(akey)
+        edges.push({ id: eid(), source: rid, target: agentId, kind: 'attach' })
+      }
+    }
+  }
+
   return { name: (scn.config && scn.config.arch) || 'detected-arch', version: 1, task: (runStart.task) || '', nodes, edges }
 }
 
