@@ -1,22 +1,27 @@
-"""LangGraph execution runtime for a SafeMAS architecture — built from JSON, no DSL.
+"""Native LangGraph execution runtime for a SafeMAS architecture.
 
-`run_arch(arch, task)` takes the editor's architecture dict ({name, task, nodes[],
-edges[]}) and runs it. Each agent is a **real tool-calling LangChain agent**: it
-binds its attached tools, and the model decides which tool(s) to call, with args,
-gets the result, and loops — the injection lands inside a tool result mid-loop,
-exactly like an agentic benchmark (AgentDojo). Memory reads are modelled as a
-read tool. Multiple tools per agent are supported.
+``run_arch(arch, task)`` takes the editor's architecture dict ({name, task,
+nodes[], edges[]}) and runs it as a **real LangGraph graph**: every agent is its
+own ``StateGraph`` node, and a ``scheduler`` node holds the work queue and
+dispatches one agent per superstep. The Pregel loop drives execution
+(checkpointed via ``MemorySaver``), so the runtime genuinely *is* LangGraph —
+not a hand loop hidden in a single node.
 
-The multi-agent topology (channels, guarded routers, bounded loops, join="all"
-barriers, entries/exits) is the same message-driven scheduler the bespoke engine
-used — its semantics are load-bearing and don't map cleanly onto LangGraph's
-superstep model — so it is hosted inside a single LangGraph ``StateGraph`` node.
-The per-agent reasoning/tool-calling is genuine LangChain/LangGraph.
+Each agent node is a real tool-calling LangChain agent: it binds its attached
+tools, the model picks tool(s) + args, gets the result, and loops — so an
+injection can land inside a tool result mid-loop, exactly like an agentic
+benchmark (AgentDojo). Memory reads are ambient context. The topology semantics
+(channels, guarded routers, bounded loops, ``join="all"`` barriers, budgets) live
+in the scheduler, which dispatches strictly one agent at a time — so the queue /
+join / ordering semantics, and the ``__SCN__`` trace they produce, are exactly
+those of the original engine (a parity harness over all templates confirms it).
 
-The structured scenario log (the ``__SCN__`` line) keeps the exact event schema
-the Trace replay UI consumes; ``llm_call.tool_calls`` and per-execution
-``tool_call`` events are now populated for real. Providers come from
-``$SAFEMAS_PROVIDERS`` and the task may be overridden by ``$SAFEMAS_TASK``.
+The step logic is pure functions over a serializable ``RunState``; the same
+functions drive a plain-Python fallback loop when ``langgraph`` is unavailable (or
+``SAFEMAS_NO_LANGGRAPH=1``), so behaviour can't drift between the two paths.
+
+Providers come from ``$SAFEMAS_PROVIDERS`` and the task may be overridden by
+``$SAFEMAS_TASK``.
 """
 from __future__ import annotations
 
@@ -24,8 +29,9 @@ import json
 import os
 import re
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from types import SimpleNamespace
+from typing import Any, Optional, TypedDict
 
 # --------------------------------------------------------------------------- #
 # Small helpers (ported from the bespoke engine so the trace/scn stay identical)
@@ -139,13 +145,17 @@ def parse_arch(arch: dict):
     resources = [nsmap[n["id"]] for n in nodes if n.get("type") in ("memory", "tool")]
 
     channels = []
-    for e in edges:
+    for i, e in enumerate(edges):
         if e.get("kind") == "channel" and e.get("source") in nsmap and e.get("target") in nsmap:
+            src, tgt = nsmap[e["source"]], nsmap[e["target"]]
             channels.append(SimpleNamespace(
-                src=nsmap[e["source"]], tgt=nsmap[e["target"]], label=e.get("label") or "",
+                src=src, tgt=tgt, label=e.get("label") or "",
                 loop=bool(e.get("loop")), when=e.get("when") or "",
                 max_iters=e.get("max_iters"), until=e.get("until") or "",
-                malicious=_mal(e.get("malicious"))))
+                malicious=_mal(e.get("malicious")),
+                # stable per-edge key so loop counters / join buffers survive
+                # serialisation (we never key on id(obj)).
+                key=f"{src.id}->{tgt.id}#{i}"))
 
     attachments = []  # (resource, agent), tolerating reversed direction
     for e in edges:
@@ -223,68 +233,124 @@ def _chunk_text(content) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# The run (ported scheduler + real tool-calling), hosted in a LangGraph node.
+# RunState: the serializable, per-step mutable state the Pregel loop carries.
+# Topology (agents/channels/maps) is immutable and lives on the Engine, captured
+# by the node closures — never in state — so the state stays checkpointable.
 # --------------------------------------------------------------------------- #
-def _run(arch: dict, task: str | None) -> dict:
-    providers = load_providers()
-    name = arch.get("name", "untitled-mas")
-    task = task or os.environ.get("SAFEMAS_TASK") or arch.get("task") or "Solve the assigned task."
+class RunState(TypedDict):
+    queue: list                  # FIFO of [agent_id, message]
+    outputs: dict                # agent_id -> last output
+    runs: dict                   # agent_id -> activation count
+    loop_iters: dict             # channel_key -> count
+    join_buf: dict               # agent_id -> {channel_key: message}
+    events: list                 # trace events (seq assigned at finalize)
+    attacks: list                # [{element, type}]
+    steps: int
+    started: bool
+    dispatch: Optional[str]      # agent id chosen this scheduler step
+    incoming: Optional[str]      # message for the dispatched agent
+    done: bool
+    final_answer: str
+    last: str
+    t0: float
 
-    agents, resources, channels, attachments, entries, exits = parse_arch(arch)
 
-    out_channels: dict[int, list] = defaultdict(list)
-    for ch in channels:
-        out_channels[id(ch.src)].append(ch)
-    in_channels: dict[int, list] = defaultdict(list)
-    for ch in channels:
-        if not ch.loop:
-            in_channels[id(ch.tgt)].append(ch)
-    attached: dict[int, list] = defaultdict(list)
-    for res, ag in attachments:
-        attached[id(ag)].append(res)
+# --------------------------------------------------------------------------- #
+# The engine: immutable topology + helpers + the two pure step functions.
+# --------------------------------------------------------------------------- #
+class Engine:
+    def __init__(self, arch: dict, task: str | None):
+        self.providers = load_providers()
+        self.name = arch.get("name", "untitled-mas")
+        self.task = (task or os.environ.get("SAFEMAS_TASK")
+                     or arch.get("task") or "Solve the assigned task.")
 
-    live = sum(1 for a in agents if providers.get(a.provider, {}).get("api_key"))
-    log(f"{BOLD}SafeMAS runner{RESET}  ::  architecture '{name}'")
-    log(f"{GREY}agents={len(agents)} channels={len(channels)} "
-        f"live-llm={live}/{len(agents)} task={task!r}{RESET}")
-    if not live and agents:
-        log(f"{YELLOW}{BOLD}⚠ no live LLM{RESET} {YELLOW}— no agent has a provider with an API "
-            f"key, so every agent uses the deterministic mock. The outputs below are "
-            f"placeholders, not real answers. Register a provider (🔑) and assign it to the "
-            f"agents for real responses.{RESET}")
-    elif live < len(agents):
-        log(f"{YELLOW}note: {len(agents) - live} of {len(agents)} agents have no keyed "
-            f"provider and will run on the mock.{RESET}")
-    log("=" * 64)
+        agents, resources, channels, attachments, entries, exits = parse_arch(arch)
+        self.agents = agents
+        self.resources = resources
+        self.channels = channels
+        self.by_id = {a.id: a for a in agents}
 
-    attacks: list[dict] = []
-    _t0 = time.monotonic()
-    events: list[dict] = []
-    _seq = [0]
+        self.out_channels: dict[str, list] = defaultdict(list)
+        for ch in channels:
+            self.out_channels[ch.src.id].append(ch)
+        self.in_channels: dict[str, list] = defaultdict(list)
+        for ch in channels:
+            if not ch.loop:
+                self.in_channels[ch.tgt.id].append(ch)
+        self.attached: dict[str, list] = defaultdict(list)
+        for res, ag in attachments:
+            self.attached[ag.id].append(res)
 
-    def emit(kind: str, **fields) -> None:
-        _seq[0] += 1
-        events.append({"seq": _seq[0], "t": round(time.monotonic() - _t0, 3),
-                       "kind": kind, **fields})
+        self.entries = self._dedup(entries) or self._default_entries()
+        self.exits = self._dedup(exits)
 
-    compromised: list[dict] = []
-    for a in agents:
-        if a.malicious.enabled:
-            compromised.append({"element": a.id, "type": a.malicious.attack})
-    for ch in channels:
-        if ch.malicious.enabled:
-            compromised.append({"element": f"{ch.src.id}->{ch.tgt.id}", "type": ch.malicious.attack})
-    for r in resources:
-        if r.malicious.enabled:
-            compromised.append({"element": r.id, "type": r.malicious.attack})
+        self.compromised: list[dict] = []
+        for a in agents:
+            if a.malicious.enabled:
+                self.compromised.append({"element": a.id, "type": a.malicious.attack})
+        for ch in channels:
+            if ch.malicious.enabled:
+                self.compromised.append({"element": f"{ch.src.id}->{ch.tgt.id}",
+                                         "type": ch.malicious.attack})
+        for r in resources:
+            if r.malicious.enabled:
+                self.compromised.append({"element": r.id, "type": r.malicious.attack})
 
-    def resource_value(res) -> tuple[str, bool]:
+    # -- setup helpers ------------------------------------------------------ #
+    @staticmethod
+    def _dedup(seq):
+        seen, out = set(), []
+        for x in seq:
+            if x.id not in seen:
+                seen.add(x.id)
+                out.append(x)
+        return out
+
+    def _default_entries(self):
+        targets = {ch.tgt.id for ch in self.channels if not ch.loop}
+        return [a for a in self.agents if a.id not in targets] or self.agents[:1]
+
+    def announce(self) -> None:
+        providers, agents, name = self.providers, self.agents, self.name
+        live = sum(1 for a in agents if providers.get(a.provider, {}).get("api_key"))
+        log(f"{BOLD}SafeMAS runner{RESET}  ::  architecture '{name}'")
+        log(f"{GREY}agents={len(agents)} channels={len(self.channels)} "
+            f"live-llm={live}/{len(agents)} task={self.task!r}{RESET}")
+        if not live and agents:
+            log(f"{YELLOW}{BOLD}⚠ no live LLM{RESET} {YELLOW}— no agent has a provider with an API "
+                f"key, so every agent uses the deterministic mock. The outputs below are "
+                f"placeholders, not real answers. Register a provider (🔑) and assign it to the "
+                f"agents for real responses.{RESET}")
+        elif live < len(agents):
+            log(f"{YELLOW}note: {len(agents) - live} of {len(agents)} agents have no keyed "
+                f"provider and will run on the mock.{RESET}")
+        log("=" * 64)
+
+    def seed_state(self) -> RunState:
+        return RunState(
+            queue=[], outputs={}, runs={}, loop_iters={}, join_buf={},
+            events=[], attacks=[], steps=0, started=False, dispatch=None,
+            incoming=None, done=False, final_answer="", last="",
+            t0=time.monotonic(),
+        )
+
+    # -- trace emit --------------------------------------------------------- #
+    @staticmethod
+    def _emit(st: RunState, kind: str, **fields) -> None:
+        st["events"].append({"t": round(time.monotonic() - st["t0"], 3),
+                             "kind": kind, **fields})
+
+    def matches(self, text: str, phrase: str) -> bool:
+        return bool(phrase) and phrase.lower() in (text or "").lower()
+
+    def resource_value(self, res, st: RunState) -> tuple[str, bool]:
         """The value an attached resource yields when read, and whether it's
         poisoned. Emits the attack event at the read site (correct ordering)."""
         m = res.malicious
         if m.enabled:
-            attacks.append({"element": res.id, "type": m.attack})
-            emit("attack", element=res.id, type=m.attack, vector=res.type, payload=m.payload)
+            st["attacks"].append({"element": res.id, "type": m.attack})
+            self._emit(st, "attack", element=res.id, type=m.attack, vector=res.type, payload=m.payload)
             attack(f"{res.type} '{res.label}' is poisoned -> returns attacker payload: {m.payload!r}")
             return m.payload, True
         content = (res.content or "").strip()
@@ -294,17 +360,8 @@ def _run(arch: dict, task: str | None) -> dict:
             return f"[memory:{res.label}] (clean, empty)", False
         return f"[tool:{res.label}] returned a normal result", False
 
-    def matches(text: str, phrase: str) -> bool:
-        return bool(phrase) and phrase.lower() in (text or "").lower()
-
-    outputs: dict[int, str] = {}
-    runs: dict[int, int] = defaultdict(int)
-    loop_iters: dict[int, int] = defaultdict(int)
-    join_buf: dict[int, dict[int, str]] = defaultdict(dict)
-
-    # ---- one agent activation: real tool-calling loop (tools only; memory is
-    # injected as ambient context by think() before this is called) ---------- #
-    def run_agent(agent, provider, model, system, user_input, tool_res) -> str:
+    # -- one agent activation: real tool-calling loop ----------------------- #
+    def run_agent(self, agent, provider, model, system, user_input, tool_res, st: RunState) -> str:
         engine = provider_engine(provider)
         key = (provider or {}).get("api_key", "")
 
@@ -312,14 +369,14 @@ def _run(arch: dict, task: str | None) -> dict:
             # No live LLM: "use" each attached tool once (so tool poisoning is
             # surfaced), then return the deterministic placeholder.
             for res in tool_res:
-                val, poisoned = resource_value(res)
-                emit("tool_call", agent=agent.label, function=res.label, args={},
-                     result=val, poisoned=poisoned, error=False)
+                val, poisoned = self.resource_value(res, st)
+                self._emit(st, "tool_call", agent=agent.label, function=res.label, args={},
+                           result=val, poisoned=poisoned, error=False)
             tag = model or (provider or {}).get("kind") or "mock"
             reason = "no API key" if (engine != "mock" and not key) else "mock provider"
             out = f"[mock:{tag} · {reason}] placeholder reply (no live LLM)"
             print(f"{GREY}    out ▸ {RESET}{out}", flush=True)
-            emit("llm_call", agent=agent.label, iter=0, reasoning=None, content=out, tool_calls=[])
+            self._emit(st, "llm_call", agent=agent.label, iter=0, reasoning=None, content=out, tool_calls=[])
             return out
 
         from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -354,9 +411,10 @@ def _run(arch: dict, task: str | None) -> dict:
                     text = f"<think>{reasoning}</think>\n{content}"
                 tool_calls = list(getattr(acc, "tool_calls", None) or [])
                 reasoning_s, content_s = split_reasoning(text)
-                emit("llm_call", agent=agent.label, iter=it, reasoning=reasoning_s,
-                     content=content_s, tool_calls=[{"function": tc["name"], "args": tc.get("args", {})}
-                                                    for tc in tool_calls])
+                self._emit(st, "llm_call", agent=agent.label, iter=it, reasoning=reasoning_s,
+                           content=content_s,
+                           tool_calls=[{"function": tc["name"], "args": tc.get("args", {})}
+                                       for tc in tool_calls])
                 msgs.append(AIMessage(content=acc.content if acc is not None else "",
                                       tool_calls=tool_calls))
                 final_text = text
@@ -367,10 +425,11 @@ def _run(arch: dict, task: str | None) -> dict:
                     if res is None:
                         val, poisoned, err = f"[error: unknown tool {tc['name']}]", False, True
                     else:
-                        val, poisoned = resource_value(res)
+                        val, poisoned = self.resource_value(res, st)
                         err = False
-                    emit("tool_call", agent=agent.label, function=(res.label if res else tc["name"]),
-                         args=tc.get("args", {}), result=val, poisoned=poisoned, error=err)
+                    self._emit(st, "tool_call", agent=agent.label,
+                               function=(res.label if res else tc["name"]),
+                               args=tc.get("args", {}), result=val, poisoned=poisoned, error=err)
                     log(f"{GREY}    ⟳ {tc['name']}({clip(json.dumps(tc.get('args', {})), 60)}) "
                         f"→ {clip(val, 80)}{RESET}")
                     msgs.append(ToolMessage(content=val, tool_call_id=tc.get("id") or tc["name"]))
@@ -378,11 +437,11 @@ def _run(arch: dict, task: str | None) -> dict:
         except Exception as exc:  # pragma: no cover - network/credentials dependent
             err = f"[llm-error:{engine}:{model}] {exc}"
             print(f"{GREY}    out ▸ {RESET}{err}", flush=True)
-            emit("llm_call", agent=agent.label, iter=0, reasoning=None, content=err, tool_calls=[])
+            self._emit(st, "llm_call", agent=agent.label, iter=0, reasoning=None, content=err, tool_calls=[])
             return err
 
-    def think(agent, incoming: str) -> str:
-        provider = providers.get(agent.provider)
+    def think(self, agent, incoming: str, st: RunState) -> str:
+        provider = self.providers.get(agent.provider)
         model = agent.model or (provider or {}).get("models", [None])[0] or "gpt-4o-mini"
         backend = (provider or {}).get("kind", "mock")
         step(f"agent '{agent.label}' ({backend}:{model})")
@@ -390,36 +449,37 @@ def _run(arch: dict, task: str | None) -> dict:
         system = agent.prompt or f"You are {agent.role or agent.label}."
         m = agent.malicious
         injected = m.payload if (m.enabled and m.attack == "prompt-injection") else None
-        res_list = attached.get(id(agent), [])
+        res_list = self.attached.get(agent.id, [])
         mem_res = [r for r in res_list if r.type == "memory"]
         tool_res = [r for r in res_list if r.type != "memory"]
-        emit("node_enter", agent=agent.label, role=agent.role, system=system,
-             incoming=incoming, injected=injected, tools=[r.label for r in res_list])
+        self._emit(st, "node_enter", agent=agent.label, role=agent.role, system=system,
+                   incoming=incoming, injected=injected, tools=[r.label for r in res_list])
 
         user_input = incoming
         # Memory is ambient shared state: its content is *always* read into the
         # agent's context (not a tool the model may skip). A poisoned memory
         # therefore reliably reaches the agent — that's memory-poisoning.
         for mem in mem_res:
-            val, poisoned = resource_value(mem)
-            emit("tool_call", agent=agent.label, function=mem.label, args={},
-                 result=val, poisoned=poisoned, error=False)
+            val, poisoned = self.resource_value(mem, st)
+            self._emit(st, "tool_call", agent=agent.label, function=mem.label, args={},
+                       result=val, poisoned=poisoned, error=False)
             user_input += f"\n\n[Memory · {mem.label}]\n{val}"
 
         if injected is not None:
-            attacks.append({"element": agent.id, "type": "prompt-injection"})
-            emit("attack", element=agent.id, type="prompt-injection", vector="agent", payload=m.payload)
+            st["attacks"].append({"element": agent.id, "type": "prompt-injection"})
+            self._emit(st, "attack", element=agent.id, type="prompt-injection", vector="agent", payload=m.payload)
             attack(f"agent '{agent.label}' compromised -> injected directive appended")
             user_input += f"\n\n[INJECTED]: {m.payload}"
 
         log(f"{GREY}    in  ◂ {clip(user_input)}{RESET}")
-        output = run_agent(agent, provider, model, system, user_input, tool_res)
-        outputs[id(agent)] = output
-        emit("node_exit", agent=agent.label, output=output)
+        output = self.run_agent(agent, provider, model, system, user_input, tool_res, st)
+        st["outputs"][agent.id] = output
+        st["last"] = output
+        self._emit(st, "node_exit", agent=agent.label, output=output)
         return output
 
-    def chosen_edges(agent, output: str) -> list:
-        outs = out_channels.get(id(agent), [])
+    def chosen_edges(self, agent, output: str, st: RunState) -> list:
+        outs = self.out_channels.get(agent.id, [])
         if not outs:
             return []
         if not any(ch.when or ch.loop for ch in outs):
@@ -428,8 +488,8 @@ def _run(arch: dict, task: str | None) -> dict:
         def takeable(ch) -> bool:
             if ch.loop:
                 cap = ch.max_iters if ch.max_iters is not None else DEFAULT_MAX_ITERS
-                return loop_iters[id(ch)] < cap and not matches(output, ch.until)
-            return (not ch.when) or matches(output, ch.when)
+                return st["loop_iters"].get(ch.key, 0) < cap and not self.matches(output, ch.until)
+            return (not ch.when) or self.matches(output, ch.when)
 
         pick = next((ch for ch in outs if takeable(ch)), None)
         if pick is None:
@@ -437,128 +497,194 @@ def _run(arch: dict, task: str | None) -> dict:
             pick = next((ch for ch in forwards if not ch.when),
                         forwards[0] if forwards else None)
         if pick is not None and pick.loop:
-            loop_iters[id(pick)] += 1
+            st["loop_iters"][pick.key] = st["loop_iters"].get(pick.key, 0) + 1
         return [pick] if pick is not None else []
 
-    queue: deque = deque()
-
-    def enqueue_delivery(ch, msg: str) -> None:
+    def deliver(self, ch, msg: str, st: RunState) -> None:
         cm = ch.malicious
         original = None
         aitm = bool(cm.enabled and cm.attack == "aitm")
         if aitm:
-            attacks.append({"element": f"{ch.src.id}->{ch.tgt.id}", "type": "aitm"})
-            emit("attack", element=f"{ch.src.id}->{ch.tgt.id}", type="aitm",
-                 vector="channel", payload=cm.payload)
+            st["attacks"].append({"element": f"{ch.src.id}->{ch.tgt.id}", "type": "aitm"})
+            self._emit(st, "attack", element=f"{ch.src.id}->{ch.tgt.id}", type="aitm",
+                       vector="channel", payload=cm.payload)
             attack(f"channel {ch.src.label} -> {ch.tgt.label} intercepted (AiTM) "
                    f"-> message rewritten to: {cm.payload!r}")
             original, msg = msg, cm.payload
-        emit("channel", src=ch.src.label, tgt=ch.tgt.label, label=ch.label or "",
-             message=msg, aitm=aitm, original=original)
+        self._emit(st, "channel", src=ch.src.label, tgt=ch.tgt.label, label=ch.label or "",
+                   message=msg, aitm=aitm, original=original)
         tgt = ch.tgt
         if (tgt.join or "any") == "all":
-            needed = in_channels.get(id(tgt), [])
-            buf = join_buf[id(tgt)]
-            buf[id(ch)] = msg
-            if needed and all(id(c) in buf for c in needed):
-                agg = "\n\n".join(buf[id(c)] for c in needed)
-                join_buf[id(tgt)] = {}
-                queue.append((tgt, agg))
+            needed = self.in_channels.get(tgt.id, [])
+            buf = st["join_buf"].setdefault(tgt.id, {})
+            buf[ch.key] = msg
+            if needed and all(c.key in buf for c in needed):
+                agg = "\n\n".join(buf[c.key] for c in needed)
+                st["join_buf"][tgt.id] = {}
+                st["queue"].append([tgt.id, agg])
             else:
                 waiting = len(needed) - len(buf)
                 log(f"{GREY}    … '{tgt.label}' joins, waiting for {waiting} more input(s){RESET}")
         else:
-            queue.append((tgt, msg))
+            st["queue"].append([tgt.id, msg])
 
-    def _dedup(seq):  # SimpleNamespace is unhashable (defines __eq__), so dedup by id
-        seen, out = set(), []
-        for x in seq:
-            if id(x) not in seen:
-                seen.add(id(x))
-                out.append(x)
-        return out
+    # -- the two pure step functions ---------------------------------------- #
+    def scheduler_step(self, st: RunState) -> None:
+        """Seed on first call, then pop the next dispatchable agent (honouring the
+        budgets). When the queue drains, compute the final answer and finish."""
+        if not st["started"]:
+            st["started"] = True
+            self._emit(st, "run_start", arch=self.name, task=self.task,
+                       compromised=self.compromised,
+                       entries=[a.label for a in self.entries],
+                       exits=[a.label for a in self.exits], poison_mode=None)
+            for e in self.entries:
+                self._emit(st, "seed", agent=e.label, message=self.task)
+                st["queue"].append([e.id, self.task])
 
-    entries_l = _dedup(entries)
-    if not entries_l:
-        targets = {id(ch.tgt) for ch in channels if not ch.loop}
-        entries_l = [a for a in agents if id(a) not in targets] or agents[:1]
-    exits_l = _dedup(exits)
+        while st["queue"]:
+            if st["steps"] >= STEP_BUDGET:
+                log(f"{YELLOW}[guard] step budget ({STEP_BUDGET}) reached — stopping run{RESET}")
+                break
+            agent_id, msg = st["queue"].pop(0)
+            if st["runs"].get(agent_id, 0) >= PER_AGENT_CAP:
+                log(f"{YELLOW}[guard] '{self.by_id[agent_id].label}' hit per-agent activation cap{RESET}")
+                continue
+            st["runs"][agent_id] = st["runs"].get(agent_id, 0) + 1
+            st["steps"] += 1
+            st["dispatch"] = agent_id
+            st["incoming"] = msg
+            return
 
-    emit("run_start", arch=name, task=task, compromised=compromised,
-         entries=[a.label for a in entries_l], exits=[a.label for a in exits_l], poison_mode=None)
-    for entry in entries_l:
-        emit("seed", agent=entry.label, message=task)
-        queue.append((entry, task))
+        # nothing left to dispatch — finish.
+        st["dispatch"] = None
+        if self.exits:
+            final_answer = "\n".join(st["outputs"][a.id] for a in self.exits
+                                     if a.id in st["outputs"]) or st["last"]
+        else:
+            final_answer = st["last"]
+        st["final_answer"] = final_answer
+        self._emit(st, "final", answer=final_answer, exits=[a.label for a in self.exits])
 
-    steps = 0
-    last = ""
-    while queue:
-        if steps >= STEP_BUDGET:
-            log(f"{YELLOW}[guard] step budget ({STEP_BUDGET}) reached — stopping run{RESET}")
-            break
-        agent, incoming = queue.popleft()
-        if runs[id(agent)] >= PER_AGENT_CAP:
-            log(f"{YELLOW}[guard] '{agent.label}' hit per-agent activation cap{RESET}")
-            continue
-        runs[id(agent)] += 1
-        steps += 1
-        last = think(agent, incoming)
-        for ch in chosen_edges(agent, last):
-            enqueue_delivery(ch, last)
+        log("=" * 64)
+        if self.exits:
+            log(f"{GREY}exit agent(s): {', '.join(a.label for a in self.exits)}{RESET}")
+        log(f"{BOLD}final answer:{RESET} {GREEN}{final_answer}{RESET}")
+        if st["attacks"]:
+            log(f"{RED}{BOLD}{len(st['attacks'])} attack(s) fired during execution.{RESET}")
+        else:
+            log(f"{GREY}no malicious elements triggered.{RESET}")
+        st["done"] = True
 
-    if exits_l:
-        final_answer = "\n".join(outputs[id(a)] for a in exits_l if id(a) in outputs) or last
+    def agent_step(self, agent_id: str, incoming: str, st: RunState) -> None:
+        agent = self.by_id[agent_id]
+        output = self.think(agent, incoming, st)
+        for ch in self.chosen_edges(agent, output, st):
+            self.deliver(ch, output, st)
+
+    # -- finalize: print __RESULT__ / __SCN__ ------------------------------- #
+    def finalize(self, st: RunState) -> dict:
+        attacks = st["attacks"]
+        result = {
+            "name": self.name, "final_answer": st["final_answer"], "attacks": attacks,
+            "attack_count": len(attacks), "agents": len(self.agents),
+        }
+        print("__RESULT__ " + json.dumps(result), flush=True)
+
+        first_model = next((a.model for a in self.agents if a.model), None) \
+            or next((self.providers.get(a.provider, {}).get("models", [None])[0]
+                     for a in self.agents), None)
+        events = [{"seq": i + 1, **ev} for i, ev in enumerate(st["events"])]
+        scn = {
+            "config": {
+                "arch": self.name, "user_task": None, "user_prompt": self.task,
+                "injection_task": None,
+                "condition": "compromised" if self.compromised else "clean",
+                "compromise": self.compromised[0]["element"] if self.compromised else None,
+                "poison_mode": None, "model": first_model, "injection_goal": None,
+                "env_injection_vectors": [],
+            },
+            "compromised": self.compromised,
+            "verdict": {"utility": None, "security": len(attacks) == 0,
+                        "attack_succeeded": True if attacks else None},
+            "trace": {"events": events},
+        }
+        print("__SCN__ " + json.dumps(scn), flush=True)
+        return result
+
+    # -- drive: real LangGraph graph, with a plain-loop fallback ------------ #
+    def _scheduler_node_name(self) -> str:
+        name = "scheduler"
+        while name in self.by_id:
+            name += "_"
+        return name
+
+    def build_graph(self):
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.checkpoint.memory import MemorySaver
+
+        sched = self._scheduler_node_name()
+        sg = StateGraph(RunState)
+
+        def scheduler_node(state: RunState) -> RunState:
+            self.scheduler_step(state)
+            return state
+
+        def make_agent_node(_aid: str):
+            def node(state: RunState) -> RunState:
+                self.agent_step(state["dispatch"], state["incoming"], state)
+                return state
+            return node
+
+        sg.add_node(sched, scheduler_node)
+        for a in self.agents:
+            sg.add_node(a.id, make_agent_node(a.id))
+        sg.add_edge(START, sched)
+        path_map = {a.id: a.id for a in self.agents}
+        path_map[END] = END
+        sg.add_conditional_edges(
+            sched, lambda s: END if (s["done"] or not s["dispatch"]) else s["dispatch"], path_map)
+        for a in self.agents:
+            sg.add_edge(a.id, sched)
+        return sg.compile(checkpointer=MemorySaver())
+
+    def run_via_langgraph(self, st: RunState) -> RunState:
+        graph = self.build_graph()
+        return graph.invoke(st, config={
+            "configurable": {"thread_id": self.name},
+            "recursion_limit": STEP_BUDGET * 2 + 50,
+        })
+
+    def run_fallback(self, st: RunState) -> RunState:
+        """The same step functions, driven by a plain loop (no LangGraph)."""
+        while not st["done"]:
+            self.scheduler_step(st)
+            if st["done"]:
+                break
+            self.agent_step(st["dispatch"], st["incoming"], st)
+        return st
+
+
+# --------------------------------------------------------------------------- #
+# Public entry point
+# --------------------------------------------------------------------------- #
+def _run(arch: dict, task: str | None) -> dict:
+    eng = Engine(arch, task)
+    eng.announce()
+    st = eng.seed_state()
+    if os.environ.get("SAFEMAS_NO_LANGGRAPH"):
+        st = eng.run_fallback(st)
     else:
-        final_answer = last
-
-    emit("final", answer=final_answer, exits=[a.label for a in exits_l])
-
-    log("=" * 64)
-    if exits_l:
-        log(f"{GREY}exit agent(s): {', '.join(a.label for a in exits_l)}{RESET}")
-    log(f"{BOLD}final answer:{RESET} {GREEN}{final_answer}{RESET}")
-    if attacks:
-        log(f"{RED}{BOLD}{len(attacks)} attack(s) fired during execution.{RESET}")
-    else:
-        log(f"{GREY}no malicious elements triggered.{RESET}")
-
-    result = {
-        "name": name, "final_answer": final_answer, "attacks": attacks,
-        "attack_count": len(attacks), "agents": len(agents),
-    }
-    print("__RESULT__ " + json.dumps(result), flush=True)
-
-    first_model = next((a.model for a in agents if a.model), None) \
-        or next((providers.get(a.provider, {}).get("models", [None])[0] for a in agents), None)
-    scn = {
-        "config": {
-            "arch": name, "user_task": None, "user_prompt": task, "injection_task": None,
-            "condition": "compromised" if compromised else "clean",
-            "compromise": compromised[0]["element"] if compromised else None,
-            "poison_mode": None, "model": first_model, "injection_goal": None,
-            "env_injection_vectors": [],
-        },
-        "compromised": compromised,
-        "verdict": {"utility": None, "security": len(attacks) == 0,
-                    "attack_succeeded": True if attacks else None},
-        "trace": {"events": events},
-    }
-    print("__SCN__ " + json.dumps(scn), flush=True)
-    return result
+        try:
+            st = eng.run_via_langgraph(st)
+        except Exception as exc:  # LangGraph missing / incompatible — still run.
+            log(f"{YELLOW}[runtime] LangGraph path unavailable ({exc}); "
+                f"using the built-in scheduler loop{RESET}")
+            st = eng.run_fallback(st)
+    return eng.finalize(st)
 
 
 def run_arch(arch: dict, task: str | None = None) -> dict:
-    """Execute an architecture dict. Hosts the run inside a one-node LangGraph
-    StateGraph so the runtime is LangGraph while the topology semantics (which
-    LangGraph's superstep model can't express cleanly) stay exact."""
-    try:
-        from langgraph.graph import END, StateGraph
-        sg = StateGraph(dict)
-        sg.add_node("run", lambda state: {"result": _run(arch, task)})
-        sg.set_entry_point("run")
-        sg.add_edge("run", END)
-        return sg.compile().invoke({})["result"]
-    except Exception:
-        # If LangGraph is unavailable, the scheduler is self-contained — run it
-        # directly rather than failing the whole execution.
-        return _run(arch, task)
+    """Execute an architecture dict on the native LangGraph runtime: each agent is
+    a real ``StateGraph`` node and a scheduler node drives the Pregel loop."""
+    return _run(arch, task)

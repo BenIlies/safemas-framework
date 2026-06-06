@@ -1,19 +1,25 @@
 """SafeMAS backend.
 
-REST API for the visual editor. An architecture is a JSON graph ({name, task,
-nodes[], edges[]}) — the single source of truth. Runs execute it on the LangGraph
-runtime (:mod:`safemas.graph_runtime`) in a Docker sandbox when available,
-otherwise a local subprocess. There is no DSL / codegen step.
+REST API for the visual editor. The canonical authoring/persisted form of an
+architecture is **native-LangGraph Python code** (the ``StateGraph`` DSL — see
+:mod:`safemas.model`); templates and saved configs are ``.py`` files. The
+backend converts code <-> the architecture graph dict ({name, task, nodes[],
+edges[]}) via :mod:`safemas.codegen`, and runs that dict on the LangGraph runtime
+(:mod:`safemas.graph_runtime`) in a Docker sandbox when available, otherwise a
+local subprocess.
 
 Endpoints
     GET    /api/health
-    GET    /api/configs                 list saved architectures (JSON)
+    GET    /api/configs                 list saved architectures (.py)
     GET    /api/configs/{name}          load one
-    PUT    /api/configs/{name}          save / overwrite
+    PUT    /api/configs/{name}          save / overwrite (persisted as code)
     DELETE /api/configs/{name}          delete
     GET    /api/templates               list built-in templates
-    GET    /api/templates/{id}          load a template (JSON graph)
+    GET    /api/templates/{id}          load a template (graph dict)
+    GET    /api/templates/{id}/code     load a template's StateGraph source
     POST   /api/templates/{id}/run      run a template with task/provider/compromise/resource overrides
+    POST   /api/code/to-arch            body: {code} -> Architecture graph
+    POST   /api/code/from-arch          body: Architecture -> {code}
     GET    /api/providers               list providers (keys masked)
     POST   /api/providers               create provider
     PUT    /api/providers/{id}          update (blank key keeps existing)
@@ -43,7 +49,9 @@ from pydantic import BaseModel, Field
 
 import campaigns as campaign_store
 import providers as provider_store
+import scenario as scenario_store
 import spec as spec_module
+from safemas.codegen import arch_to_code, code_to_arch
 from schema import Architecture, ProviderInput, ProviderPublic
 
 BASE = Path(__file__).resolve().parent
@@ -131,53 +139,62 @@ def health() -> dict:
 
 @app.get("/api/configs")
 def list_configs() -> list[dict]:
-    return [
-        {"name": p.stem, "modified": p.stat().st_mtime}
-        for p in sorted(CONFIG_DIR.glob("*.json"))
-    ]
+    # New configs persist as .py; legacy .json saves still list/load.
+    seen: dict[str, float] = {}
+    for p in sorted([*CONFIG_DIR.glob("*.py"), *CONFIG_DIR.glob("*.json")]):
+        seen.setdefault(p.stem, p.stat().st_mtime)
+    return [{"name": n, "modified": m} for n, m in sorted(seen.items())]
 
 
 @app.get("/api/configs/{name}")
 def load_config(name: str) -> Architecture:
-    p = CONFIG_DIR / f"{safe_name(name)}.json"
-    if not p.exists():
-        raise HTTPException(404, "not found")
+    safe = safe_name(name)
+    py, js = CONFIG_DIR / f"{safe}.py", CONFIG_DIR / f"{safe}.json"
     try:
-        return Architecture(**json.loads(p.read_text()))
+        if py.exists():
+            return Architecture(**code_to_arch(py.read_text()))
+        if js.exists():  # legacy JSON config
+            return Architecture(**json.loads(js.read_text()))
     except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(422, str(exc))
+    raise HTTPException(404, "not found")
 
 
 @app.put("/api/configs/{name}")
 def save_config(name: str, arch: Architecture) -> dict:
-    p = CONFIG_DIR / f"{safe_name(name)}.json"
-    p.write_text(json.dumps(arch.model_dump(), indent=2))
+    safe = safe_name(name)
+    p = CONFIG_DIR / f"{safe}.py"
+    try:
+        p.write_text(arch_to_code(arch.model_dump()))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    (CONFIG_DIR / f"{safe}.json").unlink(missing_ok=True)  # supersede legacy JSON
     return {"saved": p.stem}
 
 
 @app.delete("/api/configs/{name}")
 def delete_config(name: str) -> dict:
-    p = CONFIG_DIR / f"{safe_name(name)}.json"
-    if p.exists():
-        p.unlink()
-    return {"deleted": safe_name(name)}
+    safe = safe_name(name)
+    for ext in ("py", "json"):
+        (CONFIG_DIR / f"{safe}.{ext}").unlink(missing_ok=True)
+    return {"deleted": safe}
 
 
 # --------------------------------------------------------------------------- #
-# Built-in templates (architecture JSON files in templates/)
+# Built-in templates (native-LangGraph StateGraph .py files in templates/)
 # --------------------------------------------------------------------------- #
 def _load_template(p: Path) -> Architecture:
-    return Architecture(**json.loads(p.read_text()))
+    return Architecture(**code_to_arch(p.read_text()))
 
 
 @app.get("/api/templates")
 def list_templates() -> list[dict]:
     """List templates with their menu grouping/label."""
     out = []
-    for p in sorted(TEMPLATE_DIR.glob("*.json")):
+    for p in sorted(TEMPLATE_DIR.glob("*.py")):
         try:
             a = _load_template(p)
-        except (json.JSONDecodeError, ValueError):
+        except ValueError:
             continue
         out.append({
             "id": p.stem,
@@ -189,12 +206,45 @@ def list_templates() -> list[dict]:
 
 @app.get("/api/templates/{template_id}")
 def load_template(template_id: str) -> Architecture:
-    p = TEMPLATE_DIR / f"{safe_name(template_id)}.json"
+    p = TEMPLATE_DIR / f"{safe_name(template_id)}.py"
     if not p.exists():
         raise HTTPException(404, "template not found")
     try:
         return _load_template(p)
-    except (json.JSONDecodeError, ValueError) as exc:
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+@app.get("/api/templates/{template_id}/code", response_class=PlainTextResponse)
+def load_template_code(template_id: str) -> str:
+    p = TEMPLATE_DIR / f"{safe_name(template_id)}.py"
+    if not p.exists():
+        raise HTTPException(404, "template not found")
+    return p.read_text()
+
+
+# --------------------------------------------------------------------------- #
+# Code <-> architecture graph (the editor authors templates as StateGraph code)
+# --------------------------------------------------------------------------- #
+class CodeIn(BaseModel):
+    code: str = ""
+
+
+@app.post("/api/code/to-arch")
+def code_to_arch_endpoint(body: CodeIn) -> Architecture:
+    """Execute StateGraph source and return the architecture graph it builds."""
+    try:
+        return Architecture(**code_to_arch(body.code))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+@app.post("/api/code/from-arch")
+def code_from_arch_endpoint(arch: Architecture) -> dict:
+    """Generate native-LangGraph StateGraph source from an architecture graph."""
+    try:
+        return {"code": arch_to_code(arch.model_dump())}
+    except ValueError as exc:
         raise HTTPException(422, str(exc))
 
 
@@ -204,6 +254,97 @@ def load_template(template_id: str) -> Architecture:
 @app.get("/api/spec")
 def spec() -> dict:
     return spec_module.build_spec(list_templates())
+
+
+# --------------------------------------------------------------------------- #
+# Environments + scenario runner — pick an environment dataset, a template, a
+# task, and (optionally) an injection scenario + where the poison lands, then
+# assemble and run that single case (the in-app counterpart of run_test.py).
+# --------------------------------------------------------------------------- #
+@app.get("/api/environments")
+def list_environments() -> list[dict]:
+    return scenario_store.list_environments()
+
+
+@app.get("/api/environments/{name}")
+def get_environment(name: str) -> dict:
+    env = scenario_store.load_environment(name)
+    if env is None:
+        raise HTTPException(404, "unknown environment")
+    return {
+        **env,
+        "injection_points": scenario_store.injection_points(env),
+        "default_breach_signal": scenario_store.default_breach_signal(env),
+    }
+
+
+class ScenarioInput(BaseModel):
+    """Compose one runnable case: template ⊗ environment ⊗ poison ⊗ task."""
+
+    environment: str
+    template_id: str
+    user_task_id: Optional[str] = None      # benign task; None -> env's first
+    injection_task_id: Optional[str] = None  # attacker goal; None -> clean run
+    injection_kind: Optional[str] = None     # 'tool' | 'memory' | 'agent'
+    injection_target: Optional[str] = None   # resource id for tool/memory
+    stealth_style: str = "blended"           # blended | authority | metadata | tagged
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
+    env = scenario_store.load_environment(inp.environment)
+    if env is None:
+        raise HTTPException(404, "unknown environment")
+    template = load_template(inp.template_id).model_dump()  # reuses 404 handling
+
+    tasks = {t["id"]: t for t in env.get("user_tasks", [])}
+    if inp.user_task_id and inp.user_task_id in tasks:
+        task_prompt = tasks[inp.user_task_id]["prompt"]
+    elif env.get("user_tasks"):
+        task_prompt = env["user_tasks"][0]["prompt"]
+    else:
+        task_prompt = "Help the user with their request."
+
+    goal, point = None, None
+    if inp.injection_task_id:
+        inj = next((j for j in env.get("injection_tasks", [])
+                    if j["id"] == inp.injection_task_id), None)
+        if inj is None:
+            raise HTTPException(422, "unknown injection_task_id")
+        goal = inj["goal"]
+        kind = inp.injection_kind or "agent"
+        point = next((p for p in scenario_store.injection_points(env)
+                      if p["kind"] == kind and (p["id"] or None) == (inp.injection_target or None)),
+                     None)
+        if point is None:
+            raise HTTPException(422, "injection point not found for this environment")
+
+    try:
+        arch, meta = scenario_store.assemble(
+            template, env, task_prompt=task_prompt, provider=inp.provider,
+            model=inp.model, injection_goal=goal, point=point, style=inp.stealth_style)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    meta["breach_signal"] = scenario_store.default_breach_signal(env)
+    return Architecture(**arch), meta
+
+
+@app.post("/api/scenario/preview")
+def scenario_preview(inp: ScenarioInput) -> dict:
+    """Assemble the case without running it — returns the rendered payload, the
+    resolved injection-point label, the task prompt, and the breach signal."""
+    _, meta = _build_scenario(inp)
+    return meta
+
+
+@app.post("/api/scenario/run")
+def scenario_run(inp: ScenarioInput) -> dict:
+    arch, meta = _build_scenario(inp)
+    # Return the assembled architecture so the editor can switch its canvas to
+    # exactly what's running (env tools/memory + the injection point), not just
+    # the bare template.
+    return {"run_id": _start_run(arch), "arch": arch.model_dump(), **meta}
 
 
 # --------------------------------------------------------------------------- #
@@ -363,9 +504,22 @@ def _run_local(arch_json: str, prov_json: str, logf) -> int:
     ).returncode
 
 
+def _apply_default_provider(arch: Architecture) -> None:
+    """Every agent runs on the default provider unless it was set explicitly — so
+    an architecture never silently falls back to the offline mock. Manual choices
+    (an agent with its own provider) are left untouched."""
+    default = provider_store.get_default()
+    if not default:
+        return
+    for n in arch.nodes:
+        if n.type == "agent" and not n.provider:
+            n.provider = default
+
+
 def _execute(run_id: str, arch: Architecture) -> None:
     run = RUNS[run_id]
     log_path = Path(run["log_path"])
+    _apply_default_provider(arch)
     prov_map = provider_store.resolved_map()
     arch_json = json.dumps(arch.model_dump())
     prov_json = json.dumps(prov_map)

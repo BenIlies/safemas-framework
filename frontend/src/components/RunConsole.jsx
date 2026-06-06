@@ -12,9 +12,22 @@ export default function RunConsole({ run, onAnalyze }) {
   const [collapsed, setCollapsed] = useState(true)
   const [height, setHeight] = useState(DEFAULT_H)
   const drag = useRef(null)
+  const bodyRef = useRef(null)
+  const stick = useRef(true)   // follow new output unless the user scrolled up
 
-  // Re-fold whenever a new run begins.
-  useEffect(() => { if (run) setCollapsed(true) }, [run?.run_id])
+  // Re-fold whenever a new run begins (and resume following its output).
+  useEffect(() => { if (run) { setCollapsed(true); stick.current = true } }, [run?.run_id])
+
+  // Auto-scroll to the latest output as the log streams in, but only while the
+  // user is parked at the bottom — if they scroll up to read, leave them there.
+  const onBodyScroll = () => {
+    const el = bodyRef.current
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+  }
+  useEffect(() => {
+    const el = bodyRef.current
+    if (el && stick.current) el.scrollTop = el.scrollHeight
+  }, [run?.log, run?.status, collapsed, height])
 
   useEffect(() => {
     const onMove = (e) => {
@@ -79,7 +92,7 @@ export default function RunConsole({ run, onAnalyze }) {
         )}
       </div>
       {!collapsed && (
-        <pre className="console-body">
+        <pre className="console-body" ref={bodyRef} onScroll={onBodyScroll}>
           {!run && <div className="console-summary">Run an architecture to see output here.</div>}
           {run && lines.map((l, i) => (
             <div key={i} className={l.includes('[ATTACK]') ? 'log-attack' : l.includes('final answer') ? 'log-final' : ''}>

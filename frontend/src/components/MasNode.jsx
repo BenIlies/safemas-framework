@@ -48,7 +48,7 @@ export default function MasNode({ data, selected }) {
         <span className="mas-title">{data.label || def.label}</span>
       </div>
       <div className="mas-node-sub">
-        {data.type === 'agent' && <span>{data.model || 'mock'}</span>}
+        {data.type === 'agent' && <span>{data.__model || data.model || 'mock'}</span>}
         {data.type === 'memory' && <span>{data.backend || 'in-memory'}</span>}
         {data.type === 'tool' && <span>tool</span>}
         {data.type === 'agent' && data.join === 'all' && <span className="mas-join" title="waits for all inputs, then aggregates">⋈ join all</span>}

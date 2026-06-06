@@ -12,11 +12,20 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
   const [form, setForm] = useState(empty())
   const [busy, setBusy] = useState(false)
 
+  // SafeMAS needs at least one provider — every agent runs on it (the default).
+  // With none configured the modal is mandatory: it can't be dismissed until one
+  // is saved, gating access to the editor.
+  const mandatory = providers.length === 0
+  const tryClose = () => { if (!mandatory) onClose() }
+
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e) => { if (e.key === 'Escape') tryClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // With no providers yet, open the add form straight away.
+  useEffect(() => { if (mandatory && !editing) startNew() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startNew = () => {
     setForm({ ...empty(), base_url: PROVIDER_KINDS.openai.baseUrl || '', models: PROVIDER_KINDS.openai.models.join(', ') })
@@ -70,17 +79,22 @@ export default function ProvidersModal({ providers, onSaved, onClose, toast }) {
   const existing = editingExisting && providers.find((p) => p.id === editing)
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={tryClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span>🔑 LLM Providers</span>
-          <button className="btn ghost" onClick={onClose}>✕</button>
+          {!mandatory && <button className="btn ghost" onClick={onClose}>✕</button>}
         </div>
 
         <div className="modal-body">
           <p className="modal-hint">
-            Save an endpoint and its API key once. Agents reference a provider by
-            name — the key stays on the server and is never shown again.
+            {mandatory ? (
+              <b>SafeMAS needs at least one LLM provider to run. Add one to continue —
+                it becomes the default every agent uses (unless you pick another per agent).</b>
+            ) : (
+              'Save an endpoint and its API key once. Agents reference a provider by '
+              + 'name — the key stays on the server and is never shown again.'
+            )}
           </p>
 
           <div className="provider-list">

@@ -39,12 +39,52 @@ export async function setDefaultProvider(id) {
   return jsonOrThrow(await fetch(`/api/providers/${id}/default`, { method: 'PUT' }), 'set default failed')
 }
 
-// ---- templates (built-in MAS, served as DSL code) ----
+// ---- templates (built-in MAS, authored as native-LangGraph StateGraph code) ----
 export async function listTemplates() {
   try { return await (await fetch('/api/templates')).json() } catch { return [] }
 }
 export async function loadTemplate(id) {
   return jsonOrThrow(await fetch(`/api/templates/${encodeURIComponent(id)}`), 'template load failed')
+}
+export async function templateCode(id) {
+  const r = await fetch(`/api/templates/${encodeURIComponent(id)}/code`)
+  if (!r.ok) throw new Error('template code load failed')
+  return r.text()
+}
+
+// ---- code <-> architecture graph (the StateGraph DSL is the source of truth) ----
+export async function codeFromArch(arch) {
+  const { code } = await jsonOrThrow(await fetch('/api/code/from-arch', {
+    method: 'POST', headers: J, body: JSON.stringify(arch),
+  }), 'code generation failed')
+  return code
+}
+export async function codeToArch(code) {
+  const r = await fetch('/api/code/to-arch', { method: 'POST', headers: J, body: JSON.stringify({ code }) })
+  if (!r.ok) {
+    let msg = 'code is invalid'
+    try { msg = (await r.json()).detail || msg } catch { /* keep default */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
+// ---- environments + scenario runner (env ⊗ template ⊗ injection ⊗ task) ----
+export async function listEnvironments() {
+  try { return await (await fetch('/api/environments')).json() } catch { return [] }
+}
+export async function loadEnvironment(name) {
+  return jsonOrThrow(await fetch(`/api/environments/${encodeURIComponent(name)}`), 'environment load failed')
+}
+export async function scenarioPreview(input) {
+  return jsonOrThrow(await fetch('/api/scenario/preview', {
+    method: 'POST', headers: J, body: JSON.stringify(input),
+  }), 'preview failed')
+}
+export async function runScenario(input) {
+  return jsonOrThrow(await fetch('/api/scenario/run', {
+    method: 'POST', headers: J, body: JSON.stringify(input),
+  }), 'scenario run failed')
 }
 
 // ---- run ----

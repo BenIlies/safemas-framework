@@ -1,8 +1,18 @@
-"""SafeMAS — multi-agent systems described as JSON and executed on LangGraph.
+"""SafeMAS — a multi-agent system, expressed as code in the LangGraph idiom.
 
-The canonical artifact is the architecture JSON (the editor's wire format). The
-execution runtime is :mod:`safemas.graph_runtime`, imported explicitly by the
-runner so the package import stays light.
+    from safemas import StateGraph
+
+The visual editor is one view onto a graph; the canonical artifact is the Python
+file the DSL produces (see :mod:`safemas.model`). Importing this package pulls
+only the lightweight model + builder — the execution runtime
+(``safemas.graph_runtime``), codegen and loader are imported lazily / explicitly
+so the sandboxed runner stays minimal.
 """
+from .model import (
+    MAS, StateGraph, Agent, Memory, Tool, Element, Channel, Attach, Malicious,
+)
 
-__all__ = ["graph_runtime"]
+__all__ = [
+    "StateGraph", "MAS", "Agent", "Memory", "Tool", "Element",
+    "Channel", "Attach", "Malicious",
+]
