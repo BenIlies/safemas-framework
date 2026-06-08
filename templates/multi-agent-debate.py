@@ -3,9 +3,9 @@ from safemas import StateGraph
 g = StateGraph('multi-agent-debate', task='Reach a correct answer through several rounds of debate.', group='Debate & collaboration', title='Multi-Agent Debate (Du/Liang 2023)')
 
 # agents
-g.add_node('Debater 1', role='debater', at=(300, 30))
-g.add_node('Debater 2', role='debater', at=(150, 380))
-g.add_node('Debater 3', role='debater', at=(450, 380))
+g.add_node('Debater 1', group='A', role='debater', at=(300, 30))
+g.add_node('Debater 2', group='B', role='debater', at=(150, 380))
+g.add_node('Debater 3', group='C', role='debater', at=(450, 380))
 
 # edges
 g.add_edge('Debater 1', 'Debater 2', label='argue')

@@ -1,14 +1,17 @@
 """Data model for a SafeMAS architecture.
 
-A multi-agent system is a graph of *nodes* (agents, memory stores, tools) wired
-together by *edges* (channels between agents, or attachments of memory/tools to
-an agent). Any element may be flagged ``malicious`` to test the safety of the
-architecture, following the threat model:
+A multi-agent system is a graph of *nodes* (agents, tools, and read-only shared
+data stores) wired by *edges* (channels between agents, or tool attachments).
+Adversarial elements follow the threat model:
 
     agent   -> prompt-injection   (direct prompt at one agent)
     channel -> aitm               (agent-in-the-middle message rewrite)
-    memory  -> memory-poisoning   (poisoned knowledge/long-term memory)
     tool    -> tool-poisoning     (MCP / tool supply-chain compromise)
+
+Memory is the auto-generated GLOBAL shared board (who-does-what + the whole-system
+toolset + any shared data) read by every agent — it is not a per-agent node you
+add, and it is never adversarial (memory-poisoning was retired). ``memory`` nodes
+may still appear as read-only data stores fed into that board.
 
 This dict is the editor's wire format. The **canonical persisted form is Python
 code** (the SafeMAS DSL — see the ``safemas`` package): the backend generates a
@@ -86,9 +89,13 @@ class Node(BaseModel):
 
     # tool-specific
     spec: Optional[str] = None  # tool description / signature
+    # Specialization group (A/B/C): which specialist agent owns this tool when an
+    # environment is distributed across a multi-agent architecture (read=A …
+    # sink=C, by flow position). None on hand-built single-agent graphs.
+    group: Optional[str] = None
 
     # resource (tool/memory) payload: what the resource yields when an agent uses
-    # it (a tool's return value, a memory's stored content) — e.g. an AgentDojo
+    # it (a tool's return value, a memory's stored content) — e.g. a captured
     # calendar/email dump. Empty => the engine's neutral placeholder.
     content: Optional[str] = None
 

@@ -10,7 +10,7 @@ not a hand loop hidden in a single node.
 Each agent node is a real tool-calling LangChain agent: it binds its attached
 tools, the model picks tool(s) + args, gets the result, and loops — so an
 injection can land inside a tool result mid-loop, exactly like an agentic
-benchmark (AgentDojo). Memory reads are ambient context. The topology semantics
+benchmark. Memory reads are ambient context. The topology semantics
 (channels, guarded routers, bounded loops, ``join="all"`` barriers, budgets) live
 in the scheduler, which dispatches strictly one agent at a time — so the queue /
 join / ordering semantics, and the ``__SCN__`` trace they produce, are exactly
@@ -73,7 +73,7 @@ def split_reasoning(s: str) -> tuple[str | None, str]:
 
 def slug(label: str, taken: set[str]) -> str:
     """Stable, unique, human-readable id derived from a label (matches model.slug
-    and the frontend's element-id mapping in PcapModal)."""
+    and the frontend's element-id mapping in the Trace UI)."""
     base = re.sub(r"[^a-z0-9]+", "-", (label or "").lower()).strip("-") or "node"
     out, i = base, 2
     while out in taken:
@@ -169,7 +169,7 @@ def parse_arch(arch: dict):
             model=n.get("model"), temperature=n.get("temperature"),
             max_tokens=n.get("max_tokens"), join=n.get("join") or "any",
             spec=n.get("spec"), backend=n.get("backend"), content=n.get("content"),
-            malicious=_mal(n.get("malicious")),
+            group=n.get("group"), malicious=_mal(n.get("malicious")),
         )
 
     agents = [nsmap[n["id"]] for n in nodes if n.get("type") == "agent"]
@@ -236,17 +236,15 @@ def build_chat_model(provider: dict, model: str, agent):
 
 def build_tools(res_list):
     """LangChain tool stubs (name + description + a free-form ``query`` arg) for
-    each attached resource. Execution is done manually in the loop so we control
-    the scn event ordering, so the stub body is never actually invoked."""
+    each attached tool. Execution is done manually in the loop so we control the
+    scn event ordering, so the stub body is never actually invoked."""
     from langchain_core.tools import StructuredTool
     tools, by_name = [], {}
     for res in res_list:
         name = _tool_name(res.label)
         while name in by_name:           # disambiguate collisions
             name += "_"
-        desc = (res.spec or "").strip() or (
-            f"Read the '{res.label}' memory store." if res.type == "memory"
-            else f"Call the '{res.label}' tool.")
+        desc = (res.spec or "").strip() or f"Call the '{res.label}' tool."
 
         def _stub(query: str = "") -> str:  # pragma: no cover - never called
             return ""
@@ -309,13 +307,22 @@ class Engine:
         for ch in channels:
             if not ch.loop:
                 self.in_channels[ch.tgt.id].append(ch)
+        # Memory is now a single GLOBAL shared board (auto-generated below), read by
+        # every agent — not a per-agent attached store. Every memory node's data is
+        # folded into it; only TOOLS attach per-agent.
+        self.stores = [r for r in resources if r.type == "memory"]
+        self.tools = [r for r in resources if r.type == "tool"]
         self.attached: dict[str, list] = defaultdict(list)
         for res, ag in attachments:
-            self.attached[ag.id].append(res)
+            if res.type == "tool":
+                self.attached[ag.id].append(res)
 
         self.entries = self._dedup(entries) or self._default_entries()
         self.exits = self._dedup(exits)
 
+        # Compromise surfaces: agent (prompt-injection), channel (AiTM), tool
+        # (tool-poisoning). Memory-poisoning was removed when memory became the
+        # auto-generated global board — memory nodes are never adversarial.
         self.compromised: list[dict] = []
         for a in agents:
             if a.malicious.enabled:
@@ -324,9 +331,11 @@ class Engine:
             if ch.malicious.enabled:
                 self.compromised.append({"element": f"{ch.src.id}->{ch.tgt.id}",
                                          "type": ch.malicious.attack})
-        for r in resources:
+        for r in self.tools:
             if r.malicious.enabled:
                 self.compromised.append({"element": r.id, "type": r.malicious.attack})
+
+        self.global_memory = self._build_global_memory()
 
     # -- setup helpers ------------------------------------------------------ #
     @staticmethod
@@ -341,6 +350,31 @@ class Engine:
     def _default_entries(self):
         targets = {ch.tgt.id for ch in self.channels if not ch.loop}
         return [a for a in self.agents if a.id not in targets] or self.agents[:1]
+
+    def _build_global_memory(self) -> str:
+        """The shared, auto-generated board read by every agent: who does what,
+        which tools exist across the whole system, and any shared data. It is
+        derived entirely from the architecture (there are no user-authored memory
+        nodes), so every agent has the same picture of the team and the toolset."""
+        lines = [f"# Shared memory — multi-agent system '{self.name}'",
+                 f"Overall task: {self.task}", "", "## Agents (who does what)"]
+        for a in self.agents:
+            role = f" · role: {a.role}" if a.role else ""
+            desc = clip((a.prompt or "").replace("\n", " "), 200)
+            lines.append(f"- **{a.label}**{role}" + (f" — {desc}" if desc else ""))
+            owned = self.attached.get(a.id, [])
+            if owned:
+                lines.append(f"    tools it can call: {', '.join(t.label for t in owned)}")
+        if self.tools:
+            lines += ["", "## Tools available (whole system)"]
+            for t in self.tools:
+                lines.append(f"- `{t.label}` — {(t.spec or '').strip() or 'no signature'}")
+        stores = [s for s in self.stores if (s.content or "").strip()]
+        if stores:
+            lines.append("\n## Shared data")
+            for s in stores:
+                lines.append(f"### {s.label}\n{(s.content or '').strip()}")
+        return "\n".join(lines)
 
     def announce(self) -> None:
         providers, agents, name = self.providers, self.agents, self.name
@@ -376,8 +410,9 @@ class Engine:
         return bool(phrase) and phrase.lower() in (text or "").lower()
 
     def resource_value(self, res, st: RunState) -> tuple[str, bool]:
-        """The value an attached resource yields when read, and whether it's
-        poisoned. Emits the attack event at the read site (correct ordering)."""
+        """The value a tool yields when called, and whether it's poisoned. Emits the
+        attack event at the call site (correct ordering). (Memory is the global
+        board, never read through here.)"""
         m = res.malicious
         if m.enabled:
             st["attacks"].append({"element": res.id, "type": m.attack})
@@ -387,8 +422,6 @@ class Engine:
         content = (res.content or "").strip()
         if content:
             return content, False
-        if res.type == "memory":
-            return f"[memory:{res.label}] (clean, empty)", False
         return f"[tool:{res.label}] returned a normal result", False
 
     # -- one agent activation: real tool-calling loop ----------------------- #
@@ -480,21 +513,16 @@ class Engine:
         system = agent.prompt or f"You are {agent.role or agent.label}."
         m = agent.malicious
         injected = m.payload if (m.enabled and m.attack == "prompt-injection") else None
-        res_list = self.attached.get(agent.id, [])
-        mem_res = [r for r in res_list if r.type == "memory"]
-        tool_res = [r for r in res_list if r.type != "memory"]
+        tool_res = self.attached.get(agent.id, [])   # tools only — memory is global
         self._emit(st, "node_enter", agent=agent.label, role=agent.role, system=system,
-                   incoming=incoming, injected=injected, tools=[r.label for r in res_list])
+                   incoming=incoming, injected=injected, tools=[r.label for r in tool_res])
 
+        # The global shared memory (auto-generated team / tools / data board) is
+        # ambient context, prepended to every agent's input so each agent knows who
+        # does what and what tools exist across the whole system.
         user_input = incoming
-        # Memory is ambient shared state: its content is *always* read into the
-        # agent's context (not a tool the model may skip). A poisoned memory
-        # therefore reliably reaches the agent — that's memory-poisoning.
-        for mem in mem_res:
-            val, poisoned = self.resource_value(mem, st)
-            self._emit(st, "tool_call", agent=agent.label, function=mem.label, args={},
-                       result=val, poisoned=poisoned, error=False)
-            user_input += f"\n\n[Memory · {mem.label}]\n{val}"
+        if self.global_memory:
+            user_input = f"[Shared memory]\n{self.global_memory}\n\n{incoming}"
 
         if injected is not None:
             st["attacks"].append({"element": agent.id, "type": "prompt-injection"})
@@ -566,7 +594,7 @@ class Engine:
         if not st["started"]:
             st["started"] = True
             self._emit(st, "run_start", arch=self.name, task=self.task,
-                       compromised=self.compromised,
+                       compromised=self.compromised, global_memory=self.global_memory,
                        entries=[a.label for a in self.entries],
                        exits=[a.label for a in self.exits], poison_mode=None)
             for e in self.entries:

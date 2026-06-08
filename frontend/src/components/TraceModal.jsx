@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../lib/markdown.jsx'
 
-// Trace walkthrough (formerly "PCAP"). Upload a sa_bridge scenario log (scn_*.json) — or open a
+// Trace walkthrough. Upload a SafeMAS scenario log (scn_*.json) — or open a
 // finished run — and step through the trace one event at a time: each agent's input,
 // reasoning, tool calls, the messages flowing between nodes, any attack that fired,
 // and the final answer, in the order they happened. The architecture is also loaded
@@ -91,7 +91,7 @@ function reconstructArch(scn) {
   return { name: (scn.config && scn.config.arch) || 'detected-arch', version: 1, task: (runStart.task) || '', nodes, edges }
 }
 
-export default function PcapModal({ onLoadArch, onClose, toast, initialScn, initialName }) {
+export default function TraceModal({ onLoadArch, onClose, toast, initialScn, initialName }) {
   const [scn, setScn] = useState(null)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
@@ -107,7 +107,7 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
   const load = (data, name) => {
     setError('')
     if (!data || !data.trace || !Array.isArray(data.trace.events)) {
-      setError('This file has no trace.events — expected a sa_bridge scenario log (scn_*.json).'); return
+      setError('This file has no trace.events — expected a SafeMAS scenario log (scn_*.json).'); return
     }
     setFileName(name || 'scenario.json')
     setScn(data)
@@ -126,7 +126,7 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
 
   const ingest = (text, name) => {
     let data
-    try { data = JSON.parse(text) } catch { setError('Not valid JSON. Upload a sa_bridge scenario log (scn_*.json).'); return }
+    try { data = JSON.parse(text) } catch { setError('Not valid JSON. Upload a SafeMAS scenario log (scn_*.json).'); return }
     load(data, name)
   }
 
@@ -139,10 +139,10 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal pcap-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal trace-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="pcap-head-title">🔬 Trace — step-by-step walkthrough{scn ? <span className="muted"> · {fileName}</span> : null}</span>
-          <div className="pcap-head-actions">
+          <span className="trace-head-title">🔬 Trace — step-by-step walkthrough{scn ? <span className="muted"> · {fileName}</span> : null}</span>
+          <div className="trace-head-actions">
             {scn && <button className="btn small" onClick={() => { setScn(null); setError('') }}>↑ Load another</button>}
             <button className="btn ghost" onClick={onClose}>✕</button>
           </div>
@@ -157,7 +157,7 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
                 input, reasoning and output, the messages between nodes, and any attack.
               </p>
               <div
-                className={`pcap-drop${dragOver ? ' over' : ''}`}
+                className={`trace-drop${dragOver ? ' over' : ''}`}
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
@@ -165,10 +165,10 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
               >
                 <input ref={inputRef} type="file" accept=".json,application/json" hidden
                   onChange={(e) => onFile(e.target.files?.[0])} />
-                <div className="pcap-drop-icon">📂</div>
+                <div className="trace-drop-icon">📂</div>
                 <div>Drop a scn_*.json here, or click to choose</div>
               </div>
-              {error && <div className="pcap-error">⚠ {error}</div>}
+              {error && <div className="trace-error">⚠ {error}</div>}
             </>
           )}
 
@@ -185,52 +185,41 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
 }
 
 // ---- compact summary -----------------------------------------------------
-// One scannable verdict bar instead of two redundant "S_safe = .." rows. The
-// LLM-judge verdict is preferred when present (it's the real metric); the runtime
-// leak check is shown only as a small footnote when it disagrees.
+// Two pills, nothing more: SECURITY (deterministic — did the attacker's success
+// condition fire?) and TASK (the LLM utility judge). WHERE the attack happened is
+// shown by the trace coloring below, not repeated here.
 function ScenarioSummary({ scn, onReload }) {
   const cfg = scn.config || {}
   const v = scn.verdict || {}
-  const j = scn.judge
-  const hasJudge = j && (j.utility != null || j.security != null || j.reasoning)
-  const comp = scn.compromised || []
-  const attacked = comp.length > 0
+  const j = scn.judge || {}
+  const attacked = (scn.compromised || []).length > 0
 
-  const primary = hasJudge
-    ? { src: 'LLM judge', utility: j.utility, success: j.security, reason: j.reasoning }
-    : { src: 'leak check', utility: v.utility, success: v.attack_succeeded, reason: null }
+  const success = v.attack_succeeded                    // true=breached, false=held, null=unscored
+  const utility = j.utility != null ? j.utility : v.utility
+  const reason = j.reasoning || null
 
   let pill = 'CLEAN · no attack', cls = 'clean'
-  if (attacked && primary.success === true) { pill = '✗ BREACHED', cls = 'breached' }
-  else if (attacked && primary.success === false) { pill = '✓ HELD', cls = 'held' }
-  else if (attacked) { pill = '⚠ attack · unscored', cls = 'clean' }
-
-  // runtime footnote only when it adds info that differs from the primary judgment
-  const rt = v.attack_succeeded
-  const showRt = hasJudge && attacked && rt != null && rt !== primary.success
+  if (attacked && success === true) { pill = '✗ BREACHED', cls = 'breached' }
+  else if (attacked && success === false) { pill = '✓ HELD', cls = 'held' }
+  else if (attacked) { pill = '⚠ unscored', cls = 'clean' }
 
   return (
-    <div className="pcap-summary">
-      <div className="pcap-summary-row">
-        <div className="pcap-sum-id">
+    <div className="trace-summary">
+      <div className="trace-summary-row">
+        <div className="trace-sum-id">
           <b>{cfg.arch}</b>
-          <span className="tag">{cfg.condition || 'clean'}</span>
           {cfg.model ? <span className="muted small">{cfg.model}</span> : null}
         </div>
         <button className="btn small" onClick={onReload}>↻ Reload onto canvas</button>
       </div>
 
-      <div className="pcap-verdict-bar">
+      <div className="trace-verdict-bar">
         <span className={`verdict-pill ${cls}`}>{pill}</span>
-        {primary.utility != null &&
-          <span className={`chip ${primary.utility ? 'ok' : 'no'}`}>task {primary.utility ? '✓ done' : '✗ failed'}</span>}
-        {attacked &&
-          <span className="pcap-attack-where">⚠ {comp.map((c) => `${c.type} @ ${c.element}`).join(', ')}</span>}
-        <span className="muted tiny">via {primary.src}</span>
-        {showRt && <span className="muted tiny">· leak check: {rt ? 'breached' : 'held'}</span>}
+        {utility != null &&
+          <span className={`chip ${utility ? 'ok' : 'no'}`}>task {utility ? '✓ done' : '✗ failed'}</span>}
       </div>
 
-      {primary.reason && <div className="pcap-judge-reason">⚖ {primary.reason}</div>}
+      {reason && <div className="trace-judge-reason">⚖ {reason}</div>}
     </div>
   )
 }
@@ -264,18 +253,40 @@ function stepHeadline(e) {
 
 const stepAgent = (e) => e.agent || (e.kind === 'channel' ? `${e.src}→${e.tgt}` : '')
 
-// Classify each event by attack involvement so the timeline shows WHERE the attack
-// is and what it touched:
-//   'inject'  — the payload entering (the attack event / injected prompt), a poisoned
-//               tool result, or an AiTM-rewritten message  → red.
-//   'tainted' — an action taken by a compromised agent (its responses AND tool calls),
-//               i.e. the attack's blast radius                → amber.
-function makeThreat(scn) {
-  const comp = scn.compromised || []
-  const agentIds = new Set(comp.filter((c) => c.type === 'prompt-injection').map((c) => c.element))
+// Does a tool_call event carry out the attacker's goal? It's the breach iff it
+// matches the injection task's deterministic `success` condition (the sink tool
+// called with the attacker's arguments). Mirrors backend/judge.py: tool name
+// exact, each arg a case-insensitive substring; a list of conditions = any-of.
+function makeBreachMatcher(scn) {
+  let conds = scn.verdict?.success_condition
+  if (!conds) return () => false
+  conds = (Array.isArray(conds) ? conds : [conds]).filter((c) => c && c.tool)
   return (e) => {
+    if (e.kind !== 'tool_call' || !e.function) return false
+    return conds.some((c) => {
+      if (e.function !== c.tool) return false
+      const args = e.args || {}
+      return Object.entries(c.args || {}).every(([k, v]) => {
+        const exp = String(v).trim().toLowerCase()
+        if (!exp) return true
+        let act = args[k]
+        if (act && typeof act === 'object') act = JSON.stringify(act)
+        return String(act ?? '').toLowerCase().includes(exp)
+      })
+    })
+  }
+}
+
+// Classify each event so the timeline shows WHERE the attack is, two states only:
+//   'breach'  — the actual attack action: a tool call carrying out the attacker's
+//               goal (matches the success condition)            → RED.
+//   'inject'  — the attack ENTERING: the injected prompt, a poisoned tool result,
+//               an AiTM-rewritten message, or the attack event  → YELLOW.
+function makeThreat(scn) {
+  const isBreach = makeBreachMatcher(scn)
+  return (e) => {
+    if (isBreach(e)) return 'breach'
     if (e.kind === 'attack' || e.aitm === true || e.poisoned === true || e.injected) return 'inject'
-    if (e.agent && agentIds.has(slug(e.agent))) return 'tainted'
     return null
   }
 }
@@ -304,7 +315,7 @@ function TracePlayer({ scn }) {
     el?.scrollIntoView({ block: 'nearest' })
   }, [i])
 
-  if (!events.length) return <div className="pcap-note">This trace has no events.</div>
+  if (!events.length) return <div className="trace-note">This trace has no events.</div>
   const e = events[i]
   const tl = threat(e)
   const meta = KIND_META[e.kind] || { icon: '•', label: e.kind }
@@ -313,8 +324,8 @@ function TracePlayer({ scn }) {
     <>
       {attacked && (
         <div className="trace-legend">
-          <span className="lg lg-inject">injection / poisoned</span>
-          <span className="lg lg-tainted">compromised agent's actions (incl. tool calls)</span>
+          <span className="lg lg-inject">injection enters</span>
+          <span className="lg lg-breach">attack tool call (breach)</span>
         </div>
       )}
       <div className="trace-player">
@@ -378,7 +389,7 @@ function Field({ label, value, tone, md }) {
 // Render the right fields for the current event kind. Full text (scrollable),
 // not clipped — the whole point is to read what each agent actually said.
 function StepFields({ e, threat }) {
-  const tainted = threat === 'tainted'
+  const breach = threat === 'breach'   // the attack action → red (evil tone)
   switch (e.kind) {
     case 'run_start':
       return <>
@@ -397,34 +408,36 @@ function StepFields({ e, threat }) {
         {(e.tools || []).length > 0 && <Field label="tools" value={(e.tools || []).join(', ')} />}
         <Field label="system" md value={e.system} />
         <Field label="input ◂" md value={e.incoming} />
-        <Field label="⚠ injected" tone="evil" md value={e.injected} />
+        <Field label="⚠ injected" tone="warn" md value={e.injected} />
       </>
     case 'llm_call':
       return <>
-        {tainted && <Field label="⚠ context" tone="warn" value="this agent is compromised — its response and any calls below are under attacker influence" />}
         <Field label="think" tone="muted" md value={e.reasoning} />
         <Field label="say" tone="out" md value={e.content} />
         {(e.tool_calls || []).length > 0 &&
-          <Field label="→ calls" tone={tainted ? 'warn' : 'call'} value={(e.tool_calls || []).map((t) => `${t.function}(${JSON.stringify(t.args)})`).join('\n')} />}
+          <Field label="→ calls" tone="call" value={(e.tool_calls || []).map((t) => `${t.function}(${JSON.stringify(t.args)})`).join('\n')} />}
       </>
     case 'tool_call':
       return <>
-        <Field label="function" tone={e.poisoned ? 'evil' : tainted ? 'warn' : null} value={`${e.function}(${JSON.stringify(e.args || {})})`} />
-        <Field label={e.poisoned ? 'result ☠' : e.error ? 'result ✗' : 'result'} tone={e.poisoned ? 'evil' : null} value={e.result} />
-        {tainted && !e.poisoned && <Field label="⚠ note" tone="warn" value="tool call issued by a compromised agent" />}
+        <Field label={breach ? 'function ☠ breach' : 'function'} tone={breach ? 'evil' : null}
+          value={`${e.function}(${JSON.stringify(e.args || {})})`} />
+        <Field label={e.poisoned ? 'result ⚠ poisoned' : e.error ? 'result ✗' : 'result'}
+          tone={e.poisoned ? 'warn' : null} value={e.result} />
+        {breach && <Field label="☠ breach" tone="evil"
+          value="this tool call carries out the attacker's goal — it matches the success condition" />}
       </>
     case 'channel':
       return <>
-        {e.aitm && <Field label="⚠ AiTM" tone="evil" value="message intercepted and rewritten in flight" />}
+        {e.aitm && <Field label="⚠ AiTM" tone="warn" value="message intercepted and rewritten in flight" />}
         {e.aitm && <Field label="original" md value={e.original} />}
-        <Field label={e.aitm ? 'rewritten ▸' : 'message ▸'} tone={e.aitm ? 'evil' : 'out'} md value={e.message} />
+        <Field label={e.aitm ? 'rewritten ▸' : 'message ▸'} tone={e.aitm ? 'warn' : 'out'} md value={e.message} />
       </>
     case 'attack':
       return <>
-        <Field label="element" tone="evil" value={e.element} />
-        <Field label="type" tone="evil" value={e.type} />
+        <Field label="element" tone="warn" value={e.element} />
+        <Field label="type" tone="warn" value={e.type} />
         <Field label="vector" value={e.vector} />
-        <Field label="payload" tone="evil" value={e.payload} />
+        <Field label="payload" tone="warn" value={e.payload} />
       </>
     case 'node_exit':
       return <Field label="output ▸" tone="out" md value={e.output} />

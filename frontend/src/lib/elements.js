@@ -13,12 +13,15 @@ export const NODE_TYPES = {
       temperature: null, max_tokens: null, join: 'any', entry: false, exit: false,
     },
   },
+  // Memory is the auto-generated GLOBAL shared board (who-does-what + tools + any
+  // shared data), not a node you add. It is never adversarial. Memory nodes can
+  // still appear from loaded scenarios/configs (as read-only data stores) and are
+  // rendered/inspected, but `nonAddable` keeps them out of the add menus.
   memory: {
-    label: 'Memory',
+    label: 'Memory (shared data)',
     icon: '🧠',
     color: '#8b5cf6',
-    attack: 'memory-poisoning',
-    attackLabel: 'Memory Poisoning',
+    nonAddable: true,
     defaults: { backend: 'in-memory' },
   },
   tool: {

@@ -127,7 +127,7 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
           </Field>
           <Field label="Stored content (what a read returns)">
             <textarea rows={4} value={data.content || ''}
-              placeholder="Leave empty for a neutral placeholder, or paste the data this memory holds (e.g. an AgentDojo inbox / notes dump)."
+              placeholder="Leave empty for a neutral placeholder, or paste the data this memory holds (e.g. a captured inbox / notes dump)."
               onChange={(e) => set({ content: e.target.value })} />
             <span className="field-hint">Returned to any agent that reads this memory. Empty → the engine’s neutral “(clean, empty)” placeholder.</span>
           </Field>
@@ -136,6 +136,12 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
 
       {!isEdge && data.type === 'tool' && (
         <>
+          {data.group && (
+            <div className="kind-readout" title="Specialization group (A=read · B=mid · C=action/sink): which specialist agent owns this tool when an environment is distributed across a multi-agent architecture by flow position.">
+              specialist group <b>{data.group}</b>
+              {' · '}{data.group === 'C' ? 'action / sink' : data.group === 'A' ? 'read / input' : 'mid / processing'}
+            </div>
+          )}
           <Field label="Spec / signature">
             <textarea rows={3} value={data.spec || ''}
               placeholder="e.g. get_calendar(query) → the user's calendar events"
@@ -148,7 +154,7 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
           </Field>
           <Field label="Returns (what the tool yields)">
             <textarea rows={4} value={data.content || ''}
-              placeholder="Leave empty for a neutral placeholder, or paste the tool's result (e.g. an AgentDojo calendar / search result)."
+              placeholder="Leave empty for a neutral placeholder, or paste the tool's result (e.g. a captured calendar / search result)."
               onChange={(e) => set({ content: e.target.value })} />
             <span className="field-hint">Returned whenever an agent calls this tool. Empty → the engine’s neutral “returned a normal result” placeholder.</span>
           </Field>
@@ -247,7 +253,6 @@ function payloadHint(attack) {
   switch (attack) {
     case 'prompt-injection': return 'Directive injected into this agent’s input...'
     case 'aitm': return 'Replacement message written onto this channel...'
-    case 'memory-poisoning': return 'Poisoned content returned on every read...'
     case 'tool-poisoning': return 'Malicious result this tool returns...'
     default: return ''
   }

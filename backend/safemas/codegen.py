@@ -71,6 +71,7 @@ def arch_to_code(arch: dict) -> str:
                 _kw("temperature", n.get("temperature")),
                 _kw("max_tokens", n.get("max_tokens")),
                 _kw("join", n.get("join")) if n.get("join") not in (None, "", "any") else None,
+                _kw("group", n.get("group")),
             ]))
     if memories or tools:
         L.append("")
@@ -187,6 +188,7 @@ def mas_to_arch(mas) -> dict:
             "provider": a.provider, "model": a.model, "role": a.role,
             "prompt": a.prompt, "temperature": a.temperature,
             "max_tokens": a.max_tokens, "join": getattr(a, "join", "any"),
+            "group": getattr(a, "group", None),
             "malicious": mal(a),
         })
     for m in mas.memories:

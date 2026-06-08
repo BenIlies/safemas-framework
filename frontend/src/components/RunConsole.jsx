@@ -85,7 +85,7 @@ export default function RunConsole({ run, onAnalyze }) {
           )}
         </span>
         {run?.has_scn && onAnalyze && (
-          <button className="btn small console-pcap" title="Step through this run's recorded trace"
+          <button className="btn small console-trace" title="Step through this run's recorded trace"
             onClick={() => onAnalyze(run.run_id)}>
             🔬 Open trace
           </button>

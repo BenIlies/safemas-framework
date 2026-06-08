@@ -4,9 +4,9 @@ g = StateGraph('self-consistency', task='Solve a reasoning problem and vote over
 
 # agents
 g.add_node('Dispatcher', role='dispatcher', prompt='Relay the task to each sampler unchanged.', at=(-40, 210))
-g.add_node('CoT Sample 1', role='reasoner', temperature=0.7, at=(220, 40))
-g.add_node('CoT Sample 2', role='reasoner', temperature=0.7, at=(220, 210))
-g.add_node('CoT Sample 3', role='reasoner', temperature=0.7, at=(220, 380))
+g.add_node('CoT Sample 1', group='A', role='reasoner', temperature=0.7, at=(220, 40))
+g.add_node('CoT Sample 2', group='B', role='reasoner', temperature=0.7, at=(220, 210))
+g.add_node('CoT Sample 3', group='C', role='reasoner', temperature=0.7, at=(220, 380))
 g.add_node('Majority Vote', role='aggregator', prompt='Return the answer that the most reasoning paths agree on.', join='all', at=(520, 210))
 
 # edges

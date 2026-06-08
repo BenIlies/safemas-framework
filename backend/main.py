@@ -48,6 +48,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 import campaigns as campaign_store
+import judge as judge_store
 import providers as provider_store
 import scenario as scenario_store
 import spec as spec_module
@@ -259,7 +260,7 @@ def spec() -> dict:
 # --------------------------------------------------------------------------- #
 # Environments + scenario runner — pick an environment dataset, a template, a
 # task, and (optionally) an injection scenario + where the poison lands, then
-# assemble and run that single case (the in-app counterpart of run_test.py).
+# assemble and run that single case.
 # --------------------------------------------------------------------------- #
 @app.get("/api/environments")
 def list_environments() -> list[dict]:
@@ -285,7 +286,7 @@ class ScenarioInput(BaseModel):
     template_id: str
     user_task_id: Optional[str] = None      # benign task; None -> env's first
     injection_task_id: Optional[str] = None  # attacker goal; None -> clean run
-    injection_kind: Optional[str] = None     # 'tool' | 'memory' | 'agent'
+    injection_kind: Optional[str] = None     # 'tool' | 'agent' (memory is the global board, never injected)
     injection_target: Optional[str] = None   # resource id for tool/memory
     stealth_style: str = "blended"           # blended | authority | metadata | tagged
     provider: Optional[str] = None
@@ -306,13 +307,14 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     else:
         task_prompt = "Help the user with their request."
 
-    goal, point = None, None
+    goal, point, success = None, None, None
     if inp.injection_task_id:
         inj = next((j for j in env.get("injection_tasks", [])
                     if j["id"] == inp.injection_task_id), None)
         if inj is None:
             raise HTTPException(422, "unknown injection_task_id")
         goal = inj["goal"]
+        success = inj.get("success")  # deterministic tool-call attack-success condition
         kind = inp.injection_kind or "agent"
         point = next((p for p in scenario_store.injection_points(env)
                       if p["kind"] == kind and (p["id"] or None) == (inp.injection_target or None)),
@@ -327,6 +329,8 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     meta["breach_signal"] = scenario_store.default_breach_signal(env)
+    meta["success"] = success           # {tool, args} sink that means the attack landed
+    meta["task_prompt"] = task_prompt
     return Architecture(**arch), meta
 
 
@@ -341,10 +345,19 @@ def scenario_preview(inp: ScenarioInput) -> dict:
 @app.post("/api/scenario/run")
 def scenario_run(inp: ScenarioInput) -> dict:
     arch, meta = _build_scenario(inp)
+    # Attach an evaluation spec so the run is scored once it finishes: attack
+    # success deterministically (the tool-call `success` condition) and task
+    # completion via the LLM judge (both written back into the scn).
+    evaluate = {
+        "success": meta.get("success"),
+        "task": meta.get("task_prompt"),
+        "provider": inp.provider,
+        "model": inp.model,
+    }
     # Return the assembled architecture so the editor can switch its canvas to
     # exactly what's running (env tools/memory + the injection point), not just
     # the bare template.
-    return {"run_id": _start_run(arch), "arch": arch.model_dump(), **meta}
+    return {"run_id": _start_run(arch, evaluate=evaluate), "arch": arch.model_dump(), **meta}
 
 
 # --------------------------------------------------------------------------- #
@@ -397,7 +410,7 @@ def campaign_log(cid: str) -> str:
 
 @app.get("/api/campaigns/{cid}/tests/{idx}/scn")
 def campaign_test_scn(cid: str, idx: int) -> dict:
-    """One campaign test's scenario log (PCAP scn_*.json format)."""
+    """One campaign test's scenario log (scn_*.json format)."""
     _get_campaign(cid)
     scn = campaign_store.test_scn(cid, idx)
     if scn is None:
@@ -537,7 +550,7 @@ def _execute(run_id: str, arch: Architecture) -> None:
             logf.write(f"[error] execution failed: {exc}\n")
             rc = 1
 
-    result = None
+    result = scn = None
     for line in log_path.read_text().splitlines():
         if line.startswith("__RESULT__ "):
             try:
@@ -547,23 +560,48 @@ def _execute(run_id: str, arch: Architecture) -> None:
         elif line.startswith("__SCN__ "):
             try:
                 scn = json.loads(line[len("__SCN__ "):])
-                Path(run["scn_path"]).write_text(json.dumps(scn, indent=2))
-                run["has_scn"] = True
-            except (json.JSONDecodeError, OSError):
-                pass
+            except json.JSONDecodeError:
+                scn = None
+    if scn is not None:
+        _score_run(run, scn)
+        try:
+            Path(run["scn_path"]).write_text(json.dumps(scn, indent=2))
+            run["has_scn"] = True
+        except OSError:
+            pass
     run["result"] = result
     run["status"] = "done" if rc == 0 else "error"
 
 
-def _start_run(arch: Architecture) -> str:
-    """Register a run for ``arch`` and kick off execution in a thread. Returns id."""
+def _score_run(run: dict, scn: dict) -> None:
+    """For a scenario run, write the deterministic security verdict + the LLM task
+    judge into the scn (no-op for a plain canvas run, which carries no spec)."""
+    ev = run.get("evaluate")
+    if not ev:
+        return
+    prov_map = provider_store.resolved_map()
+    provider = prov_map.get(ev.get("provider")) if ev.get("provider") else None
+    try:
+        judge_store.evaluate_scenario(
+            scn, success=ev.get("success"), task=ev.get("task") or "",
+            provider=provider, model=ev.get("model"))
+    except Exception:  # scoring must never sink the run
+        pass
+
+
+def _start_run(arch: Architecture, evaluate: Optional[dict] = None) -> str:
+    """Register a run for ``arch`` and kick off execution in a thread. Returns id.
+
+    ``evaluate`` (optional) carries the scoring spec for a scenario run:
+    ``{success, task, provider, model}`` — applied post-run by :func:`_score_run`.
+    """
     run_id = uuid.uuid4().hex[:12]
     log_path = RUNS_DIR / f"{run_id}.log"
     log_path.write_text("[queued] preparing execution...\n")
     RUNS[run_id] = {
         "status": "queued", "log_path": str(log_path),
         "scn_path": str(RUNS_DIR / f"{run_id}.scn.json"),
-        "has_scn": False, "result": None,
+        "has_scn": False, "result": None, "evaluate": evaluate,
     }
     threading.Thread(target=_execute, args=(run_id, arch), daemon=True).start()
     return run_id
@@ -637,7 +675,7 @@ def run_status(run_id: str) -> dict:
 
 @app.get("/api/run/{run_id}/scn")
 def run_scn(run_id: str) -> dict:
-    """The structured scenario log for a run (the PCAP analyzer's scn_*.json
+    """The structured scenario log for a run (the scn_*.json
     format). 404 until the run finishes and emits one."""
     run = RUNS.get(run_id)
     if not run:

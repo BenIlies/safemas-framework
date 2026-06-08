@@ -1,5 +1,5 @@
-// Simulate how the SafeMAS engine will run a graph, so the canvas can tell the
-// truth about it. This mirrors backend/safemas/engine.py's message-driven
+// Simulate how the SafeMAS runtime will run a graph, so the canvas can tell the
+// truth about it. This mirrors backend/safemas/graph_runtime.py's message-driven
 // scheduler: a work queue of agent activations with bounded loop edges, guarded
 // routing (select one branch), and join="all" agents that wait for every inbound
 // channel and aggregate. Guards/`until` depend on live model output, which the

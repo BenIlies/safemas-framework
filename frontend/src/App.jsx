@@ -11,7 +11,7 @@ import Inspector from './components/Inspector.jsx'
 import RunConsole from './components/RunConsole.jsx'
 import ProvidersModal from './components/ProvidersModal.jsx'
 import ScenarioRunner from './components/ScenarioRunner.jsx'
-import PcapModal from './components/PcapModal.jsx'
+import TraceModal from './components/TraceModal.jsx'
 import ContextMenu from './components/ContextMenu.jsx'
 import Diagnostics from './components/Diagnostics.jsx'
 import { simulateExecution } from './lib/simulate.js'
@@ -38,6 +38,40 @@ function groupTemplates(list) {
     else acc.push([g, [t]])
     return acc
   }, [])
+}
+
+// Mirror backend graph_runtime._build_global_memory: the auto-generated shared
+// board (who-does-what + all tools + any shared data) that every agent reads. It
+// is inspect-only — regenerated live from the canvas, never user-authored.
+function buildGlobalMemory(name, task, nodes, edges = []) {
+  const clip = (s, n = 200) => { s = (s || '').replace(/\s+/g, ' ').trim(); return s.length <= n ? s : s.slice(0, n - 1) + '…' }
+  const agents = nodes.filter((n) => n.data.type === 'agent')
+  const tools = nodes.filter((n) => n.data.type === 'tool')
+  const stores = nodes.filter((n) => n.data.type === 'memory' && (n.data.content || '').trim())
+  const typeOf = Object.fromEntries(nodes.map((n) => [n.id, n.data.type]))
+  const labelOf = Object.fromEntries(nodes.map((n) => [n.id, n.data.label]))
+  const ownedBy = {}  // agent id -> [tool labels]
+  for (const e of edges) {
+    if ((e.data?.kind || e.kind) !== 'attach') continue
+    const [tool, agent] = typeOf[e.source] === 'tool' ? [e.source, e.target] : [e.target, e.source]
+    if (typeOf[tool] === 'tool' && typeOf[agent] === 'agent') (ownedBy[agent] ||= []).push(labelOf[tool])
+  }
+  const L = [`# Shared memory — multi-agent system '${name}'`, `Overall task: ${task}`, '', '## Agents (who does what)']
+  for (const a of agents) {
+    const role = a.data.role ? ` · role: ${a.data.role}` : ''
+    const desc = clip(a.data.prompt)
+    L.push(`- **${a.data.label}**${role}` + (desc ? ` — ${desc}` : ''))
+    if (ownedBy[a.id]?.length) L.push(`    tools it can call: ${ownedBy[a.id].join(', ')}`)
+  }
+  if (tools.length) {
+    L.push('', '## Tools available (whole system)')
+    for (const t of tools) L.push(`- \`${t.data.label}\` — ${(t.data.spec || '').trim() || 'no signature'}`)
+  }
+  if (stores.length) {
+    L.push('', '## Shared data')
+    for (const s of stores) L.push(`### ${s.data.label}\n${(s.data.content || '').trim()}`)
+  }
+  return L.join('\n')
 }
 
 // Validate a connection against the SafeMAS wiring rules and return the edge
@@ -113,6 +147,7 @@ function Editor() {
   const [code, setCode] = useState('')              // StateGraph source shown / edited in the panel
   const [codeDirty, setCodeDirty] = useState(false) // user is editing code (suspends auto-regen)
   const [codeError, setCodeError] = useState('')    // last "Apply code" / generation error
+  const [memOpen, setMemOpen] = useState(false)     // the auto-generated shared-memory panel
   const [execView, setExecView] = useState(false)   // execution lens: run order + diagnostics
   const [saved, setSaved] = useState([])
   const [templates, setTemplates] = useState([])    // built-in templates (from the backend)
@@ -120,8 +155,8 @@ function Editor() {
   const [providersLoaded, setProvidersLoaded] = useState(false)  // first fetch done
   const [providersOpen, setProvidersOpen] = useState(false)
   const [scenarioOpen, setScenarioOpen] = useState(false)  // scenario test runner modal
-  const [pcapOpen, setPcapOpen] = useState(false)   // scenario-trace (pcap) modal
-  const [pcapScn, setPcapScn] = useState(null)      // scenario log preloaded from a run
+  const [traceOpen, setTraceOpen] = useState(false)   // scenario-trace modal
+  const [traceScn, setTraceScn] = useState(null)      // scenario log preloaded from a run
   const [health, setHealth] = useState({ docker: true, sandbox: 'docker' })
   const [toasts, setToasts] = useState([])
   const [history, setHistory] = useState({ undo: 0, redo: 0 })  // depths, for menu enable
@@ -194,6 +229,8 @@ function Editor() {
   }, [loadArch, refreshSaved, refreshProviders])
 
   const arch = useMemo(() => graphToArch({ name, task, nodes, edges }), [name, task, nodes, edges])
+  // The auto-generated shared-memory board, regenerated live as the arch changes.
+  const globalMemory = useMemo(() => buildGlobalMemory(name, task, nodes, edges), [name, task, nodes, edges])
 
   // How the engine will REALLY run this graph (order, dead edges, diagnostics).
   // Cheap, so always computed; the execution lens decides whether to show it.
@@ -466,22 +503,20 @@ function Editor() {
   }
   useEffect(() => () => clearInterval(pollRef.current), [])
 
-  // After an injected scenario finishes, decide held vs. breached: the attack
-  // succeeded iff the operator actually invoked the sink tool (breach_signal),
-  // mirroring run_test.py's verdict. Matches the tool name in the trace.
-  const checkBreach = useCallback(async (runId, signal) => {
-    if (!signal) return
+  // After an injected scenario finishes, report the backend's verdict. Security
+  // is DETERMINISTIC: the backend checked the injection task's `success` condition
+  // (a specific sink tool called with the attacker's parameters) against the
+  // trace — no LLM. Task completion (utility) is the only LLM-judged axis.
+  const checkBreach = useCallback(async (runId) => {
     try {
       const scn = await api.runScn(runId)
-      const sig = signal.toLowerCase()
-      const calls = []
-      for (const e of scn.trace?.events || []) {
-        if (e.kind === 'llm_call') for (const tc of e.tool_calls || []) calls.push((tc.function || '').toLowerCase())
-        if (e.kind === 'tool_call' && e.function) calls.push(e.function.toLowerCase())
-      }
-      const breached = calls.some((c) => c === sig || c.includes(sig))
-      if (breached) toast(`☠ BREACHED — agent called "${signal}" (attack succeeded)`, 'error')
-      else toast(`✓ Held — "${signal}" was never called`)
+      const success = scn.verdict?.attack_succeeded     // true=breached, false=held, null=unscored
+      const cond = scn.verdict?.success_condition
+      const tool = Array.isArray(cond) ? cond.map((c) => c.tool).join('/') : cond?.tool
+      if (success === true) toast(`☠ BREACHED — sink "${tool || 'tool'}" called with the attacker's parameters`, 'error')
+      else if (success === false) toast('✓ Held — the attacker’s sink call never fired')
+      const util = scn.judge?.utility
+      if (util != null) toast(util ? '⚖ Task judged complete' : '⚖ Task judged NOT complete')
     } catch { /* no scn for this run */ }
   }, [toast])
 
@@ -492,7 +527,7 @@ function Editor() {
     let resp
     try { resp = await api.runScenario(input) }
     catch (e) { toast(e.message || 'Scenario failed to start', 'error'); return }
-    const { run_id, breach_signal, arch } = resp
+    const { run_id, arch } = resp
     setScenarioOpen(false)
     // Switch the canvas to the architecture actually being run — the template
     // with the environment's tools/memory attached and the injection in place.
@@ -505,17 +540,17 @@ function Editor() {
       setRun(s)
       if (s.status === 'done' || s.status === 'error') {
         clearInterval(pollRef.current); setRunning(false)
-        if (input.injection_task_id) checkBreach(run_id, breach_signal)
+        if (input.injection_task_id) checkBreach(run_id)
       }
     }, 700)
   }, [providers, toast, checkBreach, loadArch])
 
-  // Pull a finished run's structured scenario log into the PCAP analyzer.
-  const analyzeRunInPcap = useCallback(async (runId) => {
+  // Pull a finished run's structured scenario log into the trace analyzer.
+  const analyzeRunInTrace = useCallback(async (runId) => {
     try {
       const scn = await api.runScn(runId)
-      setPcapScn(scn)
-      setPcapOpen(true)
+      setTraceScn(scn)
+      setTraceOpen(true)
     } catch { toast('No scenario log for this run', 'error') }
   }, [toast])
 
@@ -614,7 +649,6 @@ function Editor() {
           { icon: '↷', label: 'Redo', hint: 'Ctrl Y', disabled: !history.redo, onClick: redo },
           { separator: true },
           { icon: NODE_TYPES.agent.icon, label: 'Add Agent', onClick: () => addNodeCenter('agent') },
-          { icon: NODE_TYPES.memory.icon, label: 'Add Memory', onClick: () => addNodeCenter('memory') },
           { icon: NODE_TYPES.tool.icon, label: 'Add Tool', onClick: () => addNodeCenter('tool') },
           { separator: true },
           { icon: '🗑', label: 'Delete selection', danger: !!selId, disabled: !selId, onClick: deleteSelected },
@@ -623,6 +657,7 @@ function Editor() {
         return [
           { icon: '◳', label: execView ? 'Hide execution lens' : 'Show execution lens (run order + diagnostics)', onClick: () => setExecView((v) => !v) },
           { icon: '🧩', label: codeOpen ? 'Hide LangGraph code' : 'Show LangGraph code', onClick: () => setCodeOpen((v) => !v) },
+          { icon: '🧠', label: memOpen ? 'Hide shared memory' : 'Show shared memory (auto)', onClick: () => setMemOpen((v) => !v) },
           { icon: '⤢', label: 'Fit view', onClick: () => rf.current?.fitView({ duration: 300 }) },
         ]
       case 'templates':
@@ -634,7 +669,6 @@ function Editor() {
         return [
           { header: 'Add element here' },
           { icon: NODE_TYPES.agent.icon, label: 'Agent', onClick: () => addNodeAt('agent', menu.x, menu.y) },
-          { icon: NODE_TYPES.memory.icon, label: 'Memory', onClick: () => addNodeAt('memory', menu.x, menu.y) },
           { icon: NODE_TYPES.tool.icon, label: 'Tool', onClick: () => addNodeAt('tool', menu.x, menu.y) },
           { separator: true },
           { icon: '⤢', label: 'Fit view', onClick: () => rf.current?.fitView({ duration: 300 }) },
@@ -677,7 +711,7 @@ function Editor() {
       }
       default: return []
     }
-  }, [menu, nodes, edges, saved, templates, history, nameIsSaved, name, selId, codeOpen, execView, addNodeAt, addNodeCenter, startLink, undo, redo, toggleNodeMalicious, toggleEdgeMalicious, toggleEdgeLoop, deleteNode, deleteEdge, deleteSelected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [menu, nodes, edges, saved, templates, history, nameIsSaved, name, selId, codeOpen, memOpen, execView, addNodeAt, addNodeCenter, startLink, undo, redo, toggleNodeMalicious, toggleEdgeMalicious, toggleEdgeLoop, deleteNode, deleteEdge, deleteSelected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- node decoration: execution-lens badges + link-mode target highlight ----
   const providersById = useMemo(() => new Map(providers.map((p) => [p.id, p])), [providers])
@@ -805,7 +839,7 @@ function Editor() {
         <span className={`sandbox-pill sandbox-${health.sandbox}`} title="Execution sandbox">
           {health.sandbox === 'docker' ? '🐳 docker' : '🖥 local'}
         </span>
-        <button className="btn" onClick={() => { setPcapScn(null); setPcapOpen(true) }} title="Step through a recorded run trace: each agent's input/output, the messages between nodes, and any attack">
+        <button className="btn" onClick={() => { setTraceScn(null); setTraceOpen(true) }} title="Step through a recorded run trace: each agent's input/output, the messages between nodes, and any attack">
           🔬 Trace
         </button>
         <button className="btn" onClick={() => setScenarioOpen(true)} title="Run a benchmark scenario: pick an environment, architecture, task, and where an injection lands">
@@ -888,6 +922,19 @@ function Editor() {
               {codeError && <div className="code-error">{codeError}</div>}
             </div>
           )}
+          {memOpen && (
+            <div className="yaml-overlay mem-overlay">
+              <div className="yaml-head">
+                Shared memory <span className="muted small">· auto · read by every agent</span>
+                <span className="yaml-head-actions">
+                  <button className="btn ghost" onClick={() => setMemOpen(false)}>✕</button>
+                </span>
+              </div>
+              <textarea className="code-edit" spellCheck={false} readOnly value={globalMemory}
+                placeholder="# add agents/tools to populate the shared memory" />
+              <div className="mem-note">Auto-generated from the architecture — agents, the whole-system toolset, and any shared data. Every agent reads this; it isn’t editable and can’t be attacked.</div>
+            </div>
+          )}
           {execView && (
             <Diagnostics items={sim.diagnostics} onSelect={selectDiag} onClose={() => setExecView(false)} />
           )}
@@ -903,7 +950,7 @@ function Editor() {
         )}
       </div>
 
-      <RunConsole run={run} onAnalyze={analyzeRunInPcap} />
+      <RunConsole run={run} onAnalyze={analyzeRunInTrace} />
 
       {(providersOpen || (providersLoaded && providers.length === 0)) && (
         <ProvidersModal
@@ -924,9 +971,9 @@ function Editor() {
         />
       )}
 
-      {pcapOpen && (
-        <PcapModal onLoadArch={loadArch} onClose={() => setPcapOpen(false)} toast={toast}
-          initialScn={pcapScn} initialName={pcapScn ? `run ${run?.run_id || ''}` : ''} />
+      {traceOpen && (
+        <TraceModal onLoadArch={loadArch} onClose={() => setTraceOpen(false)} toast={toast}
+          initialScn={traceScn} initialName={traceScn ? `run ${run?.run_id || ''}` : ''} />
       )}
 
       {menu && menuItems.length > 0 && (

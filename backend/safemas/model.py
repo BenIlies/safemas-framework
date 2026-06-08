@@ -19,10 +19,10 @@ dict** (see :mod:`safemas.codegen`); execution itself lives in
 ``safemas.graph_runtime`` and consumes that dict — the builder never imports the
 runtime, so merely *loading* a template stays lightweight.
 
-Every element can be turned adversarial with ``compromise(...)``; the attack type
-is implied by the element (agent→prompt-injection, channel→aitm,
-memory→memory-poisoning, tool→tool-poisoning), mirroring the SafeMAS threat
-model.
+Agents, tools and channels can be turned adversarial with ``compromise(...)``; the
+attack type is implied by the element (agent→prompt-injection, channel→aitm,
+tool→tool-poisoning), mirroring the SafeMAS threat model. Memory is the
+auto-generated global shared board and is never adversarial.
 
 ``at=(x, y)`` carries the editor layout so the visual canvas round-trips
 losslessly; it has no effect on execution (the runtime re-derives ids from labels
@@ -68,7 +68,7 @@ class Element:
 
     def compromise(self, payload: str = "", attack: str | None = None) -> "Element":
         """Mark this element adversarial. The attack defaults to the one its type
-        carries (prompt-injection / memory-poisoning / tool-poisoning)."""
+        carries (prompt-injection / tool-poisoning / aitm)."""
         self.malicious = Malicious(True, attack or self.attack, payload)
         return self
 
@@ -78,7 +78,7 @@ class Agent(Element):
 
     def __init__(self, mas, label, *, provider=None, model=None, role=None,
                  prompt=None, temperature=None, max_tokens=None, join="any",
-                 at=(0, 0)):
+                 group=None, at=(0, 0)):
         super().__init__(mas, label, at)
         self.provider = provider
         self.model = model
@@ -86,6 +86,9 @@ class Agent(Element):
         self.prompt = prompt
         self.temperature = temperature
         self.max_tokens = max_tokens
+        # Specialization group (A/B/C): which tool group this agent owns when an
+        # environment is distributed over the architecture. A=read … C=sink.
+        self.group = group
         # How this agent consumes multiple inbound channels: "any" runs as soon as
         # one message arrives (a relay); "all" waits for every inbound channel and
         # aggregates them in one call (a real join / aggregator).
@@ -117,13 +120,15 @@ class Agent(Element):
 
 
 class Memory(Element):
-    attack = "memory-poisoning"
+    # Memory is never adversarial: its content is read-only shared data folded into
+    # the auto-generated global memory board.
+    attack = None
 
     def __init__(self, mas, label, *, backend="in-memory", content="", at=(0, 0)):
         super().__init__(mas, label, at)
         self.backend = backend
-        # What the store yields when an agent reads it (e.g. an AgentDojo dump).
-        # Empty => the runtime's neutral placeholder.
+        # Read-only shared data folded into the global memory board (e.g. a captured
+        # inbox / notes dump). Empty => omitted from the board.
         self.content = content
 
 
@@ -288,7 +293,7 @@ class StateGraph:
     # -- nodes -------------------------------------------------------------- #
     def add_node(self, label: str, *, type: str = "agent",
                  role=None, prompt=None, provider=None, model=None,
-                 temperature=None, max_tokens=None, join="any",
+                 temperature=None, max_tokens=None, join="any", group=None,
                  backend="in-memory", spec="", content="",
                  at: tuple[float, float] | None = None) -> Element:
         if label in self._by_label:
@@ -297,7 +302,8 @@ class StateGraph:
         if type == "agent":
             el: Element = self._mas.agent(
                 label, role=role, prompt=prompt, provider=provider, model=model,
-                temperature=temperature, max_tokens=max_tokens, join=join, at=pos)
+                temperature=temperature, max_tokens=max_tokens, join=join,
+                group=group, at=pos)
         elif type == "memory":
             el = self._mas.memory(label, backend=backend, content=content, at=pos)
         elif type == "tool":
