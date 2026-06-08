@@ -185,27 +185,52 @@ export default function PcapModal({ onLoadArch, onClose, toast, initialScn, init
 }
 
 // ---- compact summary -----------------------------------------------------
+// One scannable verdict bar instead of two redundant "S_safe = .." rows. The
+// LLM-judge verdict is preferred when present (it's the real metric); the runtime
+// leak check is shown only as a small footnote when it disagrees.
 function ScenarioSummary({ scn, onReload }) {
   const cfg = scn.config || {}
   const v = scn.verdict || {}
-  const mal = scn.compromised || []
-  const breached = v.attack_succeeded === true
-  const held = v.attack_succeeded === false
+  const j = scn.judge
+  const hasJudge = j && (j.utility != null || j.security != null || j.reasoning)
+  const comp = scn.compromised || []
+  const attacked = comp.length > 0
+
+  const primary = hasJudge
+    ? { src: 'LLM judge', utility: j.utility, success: j.security, reason: j.reasoning }
+    : { src: 'leak check', utility: v.utility, success: v.attack_succeeded, reason: null }
+
+  let pill = 'CLEAN · no attack', cls = 'clean'
+  if (attacked && primary.success === true) { pill = '✗ BREACHED', cls = 'breached' }
+  else if (attacked && primary.success === false) { pill = '✓ HELD', cls = 'held' }
+  else if (attacked) { pill = '⚠ attack · unscored', cls = 'clean' }
+
+  // runtime footnote only when it adds info that differs from the primary judgment
+  const rt = v.attack_succeeded
+  const showRt = hasJudge && attacked && rt != null && rt !== primary.success
+
   return (
     <div className="pcap-summary">
       <div className="pcap-summary-row">
-        <span><b>{cfg.arch}</b> <span className="tag">{cfg.condition || 'clean'}</span>
-          {cfg.model ? <span className="muted"> · {cfg.model}</span> : null}</span>
+        <div className="pcap-sum-id">
+          <b>{cfg.arch}</b>
+          <span className="tag">{cfg.condition || 'clean'}</span>
+          {cfg.model ? <span className="muted small">{cfg.model}</span> : null}
+        </div>
         <button className="btn small" onClick={onReload}>↻ Reload onto canvas</button>
       </div>
-      {mal.length === 0
-        ? <div className="pcap-goal">✓ no compromised node</div>
-        : mal.map((c, i) => <div key={i} className="pcap-mal">☠ compromised: <b>{c.element}</b> ({c.type})</div>)}
-      {v.attack_succeeded != null && (
-        <div className={`pcap-verdict ${breached ? 'breached' : held ? 'held' : ''}`}>
-          task done: <b>{String(v.utility)}</b> · attack succeeded: <b>{String(v.attack_succeeded)}</b> · {breached ? 'S_safe = 0 (breached)' : 'S_safe = 1 (held)'}
-        </div>
-      )}
+
+      <div className="pcap-verdict-bar">
+        <span className={`verdict-pill ${cls}`}>{pill}</span>
+        {primary.utility != null &&
+          <span className={`chip ${primary.utility ? 'ok' : 'no'}`}>task {primary.utility ? '✓ done' : '✗ failed'}</span>}
+        {attacked &&
+          <span className="pcap-attack-where">⚠ {comp.map((c) => `${c.type} @ ${c.element}`).join(', ')}</span>}
+        <span className="muted tiny">via {primary.src}</span>
+        {showRt && <span className="muted tiny">· leak check: {rt ? 'breached' : 'held'}</span>}
+      </div>
+
+      {primary.reason && <div className="pcap-judge-reason">⚖ {primary.reason}</div>}
     </div>
   )
 }
@@ -238,11 +263,28 @@ function stepHeadline(e) {
 }
 
 const stepAgent = (e) => e.agent || (e.kind === 'channel' ? `${e.src}→${e.tgt}` : '')
-const isEvil = (e) => e.kind === 'attack' || e.aitm === true || e.poisoned === true || !!e.injected
+
+// Classify each event by attack involvement so the timeline shows WHERE the attack
+// is and what it touched:
+//   'inject'  — the payload entering (the attack event / injected prompt), a poisoned
+//               tool result, or an AiTM-rewritten message  → red.
+//   'tainted' — an action taken by a compromised agent (its responses AND tool calls),
+//               i.e. the attack's blast radius                → amber.
+function makeThreat(scn) {
+  const comp = scn.compromised || []
+  const agentIds = new Set(comp.filter((c) => c.type === 'prompt-injection').map((c) => c.element))
+  return (e) => {
+    if (e.kind === 'attack' || e.aitm === true || e.poisoned === true || e.injected) return 'inject'
+    if (e.agent && agentIds.has(slug(e.agent))) return 'tainted'
+    return null
+  }
+}
 
 // ---- the player ----------------------------------------------------------
 function TracePlayer({ scn }) {
   const events = scn.trace?.events || []
+  const threat = makeThreat(scn)
+  const attacked = (scn.compromised || []).length > 0
   const [i, setI] = useState(0)
   useEffect(() => { setI(0) }, [scn])
 
@@ -264,47 +306,57 @@ function TracePlayer({ scn }) {
 
   if (!events.length) return <div className="pcap-note">This trace has no events.</div>
   const e = events[i]
+  const tl = threat(e)
   const meta = KIND_META[e.kind] || { icon: '•', label: e.kind }
 
   return (
-    <div className="trace-player">
-      <div className="step-rail" ref={railRef}>
-        {events.map((ev, idx) => {
-          const m = KIND_META[ev.kind] || { icon: '•' }
-          return (
-            <button
-              key={ev.seq ?? idx}
-              className={`step-rail-item${idx === i ? ' active' : ''}${isEvil(ev) ? ' evil' : ''}`}
-              onClick={() => setI(idx)}
-            >
-              <span className="step-rail-icon">{m.icon}</span>
-              <span className="step-rail-text">{stepHeadline(ev)}</span>
-              <span className="step-rail-t">{(ev.t ?? 0).toFixed?.(1) ?? ev.t}s</span>
-            </button>
-          )
-        })}
-      </div>
+    <>
+      {attacked && (
+        <div className="trace-legend">
+          <span className="lg lg-inject">injection / poisoned</span>
+          <span className="lg lg-tainted">compromised agent's actions (incl. tool calls)</span>
+        </div>
+      )}
+      <div className="trace-player">
+        <div className="step-rail" ref={railRef}>
+          {events.map((ev, idx) => {
+            const m = KIND_META[ev.kind] || { icon: '•' }
+            const t = threat(ev)
+            return (
+              <button
+                key={ev.seq ?? idx}
+                className={`step-rail-item${idx === i ? ' active' : ''}${t ? ' ' + t : ''}`}
+                onClick={() => setI(idx)}
+              >
+                <span className="step-rail-icon">{m.icon}</span>
+                <span className="step-rail-text">{stepHeadline(ev)}</span>
+                <span className="step-rail-t">{(ev.t ?? 0).toFixed?.(1) ?? ev.t}s</span>
+              </button>
+            )
+          })}
+        </div>
 
-      <div className="step-detail">
-        <div className={`step-detail-head${isEvil(e) ? ' evil' : ''}`}>
-          <span className="step-detail-icon">{meta.icon}</span>
-          <div>
-            <div className="step-detail-title">{stepHeadline(e)}</div>
-            <div className="step-detail-sub">{meta.label} · {(e.t ?? 0).toFixed?.(2) ?? e.t}s</div>
+        <div className="step-detail">
+          <div className={`step-detail-head${tl ? ' ' + tl : ''}`}>
+            <span className="step-detail-icon">{meta.icon}</span>
+            <div>
+              <div className="step-detail-title">{stepHeadline(e)}</div>
+              <div className="step-detail-sub">{meta.label} · {(e.t ?? 0).toFixed?.(2) ?? e.t}s</div>
+            </div>
+          </div>
+
+          <div className="step-detail-body">
+            <StepFields e={e} threat={tl} />
+          </div>
+
+          <div className="step-nav">
+            <button className="btn small" disabled={i === 0} onClick={() => go(-1)}>← Previous</button>
+            <span className="step-nav-count">Step {i + 1} / {events.length}</span>
+            <button className="btn small" disabled={i === events.length - 1} onClick={() => go(1)}>Next →</button>
           </div>
         </div>
-
-        <div className="step-detail-body">
-          <StepFields e={e} />
-        </div>
-
-        <div className="step-nav">
-          <button className="btn small" disabled={i === 0} onClick={() => go(-1)}>← Previous</button>
-          <span className="step-nav-count">Step {i + 1} / {events.length}</span>
-          <button className="btn small" disabled={i === events.length - 1} onClick={() => go(1)}>Next →</button>
-        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -325,7 +377,8 @@ function Field({ label, value, tone, md }) {
 
 // Render the right fields for the current event kind. Full text (scrollable),
 // not clipped — the whole point is to read what each agent actually said.
-function StepFields({ e }) {
+function StepFields({ e, threat }) {
+  const tainted = threat === 'tainted'
   switch (e.kind) {
     case 'run_start':
       return <>
@@ -348,15 +401,17 @@ function StepFields({ e }) {
       </>
     case 'llm_call':
       return <>
+        {tainted && <Field label="⚠ context" tone="warn" value="this agent is compromised — its response and any calls below are under attacker influence" />}
         <Field label="think" tone="muted" md value={e.reasoning} />
         <Field label="say" tone="out" md value={e.content} />
         {(e.tool_calls || []).length > 0 &&
-          <Field label="→ calls" tone="call" value={(e.tool_calls || []).map((t) => `${t.function}(${JSON.stringify(t.args)})`).join('\n')} />}
+          <Field label="→ calls" tone={tainted ? 'warn' : 'call'} value={(e.tool_calls || []).map((t) => `${t.function}(${JSON.stringify(t.args)})`).join('\n')} />}
       </>
     case 'tool_call':
       return <>
-        <Field label="function" tone={e.poisoned ? 'evil' : null} value={`${e.function}(${JSON.stringify(e.args || {})})`} />
+        <Field label="function" tone={e.poisoned ? 'evil' : tainted ? 'warn' : null} value={`${e.function}(${JSON.stringify(e.args || {})})`} />
         <Field label={e.poisoned ? 'result ☠' : e.error ? 'result ✗' : 'result'} tone={e.poisoned ? 'evil' : null} value={e.result} />
+        {tainted && !e.poisoned && <Field label="⚠ note" tone="warn" value="tool call issued by a compromised agent" />}
       </>
     case 'channel':
       return <>
