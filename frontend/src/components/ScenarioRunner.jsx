@@ -27,6 +27,7 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
   const [model, setModel] = useState('')
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [tplArch, setTplArch] = useState(null)   // loaded architecture (for its agents)
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -48,7 +49,7 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When the environment changes, pull its detail and reset the task / point.
+  // When the environment changes, pull its detail and reset the task.
   useEffect(() => {
     if (!envName) return
     let live = true
@@ -57,13 +58,35 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
       setEnv(d)
       setUserTaskId(d.user_tasks?.[0]?.id || '')
       setInjTaskId('')
-      // default injection point: first non-agent (a tool), else the agent
-      const pts = d.injection_points || []
-      const firstTool = pts.find((p) => p.kind === 'tool') || pts[0]
-      setPoint(firstTool ? pointKey(firstTool) : '')
     }).catch(() => toast('Failed to load environment', 'error'))
     return () => { live = false }
   }, [envName]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load the chosen architecture so we can offer its individual agents as the
+  // prompt-injection target (which agent is compromised is an architecture choice).
+  useEffect(() => {
+    if (!templateId) { setTplArch(null); return undefined }
+    let live = true
+    api.loadTemplate(templateId).then((a) => { if (live) setTplArch(a) }).catch(() => { if (live) setTplArch(null) })
+    return () => { live = false }
+  }, [templateId])
+
+  // Injection points = one per agent (prompt-injection) + one per env tool
+  // (tool-poisoning). The agent points come from the architecture, the tool points
+  // from the environment.
+  const agentPoints = useMemo(() => (tplArch?.nodes || [])
+    .filter((n) => n.type === 'agent')
+    .map((n) => ({ kind: 'agent', id: n.id, label: `agent · ${n.label}`, attack: 'prompt-injection' })),
+    [tplArch])
+  const toolPoints = env?.injection_points || []
+  const allPoints = useMemo(() => [...agentPoints, ...toolPoints], [agentPoints, toolPoints])
+
+  // Keep the selected point valid as env / architecture change: default to the
+  // entry agent (first agent point) when present, else the first tool.
+  useEffect(() => {
+    if (!allPoints.length) { setPoint(''); return }
+    if (!allPoints.some((p) => pointKey(p) === point)) setPoint(pointKey(allPoints[0]))
+  }, [allPoints]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selProvider = providers.find((p) => p.id === provider)
   const input = useMemo(() => {
@@ -103,7 +126,6 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
   }
 
   const injTasks = env?.injection_tasks || []
-  const points = env?.injection_points || []
   const userTasks = env?.user_tasks || []
 
   return (
@@ -166,9 +188,20 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
             <label className={`field${injTaskId ? '' : ' scn-dim'}`}>
               <span className="field-label">Where the injection happens</span>
               <select value={point} onChange={(e) => setPoint(e.target.value)} disabled={!injTaskId}>
-                {points.map((p) => (
-                  <option key={pointKey(p)} value={pointKey(p)}>{p.label} · {p.attack}</option>
-                ))}
+                {agentPoints.length > 0 && (
+                  <optgroup label="Compromise an agent (prompt-injection)">
+                    {agentPoints.map((p) => (
+                      <option key={pointKey(p)} value={pointKey(p)}>{p.label}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {toolPoints.length > 0 && (
+                  <optgroup label="Poison a tool (tool-poisoning)">
+                    {toolPoints.map((p) => (
+                      <option key={pointKey(p)} value={pointKey(p)}>{p.label}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </label>
 
@@ -229,26 +262,16 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
             </div>
           )}
 
-          {preview?.distribution && Object.keys(preview.distribution).length > 0 && (
+          {preview?.shared_tools && preview.shared_tools.length > 0 && (
             <div className="scn-dist">
               <div className="scn-payload-head">
-                <span className="field-label">Specialist tool distribution</span>
-                {preview.read_agent && preview.sink_agent && preview.read_agent !== preview.sink_agent ? (
-                  <span className="scn-chain-tag" title="The injection enters at the read specialist (upstream); the attack succeeds only if the flow carries it to the agent that owns the sink tool (downstream).">
-                    chain: <b>{preview.read_agent}</b> → <b>{preview.sink_agent}</b>
-                  </span>
-                ) : (
-                  <span className="scn-chain-tag" title="A single-agent architecture owns every tool — no cross-agent chain.">single agent · all tools</span>
-                )}
+                <span className="field-label">Shared toolset</span>
+                <span className="scn-chain-tag" title="Following the paper's controlled design, every agent is given the whole environment toolset — there is no per-agent tool specialization.">
+                  every agent · all {preview.shared_tools.length} tools
+                  {preview.injected_agent ? <> · infected: <b>{preview.injected_agent}</b></> : null}
+                </span>
               </div>
-              <div className="scn-dist-rows">
-                {Object.entries(preview.distribution).map(([agent, tools]) => (
-                  <div key={agent} className="scn-dist-row">
-                    <span className="scn-dist-agent">{agent}</span>
-                    <span className="scn-dist-tools">{tools.length ? tools.join(', ') : '—'}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="scn-dist-tools">{preview.shared_tools.join(', ')}</div>
             </div>
           )}
 

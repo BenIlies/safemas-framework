@@ -89,10 +89,6 @@ class Node(BaseModel):
 
     # tool-specific
     spec: Optional[str] = None  # tool description / signature
-    # Specialization group (A/B/C): which specialist agent owns this tool when an
-    # environment is distributed across a multi-agent architecture (read=A …
-    # sink=C, by flow position). None on hand-built single-agent graphs.
-    group: Optional[str] = None
 
     # resource (tool/memory) payload: what the resource yields when an agent uses
     # it (a tool's return value, a memory's stored content) — e.g. a captured

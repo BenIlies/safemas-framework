@@ -225,7 +225,7 @@ function Editor() {
     // a sensible default to start, falling back to the offline STARTER graph.
     api.listTemplates().then((list) => {
       setTemplates(list)
-      const def = list.find((x) => x.id === 'linear-pipeline') || list[0]
+      const def = list.find((x) => x.id === 'sas') || list[0]
       if (def) api.loadTemplate(def.id).then(loadArch).catch(() => loadArch(STARTER))
       else loadArch(STARTER)
     }).catch(() => loadArch(STARTER))
@@ -982,6 +982,7 @@ function Editor() {
           toast={toast}
         />
       )}
+
 
       {traceOpen && (
         <TraceModal onLoadArch={loadArch} onClose={() => setTraceOpen(false)} toast={toast}

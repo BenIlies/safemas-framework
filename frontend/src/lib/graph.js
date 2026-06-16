@@ -24,7 +24,6 @@ export function graphToArch({ name, task, nodes, edges }) {
       backend: n.data.backend ?? null,
       spec: n.data.spec ?? null,
       content: n.data.content ?? null,
-      group: n.data.group ?? null,
       malicious: n.data.malicious || blankMalicious(),
     })),
     edges: edges.map((e) => ({
@@ -60,7 +59,6 @@ export function archToGraph(arch) {
       backend: n.backend,
       spec: n.spec,
       content: n.content ?? null,
-      group: n.group ?? null,
       malicious: n.malicious || blankMalicious(),
     },
   }))

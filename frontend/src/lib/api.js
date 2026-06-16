@@ -46,11 +46,6 @@ export async function listTemplates() {
 export async function loadTemplate(id) {
   return jsonOrThrow(await fetch(`/api/templates/${encodeURIComponent(id)}`), 'template load failed')
 }
-export async function templateCode(id) {
-  const r = await fetch(`/api/templates/${encodeURIComponent(id)}/code`)
-  if (!r.ok) throw new Error('template code load failed')
-  return r.text()
-}
 
 // ---- code <-> architecture graph (the StateGraph DSL is the source of truth) ----
 export async function codeFromArch(arch) {

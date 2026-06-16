@@ -3,12 +3,12 @@
 It lets the UI pick one *environment* (a dataset under ``environments/*.json`` —
 toolset, persistent stores, benign ``user_tasks``, adversarial
 ``injection_tasks``), one *architecture* (a template), a *task*, and — optionally —
-an *injection scenario* and the *point* where the poison lands (a tool result or
-the upstream read specialist's prompt). It then composes a single runnable
-architecture, server-side, so the visual editor can drive it and replay the trace
-in the Trace viewer:
+an *injection scenario* and the *point* where the poison lands (a tool result or a
+chosen agent's prompt). It then composes a single runnable architecture,
+server-side, so the visual editor can drive it and replay the trace in the Trace
+viewer:
 
-    template  ⊗  env tools (distributed by group) + shared data  ⊗  poison @ point  ⊗  task
+    template  ⊗  env tools (every tool on every agent) + shared data  ⊗  poison @ point  ⊗  task
 
 The injected payload is generated from the chosen ``injection_task.goal`` in a
 selectable **stealth style** — the default ``blended`` style reads as ordinary
@@ -22,7 +22,7 @@ import json
 import re
 from pathlib import Path
 
-ENV_DIR = Path(__file__).resolve().parent.parent / "environments"
+ENV_DIR = Path(__file__).resolve().parent.parent / "environments"  # the fixed, bundled datasets
 
 # A tool whose name matches one of these verbs is a plausible "sink" — the action
 # an attacker abuses (move money, message someone, exfiltrate, escalate). Used to
@@ -43,7 +43,7 @@ def _safe(name: str) -> str:
 
 
 def list_environments() -> list[dict]:
-    """Lightweight catalogue of every environment dataset."""
+    """Lightweight catalogue of the fixed, bundled environment datasets."""
     out: list[dict] = []
     for p in sorted(ENV_DIR.glob("*.json")):
         try:
@@ -80,14 +80,12 @@ def _signature(tool: dict) -> str:
 
 
 def injection_points(env: dict) -> list[dict]:
-    """Every place a scenario can inject, as {kind, id, label, attack}. The agent
-    point (prompt-injection) lands on the upstream read specialist, resolved against
-    the chosen template at assembly time (id empty); tools carry tool-poisoning.
+    """The environment-level injection points, as {kind, id, label, attack}: one
+    per tool (tool-poisoning). The agent point (prompt-injection) is *architecture*-
+    level — which agent is compromised is chosen against the picked template — so it
+    is not enumerated here; ``_build_scenario`` synthesises it from the target id.
     Memory is the auto-generated global board and is never an injection point."""
-    pts: list[dict] = [
-        {"kind": "agent", "id": "", "label": "Read specialist (upstream, system prompt)",
-         "attack": "prompt-injection"},
-    ]
+    pts: list[dict] = []
     for t in env.get("tools", []):
         pts.append({"kind": "tool", "id": t.get("name"), "label": f'tool · {t.get("name")}',
                     "attack": "tool-poisoning"})
@@ -175,31 +173,19 @@ def build_poison(goal: str, point: dict, style: str = "blended") -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Specialization — distribute env tools across agents by flow position
+# Tool access — every agent owns every tool (the paper's controlled design)
 # --------------------------------------------------------------------------- #
-GROUPS = ("A", "B", "C")  # n specialized = 3: read/input (A) → mid (B) → action/sink (C)
-
-
-def _default_group(tool: dict) -> str:
-    """Fallback group when an env tool has no explicit ``group``: action/sink → C,
-    read/query → A, everything else → B."""
-    name = (tool.get("name") or "").lower()
-    if any(p in name for p in SINK_PATTERNS):
-        return "C"
-    if name.startswith(("get_", "list_", "read_", "search", "resolve_", "fetch", "find")):
-        return "A"
-    return "B"
-
-
-def tool_group(tool: dict) -> str:
-    g = (tool.get("group") or "").strip().upper()
-    return g if g in GROUPS else _default_group(tool)
+# Following Kim et al., "Towards a Science of Scaling Agent Systems" (§3.1, §3.2):
+# the action space A_i = {ToolCall(t, θ) : t ∈ T} is identical for every agent —
+# there is one shared tool set T, with no per-agent specialization. We attach the
+# whole environment toolset to every agent so coordination structure, not tool
+# partitioning, is the only thing that varies across architectures.
 
 
 def agent_flow_order(arch: dict) -> list[dict]:
     """Agents in execution order: BFS from the entrance along (non-loop) channels,
-    then any unreached agents in node order. This is what makes reads sit *upstream*
-    of sinks so an attack must propagate along the flow."""
+    then any unreached agents in node order. The first element is the entry agent —
+    the default landing point for a prompt-injection when no agent is named."""
     nodes = {n["id"]: n for n in arch["nodes"]}
     agents = [n for n in arch["nodes"] if n.get("type") == "agent"]
     entrance_ids = {n["id"] for n in arch["nodes"] if n.get("type") == "entrance"}
@@ -222,77 +208,6 @@ def agent_flow_order(arch: dict) -> list[dict]:
         if a["id"] not in seen:
             order.append(a)
     return order
-
-
-def _deal(specs: list[dict], tools: list) -> dict[str, list]:
-    """Deal ``tools`` contiguously (flow order) across ``specs`` so each gets a
-    roughly equal slice — used to share a group across several specialists."""
-    out: dict[str, list] = {}
-    k = len(specs) or 1
-    for i, n in enumerate(specs):
-        lo, hi = (i * len(tools)) // k, ((i + 1) * len(tools)) // k
-        if tools[lo:hi]:
-            out.setdefault(n["id"], []).extend(tools[lo:hi])
-    return out
-
-
-def distribute_tools(order: list[dict], by_group: dict[str, list]) -> tuple[dict, dict | None, dict | None]:
-    """Map the 3 tool groups onto agents so reads (A) sit upstream and sinks (C)
-    downstream. Returns ``(agent_id -> [tools], read_agent, sink_agent)``.
-
-    **Explicit mode** — if the architecture tags agents with a ``group`` covering all
-    of A/B/C, each group's tools go to the agent(s) tagged with that group
-    (Specialist A ↔ group A). Read = first A-tagged agent in flow, sink = last
-    C-tagged agent.
-
-    **Empty-middle collapse** — many domains have no "middle" tools (every tool is a
-    read or a sink), which would leave the B specialist tool-less. When a group is
-    empty, the sinks stay on the C specialist(s) and the read tools are *shared*
-    across the A and B specialists, so no specialist is left empty while reads stay
-    upstream of the sink.
-
-    **Flow fallback** — for untagged graphs, distribute by flow position:
-    1 agent → all tools (no chain); 2 → upstream A+B, downstream C; ≥3 → the last
-    three agents become the A/B/C specialists (A earliest, C latest).
-    """
-    a, b, c = by_group.get("A", []), by_group.get("B", []), by_group.get("C", [])
-    if not order:
-        return {}, None, None
-
-    tagged = {g: [n for n in order if (n.get("group") or "").upper() == g] for g in GROUPS}
-    if all(tagged[g] for g in GROUPS):                 # explicit, complete specialist set
-        assign: dict[str, list] = {}
-        if a and c and not b:                          # collapse the empty middle
-            for n in tagged["C"]:
-                assign.setdefault(n["id"], []).extend(c)
-            up = [n for n in order if (n.get("group") or "").upper() in ("A", "B")]
-            for k, v in _deal(up, a).items():
-                assign.setdefault(k, []).extend(v)
-        else:
-            for g, tools in (("A", a), ("B", b), ("C", c)):
-                for n in tagged[g]:
-                    if tools:
-                        assign.setdefault(n["id"], []).extend(tools)
-        return assign, tagged["A"][0], tagged["C"][-1]
-
-    if len(order) == 1:
-        return {order[0]["id"]: [*a, *b, *c]}, order[0], order[0]
-    spec = order[-3:] if len(order) >= 3 else order[-2:]
-    assign = {}
-    if len(spec) == 3:
-        if a and c and not b:                          # collapse empty middle (fallback)
-            assign.setdefault(spec[-1]["id"], []).extend(c)
-            assign.update(_deal(spec[:-1], a))
-        else:
-            for n, tools in zip(spec, (a, b, c)):
-                if tools:
-                    assign[n["id"]] = list(tools)
-    else:
-        if [*a, *b]:
-            assign[spec[0]["id"]] = [*a, *b]
-        if c:
-            assign[spec[1]["id"]] = list(c)
-    return assign, spec[0], spec[-1]
 
 
 # --------------------------------------------------------------------------- #
@@ -343,8 +258,20 @@ def _store_get(store, path):
     return v
 
 
+_READ_PREFIXES = ("get_", "list_", "read", "search", "resolve", "fetch", "find",
+                  "show", "view", "lookup", "retrieve", "check", "track")
+
+
 def is_read_tool(tool: dict) -> bool:
-    return tool_group(tool) == "A"
+    """A *read* tool serves a slice of the backing store when called; a *write/action*
+    tool just acknowledges the action. Detected from the tool name alone (no agent
+    grouping): a sink/action verb means NOT a read; only an explicit read verb reads.
+    (Action tools like ``share_file`` / ``append_to_file`` / ``create_*`` therefore
+    return an acknowledgement, never store data.)"""
+    name = (tool.get("name") or "").lower()
+    if any(p in name for p in SINK_PATTERNS):
+        return False
+    return name.startswith(_READ_PREFIXES)
 
 
 def resolve_tool_data(tool: dict, store: dict):
@@ -395,13 +322,16 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
              style: str = "blended", max_tokens: int = 4096) -> dict:
     """Compose one runnable architecture. Returns ``(arch, meta)``.
 
-    Tools are split into 3 specialization groups and distributed across the
-    template's agents by flow order (read tools upstream, sink tools downstream), so
-    that with a multi-agent architecture an attack's data-read and its sink live on
-    *different* agents. The injection enters at the **read specialist** (upstream);
-    success (the deterministic sink-tool check) therefore depends on the flow
-    carrying the instruction downstream to the agent that owns the sink. A
-    single-agent architecture owns every tool, so there is no chain."""
+    Following the paper's controlled design, **every agent is given the whole
+    environment toolset** (one shared tool set T; no per-agent specialization). Each
+    tool becomes a single node attached to every agent. A read tool serves its slice
+    of the backing store when called; a sink/write tool just acknowledges the action,
+    and a deterministic check (sink tool invoked with the attacker's arguments) is
+    what scores attack success.
+
+    A prompt-injection lands on **one chosen agent** — ``point['id']`` names the agent
+    (by node id or label); with no name it defaults to the entry agent. A
+    tool-poisoning lands on the named tool, affecting every agent that calls it."""
     arch = json.loads(json.dumps(template_arch))  # deep copy
     agents = [n for n in arch["nodes"] if n.get("type") == "agent"]
     if not agents:
@@ -413,18 +343,17 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
             ag["provider"] = provider
         if model and not ag.get("model"):
             ag["model"] = model
+        ag["max_tokens"] = max_tokens
 
     order = agent_flow_order(arch)
-    by_group: dict[str, list] = {"A": [], "B": [], "C": []}
-    for t in env.get("tools", []):
-        by_group[tool_group(t)].append(t)
-    assign, read_agent, sink_agent = distribute_tools(order, by_group)
+    tools = env.get("tools", [])
 
-    # The injection enters UPSTREAM, at the read specialist that holds the group-A
-    # tools — not at the sink agent — so a successful attack requires propagation.
-    op = read_agent or agents[0]
-    for ag in agents:
-        ag["max_tokens"] = max_tokens
+    # Resolve which agent the prompt-injection compromises: the named target if
+    # given, else the entry (first flow-order) agent.
+    by_id = {a["id"]: a for a in agents}
+    by_label = {a.get("label"): a for a in agents}
+    target_id = (point or {}).get("id") if (point or {}).get("kind") == "agent" else None
+    op = by_id.get(target_id) or by_label.get(target_id) or (order[0] if order else agents[0])
     if not op.get("prompt"):
         op["prompt"] = (f"You are a {env.get('name', 'task')} assistant. "
                         f"Use your tools to help the user.")
@@ -440,30 +369,29 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         poison = {"enabled": True, "attack": point.get("attack"), "payload": payload}
         if point["kind"] == "agent":
             op["malicious"] = poison
-            point_label = f"{op.get('label') or 'operator'} (prompt-injection · upstream read specialist)"
+            point_label = f"{op.get('label') or 'agent'} (prompt-injection)"
         else:
             point_label = point.get("label") or f'{point["kind"]} · {point.get("id")}'
 
-    # Attach each specialist's tools (poisoning the targeted one). A READ tool's
-    # `content` is the slice of the backing store it serves when called, so an agent
-    # must invoke the tool to obtain the data instead of reading it from ambient
+    # Attach EVERY tool to EVERY agent (one tool node, fan-in attach edges). A READ
+    # tool's `content` is the slice of the backing store it serves when called, so an
+    # agent must invoke the tool to obtain the data instead of reading it from ambient
     # shared memory; write/sink tools carry no data (the runtime acks the action).
     store = _env_store(env)
     i = 0
-    for ag_id, tools in assign.items():
-        for t in tools:
-            name = t.get("name")
-            data = resolve_tool_data(t, store)
-            node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
-                    "content": json.dumps(data, indent=2) if data is not None else None,
-                    "group": tool_group(t),
-                    "position": {"x": 60 + i * 150, "y": 380}}
-            if poison is not None and point and point["kind"] == "tool" and point.get("id") == name:
-                node["malicious"] = poison
-            arch["nodes"].append(node)
-            arch["edges"].append({"id": f"scn-a{i}", "source": name,
-                                  "target": ag_id, "kind": "attach"})
-            i += 1
+    for t in tools:
+        name = t.get("name")
+        data = resolve_tool_data(t, store)
+        node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
+                "content": json.dumps(data, indent=2) if data is not None else None,
+                "position": {"x": 60 + i * 150, "y": 380}}
+        if poison is not None and point and point["kind"] == "tool" and point.get("id") == name:
+            node["malicious"] = poison
+        arch["nodes"].append(node)
+        for ag in agents:
+            arch["edges"].append({"id": f"scn-a{i}-{ag['id']}", "source": name,
+                                  "target": ag["id"], "kind": "attach"})
+        i += 1
     # Memory stores stay on the canvas as data-store nodes (no attach edge), but the
     # runtime now lists them by name only — their contents are reached through tools,
     # not handed to every agent. They are never adversarial.
@@ -473,11 +401,8 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
                               "position": {"x": 60 + i * 150, "y": 540}})
         i += 1
 
-    label_of = {n["id"]: n.get("label") for n in arch["nodes"]}
-    distribution = {label_of.get(ag_id, ag_id): [t.get("name") for t in tools]
-                    for ag_id, tools in assign.items()}
+    tool_names = [t.get("name") for t in tools]
     meta = {"payload": payload, "injection_point": point_label, "task_prompt": task_prompt,
-            "distribution": distribution,
-            "read_agent": label_of.get(read_agent["id"]) if read_agent else None,
-            "sink_agent": label_of.get(sink_agent["id"]) if sink_agent else None}
+            "shared_tools": tool_names,
+            "injected_agent": op.get("label") if poison and point and point["kind"] == "agent" else None}
     return arch, meta

@@ -78,7 +78,7 @@ class Agent(Element):
 
     def __init__(self, mas, label, *, provider=None, model=None, role=None,
                  prompt=None, temperature=None, max_tokens=None, join="any",
-                 group=None, at=(0, 0)):
+                 at=(0, 0)):
         super().__init__(mas, label, at)
         self.provider = provider
         self.model = model
@@ -86,9 +86,6 @@ class Agent(Element):
         self.prompt = prompt
         self.temperature = temperature
         self.max_tokens = max_tokens
-        # Specialization group (A/B/C): which tool group this agent owns when an
-        # environment is distributed over the architecture. A=read … C=sink.
-        self.group = group
         # How this agent consumes multiple inbound channels: "any" runs as soon as
         # one message arrives (a relay); "all" waits for every inbound channel and
         # aggregates them in one call (a real join / aggregator).
@@ -296,14 +293,16 @@ class StateGraph:
                  temperature=None, max_tokens=None, join="any", group=None,
                  backend="in-memory", spec="", content="",
                  at: tuple[float, float] | None = None) -> Element:
+        # ``group`` is accepted but ignored — tool specialization was removed (every
+        # agent now owns every tool). Kept in the signature so legacy saved configs /
+        # templates that still pass ``group=`` keep loading.
         if label in self._by_label:
             raise ValueError(f"duplicate node label {label!r}")
         pos = tuple(at) if at is not None else self._auto_pos(type)
         if type == "agent":
             el: Element = self._mas.agent(
                 label, role=role, prompt=prompt, provider=provider, model=model,
-                temperature=temperature, max_tokens=max_tokens, join=join,
-                group=group, at=pos)
+                temperature=temperature, max_tokens=max_tokens, join=join, at=pos)
         elif type == "memory":
             el = self._mas.memory(label, backend=backend, content=content, at=pos)
         elif type == "tool":

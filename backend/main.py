@@ -36,6 +36,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 import threading
 import uuid
@@ -48,7 +49,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 import campaigns as campaign_store
-import judge as judge_store
+import verdict as verdict_store
 import providers as provider_store
 import scenario as scenario_store
 import spec as spec_module
@@ -287,7 +288,7 @@ class ScenarioInput(BaseModel):
     user_task_id: Optional[str] = None      # benign task; None -> env's first
     injection_task_id: Optional[str] = None  # attacker goal; None -> clean run
     injection_kind: Optional[str] = None     # 'tool' | 'agent' (memory is the global board, never injected)
-    injection_target: Optional[str] = None   # resource id for tool/memory
+    injection_target: Optional[str] = None   # tool id (tool kind) or agent node id/label (agent kind)
     stealth_style: str = "blended"           # blended | authority | metadata | tagged
     provider: Optional[str] = None
     model: Optional[str] = None
@@ -300,12 +301,9 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     template = load_template(inp.template_id).model_dump()  # reuses 404 handling
 
     tasks = {t["id"]: t for t in env.get("user_tasks", [])}
-    if inp.user_task_id and inp.user_task_id in tasks:
-        task_prompt = tasks[inp.user_task_id]["prompt"]
-    elif env.get("user_tasks"):
-        task_prompt = env["user_tasks"][0]["prompt"]
-    else:
-        task_prompt = "Help the user with their request."
+    user_task = tasks.get(inp.user_task_id) or (env.get("user_tasks") or [None])[0]
+    task_prompt = user_task["prompt"] if user_task else "Help the user with their request."
+    task_success = user_task.get("success") if user_task else None  # deterministic completion spec
 
     goal, point, success = None, None, None
     if inp.injection_task_id:
@@ -316,11 +314,18 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
         goal = inj["goal"]
         success = inj.get("success")  # deterministic tool-call attack-success condition
         kind = inp.injection_kind or "agent"
-        point = next((p for p in scenario_store.injection_points(env)
-                      if p["kind"] == kind and (p["id"] or None) == (inp.injection_target or None)),
-                     None)
-        if point is None:
-            raise HTTPException(422, "injection point not found for this environment")
+        if kind == "agent":
+            # Which agent is compromised is an architecture-level choice (the env
+            # doesn't know the template's agents); assemble resolves the id/label and
+            # defaults to the entry agent when none is named.
+            point = {"kind": "agent", "id": inp.injection_target or "",
+                     "attack": "prompt-injection", "label": "agent"}
+        else:
+            point = next((p for p in scenario_store.injection_points(env)
+                          if p["kind"] == kind and (p["id"] or None) == (inp.injection_target or None)),
+                         None)
+            if point is None:
+                raise HTTPException(422, "injection point not found for this environment")
 
     try:
         arch, meta = scenario_store.assemble(
@@ -330,6 +335,7 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
         raise HTTPException(422, str(exc))
     meta["breach_signal"] = scenario_store.default_breach_signal(env)
     meta["success"] = success           # {tool, args} sink that means the attack landed
+    meta["task_success"] = task_success  # deterministic user-task completion spec
     meta["task_prompt"] = task_prompt
     return Architecture(**arch), meta
 
@@ -345,14 +351,12 @@ def scenario_preview(inp: ScenarioInput) -> dict:
 @app.post("/api/scenario/run")
 def scenario_run(inp: ScenarioInput) -> dict:
     arch, meta = _build_scenario(inp)
-    # Attach an evaluation spec so the run is scored once it finishes: attack
-    # success deterministically (the tool-call `success` condition) and task
-    # completion via the LLM judge (both written back into the scn).
+    # Attach an evaluation spec so the run is scored deterministically once it
+    # finishes: attack success (the injection `success` sink condition) and task
+    # completion (the user task's `task_success` spec) — both written into the scn.
     evaluate = {
         "success": meta.get("success"),
-        "task": meta.get("task_prompt"),
-        "provider": inp.provider,
-        "model": inp.model,
+        "task_success": meta.get("task_success"),
     }
     # Return the assembled architecture so the editor can switch its canvas to
     # exactly what's running (env tools/memory + the injection point), not just
@@ -492,29 +496,43 @@ def _arch_uses_live_llm(arch: Architecture, prov_map: dict) -> bool:
 
 
 def _run_docker(arch_json: str, prov_json: str, needs_net: bool, logf) -> int:
+    # The arch can be large (an environment's tool data); pass it on STDIN, not via
+    # an env var / CLI arg, which would blow past the OS argument-size limit (E2BIG).
     cmd = [
         "docker", "run", "--rm", "-i",
         "--network", "bridge" if needs_net else "none",
         "--memory", "512m", "--cpus", "1",
         # Unbuffered stdout so streamed tokens reach the log file as they arrive.
         "-e", "PYTHONUNBUFFERED=1",
-        "-e", "SAFEMAS_ARCH", "-e", "SAFEMAS_PROVIDERS",
+        "-e", "SAFEMAS_PROVIDERS",
         IMAGE_TAG,
     ]
-    env = {**os.environ, "SAFEMAS_ARCH": arch_json, "SAFEMAS_PROVIDERS": prov_json}
-    return subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, env=env).returncode
+    env = {**os.environ, "SAFEMAS_PROVIDERS": prov_json}
+    return subprocess.run(cmd, input=arch_json.encode(), stdout=logf,
+                          stderr=subprocess.STDOUT, env=env).returncode
 
 
 def _run_local(arch_json: str, prov_json: str, logf) -> int:
     logf.write("[local] Docker sandbox unavailable — running the architecture "
                "as a local subprocess (NOT network-isolated).\n")
     logf.flush()
-    env = {**os.environ, "SAFEMAS_ARCH": arch_json, "SAFEMAS_PROVIDERS": prov_json,
-           "PYTHONUNBUFFERED": "1"}
-    return subprocess.run(
-        [sys.executable, str(RUNNER_DIR / "run_mas.py")],
-        stdout=logf, stderr=subprocess.STDOUT, env=env,
-    ).returncode
+    # Write the arch to a temp file and pass its PATH (run_mas.py accepts argv[1]);
+    # putting a large arch in an env var overflows the OS limit (E2BIG).
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
+        tf.write(arch_json)
+        arch_path = tf.name
+    env = {**os.environ, "SAFEMAS_PROVIDERS": prov_json, "PYTHONUNBUFFERED": "1"}
+    env.pop("SAFEMAS_ARCH", None)  # force run_mas.py to read the file argument
+    try:
+        return subprocess.run(
+            [sys.executable, str(RUNNER_DIR / "run_mas.py"), arch_path],
+            stdout=logf, stderr=subprocess.STDOUT, env=env,
+        ).returncode
+    finally:
+        try:
+            os.unlink(arch_path)
+        except OSError:
+            pass
 
 
 def _apply_default_provider(arch: Architecture) -> None:
@@ -574,17 +592,14 @@ def _execute(run_id: str, arch: Architecture) -> None:
 
 
 def _score_run(run: dict, scn: dict) -> None:
-    """For a scenario run, write the deterministic security verdict + the LLM task
-    judge into the scn (no-op for a plain canvas run, which carries no spec)."""
+    """For a scenario run, write the deterministic verdicts (attack success + task
+    completion) into the scn (no-op for a plain canvas run, which carries no spec)."""
     ev = run.get("evaluate")
     if not ev:
         return
-    prov_map = provider_store.resolved_map()
-    provider = prov_map.get(ev.get("provider")) if ev.get("provider") else None
     try:
-        judge_store.evaluate_scenario(
-            scn, success=ev.get("success"), task=ev.get("task") or "",
-            provider=provider, model=ev.get("model"))
+        verdict_store.evaluate_scenario(
+            scn, success=ev.get("success"), task_success=ev.get("task_success"))
     except Exception:  # scoring must never sink the run
         pass
 

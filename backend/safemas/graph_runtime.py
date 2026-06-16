@@ -31,7 +31,7 @@ import re
 import time
 from collections import defaultdict
 from types import SimpleNamespace
-from typing import Any, Optional, TypedDict
+from typing import Optional, TypedDict
 
 # --------------------------------------------------------------------------- #
 # Small helpers (ported from the bespoke engine so the trace/scn stay identical)
@@ -40,10 +40,22 @@ RESET, RED, YELLOW, CYAN, GREY, GREEN, BOLD = (
     "\033[0m", "\033[91m", "\033[93m", "\033[96m", "\033[90m", "\033[92m", "\033[1m",
 )
 _THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
-DEFAULT_MAX_ITERS = 3   # loop edges with no explicit bound
-STEP_BUDGET = 256       # global cap on activations (runaway backstop)
-PER_AGENT_CAP = 64      # cap on activations of a single agent
-TOOL_LOOP_CAP = 6       # cap on tool-calling rounds within one agent activation
+# Execution budgets — configurable via env so a benchmark can match the paper's
+# iteration caps (Kim et al., App. E.2: k=10 iters/agent for SAS, 3 iters/agent/round
+# for MAS; d=3 debate / r=5 orchestration rounds). `k` is TOOL_LOOP_CAP (the per-agent
+# "thinking" / tool-calling rounds); STEP_BUDGET / PER_AGENT_CAP bound how many times
+# agents re-activate in a cyclic (debate) topology so a run can't run away.
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+DEFAULT_MAX_ITERS = _env_int("SAFEMAS_MAX_ROUNDS", 3)    # loop edges with no explicit bound (d / r)
+STEP_BUDGET = _env_int("SAFEMAS_STEP_BUDGET", 256)       # global cap on activations (runaway backstop)
+PER_AGENT_CAP = _env_int("SAFEMAS_PER_AGENT_CAP", 64)    # cap on activations of a single agent
+TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 6)     # k: tool-calling rounds within one agent activation
 
 
 def log(msg: str = "") -> None:
@@ -169,7 +181,7 @@ def parse_arch(arch: dict):
             model=n.get("model"), temperature=n.get("temperature"),
             max_tokens=n.get("max_tokens"), join=n.get("join") or "any",
             spec=n.get("spec"), backend=n.get("backend"), content=n.get("content"),
-            group=n.get("group"), malicious=_mal(n.get("malicious")),
+            malicious=_mal(n.get("malicious")),
         )
 
     agents = [nsmap[n["id"]] for n in nodes if n.get("type") == "agent"]

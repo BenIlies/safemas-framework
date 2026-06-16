@@ -136,12 +136,6 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
 
       {!isEdge && data.type === 'tool' && (
         <>
-          {data.group && (
-            <div className="kind-readout" title="Specialization group (A=read · B=mid · C=action/sink): which specialist agent owns this tool when an environment is distributed across a multi-agent architecture by flow position.">
-              specialist group <b>{data.group}</b>
-              {' · '}{data.group === 'C' ? 'action / sink' : data.group === 'A' ? 'read / input' : 'mid / processing'}
-            </div>
-          )}
           <Field label="Spec / signature">
             <textarea rows={3} value={data.spec || ''}
               placeholder="e.g. get_calendar(query) → the user's calendar events"
