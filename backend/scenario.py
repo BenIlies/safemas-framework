@@ -296,12 +296,103 @@ def distribute_tools(order: list[dict], by_group: dict[str, list]) -> tuple[dict
 
 
 # --------------------------------------------------------------------------- #
+# Tool data binding — what a READ tool returns when an agent calls it
+# --------------------------------------------------------------------------- #
+# Read tools serve their slice of the environment's backing store on demand, so an
+# agent must *call a tool* to learn the data instead of being handed everything in
+# ambient shared memory. The slice is resolved by matching the tool's name tokens
+# against the store's (nested) keys; a bare-scalar match is promoted to its parent
+# collection (read tools return collections, not single values), and a tool whose
+# name matches nothing falls back to the whole store — never to fabricated data.
+_READ_VERBS = ("get", "list", "read", "fetch", "find", "search", "resolve", "show",
+               "view", "check", "track", "lookup", "retrieve")
+
+
+def _toks(s: str) -> list[str]:
+    return [w for w in re.split(r"[^a-z0-9]+", (s or "").lower()) if w]
+
+
+def _name_toks(name: str) -> list[str]:
+    t = _toks(name)
+    return t[1:] if t and t[0] in _READ_VERBS else t
+
+
+def _stem(t: str) -> str:
+    return t[:-1] if len(t) > 3 and t.endswith("s") else t
+
+
+def _tok_match(a: str, b: str) -> bool:
+    a, b = _stem(a), _stem(b)
+    return a == b or (len(a) >= 4 and a in b) or (len(b) >= 4 and b in a)
+
+
+def _flatten_store(store, prefix=(), depth=0, out=None):
+    if out is None:
+        out = []
+    if isinstance(store, dict) and depth < 2:
+        for k, v in store.items():
+            out.append((prefix + (k,), v))
+            _flatten_store(v, prefix + (k,), depth + 1, out)
+    return out
+
+
+def _store_get(store, path):
+    v = store
+    for k in path:
+        v = v[k]
+    return v
+
+
+def is_read_tool(tool: dict) -> bool:
+    return tool_group(tool) == "A"
+
+
+def resolve_tool_data(tool: dict, store: dict):
+    """The slice of ``store`` a read tool returns. ``None`` -> serve no data (the
+    runtime returns an action acknowledgement, e.g. for write/sink tools)."""
+    if not isinstance(store, dict) or not store or not is_read_tool(tool):
+        return None
+    want = _name_toks(tool.get("name", ""))
+    if not want:
+        return store
+    best = None  # (path, score)
+    for path, _val in _flatten_store(store):
+        keytoks = [k for seg in path for k in _toks(seg)]
+        score = sum(1 for w in want if any(_tok_match(w, k) for k in keytoks))
+        if score == 0:
+            continue
+        if best is None or score > best[1] or (score == best[1] and len(path) < len(best[0])):
+            best = (path, score)
+    if best is None:
+        return store                      # no key matched -> whole store (gated, superset)
+    path = list(best[0])
+    while path and not isinstance(_store_get(store, path), (dict, list)):
+        path.pop()                        # promote a bare scalar up to its parent collection
+    return _store_get(store, path) if path else store
+
+
+def _env_store(env: dict) -> dict:
+    """The environment's canonical backing store. Prefer the explicit ``environment``
+    dict; else reconstruct it from the memory blobs (id -> parsed JSON content)."""
+    store = env.get("environment")
+    if isinstance(store, dict) and store:
+        return store
+    out: dict = {}
+    for m in env.get("memory", []):
+        try:
+            out[m.get("id")] = json.loads(m.get("content") or "")
+        except (TypeError, ValueError):
+            out[m.get("id")] = m.get("content")
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Assembly — template ⊗ env ⊗ poison ⊗ task  ->  runnable architecture dict
 # --------------------------------------------------------------------------- #
 def assemble(template_arch: dict, env: dict, *, task_prompt: str,
              provider: str | None, model: str | None,
              injection_goal: str | None = None, point: dict | None = None,
-             style: str = "blended", max_tokens: int = 900) -> dict:
+             style: str = "blended", max_tokens: int = 4096) -> dict:
     """Compose one runnable architecture. Returns ``(arch, meta)``.
 
     Tools are split into 3 specialization groups and distributed across the
@@ -353,15 +444,19 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         else:
             point_label = point.get("label") or f'{point["kind"]} · {point.get("id")}'
 
-    # Attach each specialist's tools (poisoning the targeted one). Memory stores are
-    # added as data-only nodes (no attach edge) — the runtime folds them into the
-    # global shared-memory board; they are never adversarial.
+    # Attach each specialist's tools (poisoning the targeted one). A READ tool's
+    # `content` is the slice of the backing store it serves when called, so an agent
+    # must invoke the tool to obtain the data instead of reading it from ambient
+    # shared memory; write/sink tools carry no data (the runtime acks the action).
+    store = _env_store(env)
     i = 0
     for ag_id, tools in assign.items():
         for t in tools:
             name = t.get("name")
+            data = resolve_tool_data(t, store)
             node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
-                    "content": None, "group": tool_group(t),
+                    "content": json.dumps(data, indent=2) if data is not None else None,
+                    "group": tool_group(t),
                     "position": {"x": 60 + i * 150, "y": 380}}
             if poison is not None and point and point["kind"] == "tool" and point.get("id") == name:
                 node["malicious"] = poison
@@ -369,6 +464,9 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
             arch["edges"].append({"id": f"scn-a{i}", "source": name,
                                   "target": ag_id, "kind": "attach"})
             i += 1
+    # Memory stores stay on the canvas as data-store nodes (no attach edge), but the
+    # runtime now lists them by name only — their contents are reached through tools,
+    # not handed to every agent. They are never adversarial.
     for m in env.get("memory", []):
         arch["nodes"].append({"id": m.get("id"), "type": "memory", "label": m.get("id"),
                               "spec": None, "content": m.get("content"),

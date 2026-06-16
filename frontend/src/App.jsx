@@ -11,7 +11,7 @@ import Inspector from './components/Inspector.jsx'
 import RunConsole from './components/RunConsole.jsx'
 import ProvidersModal from './components/ProvidersModal.jsx'
 import ScenarioRunner from './components/ScenarioRunner.jsx'
-import TraceModal from './components/TraceModal.jsx'
+import TraceModal, { reconstructArch } from './components/TraceModal.jsx'
 import ContextMenu from './components/ContextMenu.jsx'
 import Diagnostics from './components/Diagnostics.jsx'
 import { simulateExecution } from './lib/simulate.js'
@@ -68,8 +68,10 @@ function buildGlobalMemory(name, task, nodes, edges = []) {
     for (const t of tools) L.push(`- \`${t.data.label}\` — ${(t.data.spec || '').trim() || 'no signature'}`)
   }
   if (stores.length) {
-    L.push('', '## Shared data')
-    for (const s of stores) L.push(`### ${s.data.label}\n${(s.data.content || '').trim()}`)
+    // List data stores by NAME only — their contents are private and reached by
+    // calling the relevant tool, not handed to every agent as ambient context.
+    L.push('', '## Data stores (private — read with the matching tool, not shown here)')
+    for (const s of stores) L.push(`- \`${s.data.label}\``)
   }
   return L.join('\n')
 }
@@ -156,7 +158,8 @@ function Editor() {
   const [providersOpen, setProvidersOpen] = useState(false)
   const [scenarioOpen, setScenarioOpen] = useState(false)  // scenario test runner modal
   const [traceOpen, setTraceOpen] = useState(false)   // scenario-trace modal
-  const [traceScn, setTraceScn] = useState(null)      // scenario log preloaded from a run
+  const [traceScn, setTraceScn] = useState(null)      // loaded scenario log (persists across modal open/close)
+  const [traceName, setTraceName] = useState('')      // label for the loaded trace
   const [health, setHealth] = useState({ docker: true, sandbox: 'docker' })
   const [toasts, setToasts] = useState([])
   const [history, setHistory] = useState({ undo: 0, redo: 0 })  // depths, for menu enable
@@ -545,14 +548,23 @@ function Editor() {
     }, 700)
   }, [providers, toast, checkBreach, loadArch])
 
-  // Pull a finished run's structured scenario log into the trace analyzer.
+  // Pull a finished run's structured scenario log into the trace analyzer. Loading
+  // it also mirrors the arch onto the canvas (compromised node flagged) and toasts,
+  // matching an in-modal upload; the trace then persists across modal open/close.
   const analyzeRunInTrace = useCallback(async (runId) => {
     try {
       const scn = await api.runScn(runId)
       setTraceScn(scn)
+      setTraceName(`run ${runId}`)
+      try {
+        const arch = reconstructArch(scn)
+        loadArch(arch)
+        const mal = (scn.compromised || []).map((c) => c.element)
+        toast(mal.length ? `Loaded “${arch.name}” — compromised: ${mal.join(', ')}` : `Loaded “${arch.name}” (no compromise)`)
+      } catch { /* arch reconstruction is best-effort; the trace still opens */ }
       setTraceOpen(true)
     } catch { toast('No scenario log for this run', 'error') }
-  }, [toast])
+  }, [toast, loadArch])
 
   // Live LangGraph-code panel: generate the StateGraph source from the canvas
   // (debounced). While the user is hand-editing the code (codeDirty), suspend
@@ -839,7 +851,7 @@ function Editor() {
         <span className={`sandbox-pill sandbox-${health.sandbox}`} title="Execution sandbox">
           {health.sandbox === 'docker' ? '🐳 docker' : '🖥 local'}
         </span>
-        <button className="btn" onClick={() => { setTraceScn(null); setTraceOpen(true) }} title="Step through a recorded run trace: each agent's input/output, the messages between nodes, and any attack">
+        <button className="btn" onClick={() => setTraceOpen(true)} title="Step through a recorded run trace: each agent's input/output, the messages between nodes, and any attack. The last loaded trace stays open across visits — use “Upload a new trace” inside to swap it.">
           🔬 Trace
         </button>
         <button className="btn" onClick={() => setScenarioOpen(true)} title="Run a benchmark scenario: pick an environment, architecture, task, and where an injection lands">
@@ -973,7 +985,9 @@ function Editor() {
 
       {traceOpen && (
         <TraceModal onLoadArch={loadArch} onClose={() => setTraceOpen(false)} toast={toast}
-          initialScn={traceScn} initialName={traceScn ? `run ${run?.run_id || ''}` : ''} />
+          scn={traceScn} fileName={traceName}
+          onLoaded={(data, name) => { setTraceScn(data); setTraceName(name) }}
+          onClear={() => { setTraceScn(null); setTraceName('') }} />
       )}
 
       {menu && menuItems.length > 0 && (

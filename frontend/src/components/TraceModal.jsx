@@ -13,7 +13,7 @@ const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').re
 // Reconstruct an editor-format architecture from a scenario log. Prefer the embedded
 // `architecture` (full topology + positions + compromise flags, written by newer
 // captures); otherwise rebuild a best-effort graph from the trace events.
-function reconstructArch(scn) {
+export function reconstructArch(scn) {
   if (scn.architecture && (scn.architecture.nodes || []).length) return scn.architecture
 
   const events = scn?.trace?.events || []
@@ -91,9 +91,11 @@ function reconstructArch(scn) {
   return { name: (scn.config && scn.config.arch) || 'detected-arch', version: 1, task: (runStart.task) || '', nodes, edges }
 }
 
-export default function TraceModal({ onLoadArch, onClose, toast, initialScn, initialName }) {
-  const [scn, setScn] = useState(null)
-  const [fileName, setFileName] = useState('')
+// The loaded scenario (`scn` + `fileName`) is owned by the parent so it survives
+// closing and reopening the modal — close keeps the trace, "Load another" clears it
+// to upload a fresh one. The modal just renders the current scn and reports newly
+// ingested ones back up via `onLoaded`.
+export default function TraceModal({ onLoadArch, onClose, toast, scn, fileName, onLoaded, onClear }) {
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef(null)
@@ -109,20 +111,17 @@ export default function TraceModal({ onLoadArch, onClose, toast, initialScn, ini
     if (!data || !data.trace || !Array.isArray(data.trace.events)) {
       setError('This file has no trace.events — expected a SafeMAS scenario log (scn_*.json).'); return
     }
-    setFileName(name || 'scenario.json')
-    setScn(data)
+    let arch
     try {
-      const arch = reconstructArch(data)
-      onLoadArch(arch)
-      const mal = (data.compromised || []).map((c) => c.element)
-      toast(mal.length ? `Loaded “${arch.name}” — compromised: ${mal.join(', ')}` : `Loaded “${arch.name}” (no compromise)`)
+      arch = reconstructArch(data)
     } catch (e) {
-      setError(`Could not reconstruct the architecture: ${e.message}`)
+      setError(`Could not reconstruct the architecture: ${e.message}`); return
     }
+    onLoaded(data, name || 'scenario.json')   // persist in the parent (survives close)
+    onLoadArch(arch)
+    const mal = (data.compromised || []).map((c) => c.element)
+    toast(mal.length ? `Loaded “${arch.name}” — compromised: ${mal.join(', ')}` : `Loaded “${arch.name}” (no compromise)`)
   }
-
-  // A scenario log handed in directly (e.g. from a just-finished run).
-  useEffect(() => { if (initialScn) load(initialScn, initialName) }, [initialScn])
 
   const ingest = (text, name) => {
     let data
@@ -143,7 +142,7 @@ export default function TraceModal({ onLoadArch, onClose, toast, initialScn, ini
         <div className="modal-head">
           <span className="trace-head-title">🔬 Trace — step-by-step walkthrough{scn ? <span className="muted"> · {fileName}</span> : null}</span>
           <div className="trace-head-actions">
-            {scn && <button className="btn small" onClick={() => { setScn(null); setError('') }}>↑ Load another</button>}
+            {scn && <button className="btn small" onClick={() => { onClear(); setError('') }}>↑ Upload a new trace</button>}
             <button className="btn ghost" onClick={onClose}>✕</button>
           </div>
         </div>

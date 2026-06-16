@@ -353,9 +353,11 @@ class Engine:
 
     def _build_global_memory(self) -> str:
         """The shared, auto-generated board read by every agent: who does what,
-        which tools exist across the whole system, and any shared data. It is
-        derived entirely from the architecture (there are no user-authored memory
-        nodes), so every agent has the same picture of the team and the toolset."""
+        which tools exist across the whole system, and which data stores exist. It is
+        derived entirely from the architecture, so every agent has the same picture
+        of the team and the toolset. Crucially it lists data stores by NAME only —
+        their contents are private and must be fetched by calling the relevant tool,
+        so no agent is handed the underlying data as ambient context."""
         lines = [f"# Shared memory — multi-agent system '{self.name}'",
                  f"Overall task: {self.task}", "", "## Agents (who does what)"]
         for a in self.agents:
@@ -371,9 +373,9 @@ class Engine:
                 lines.append(f"- `{t.label}` — {(t.spec or '').strip() or 'no signature'}")
         stores = [s for s in self.stores if (s.content or "").strip()]
         if stores:
-            lines.append("\n## Shared data")
+            lines.append("\n## Data stores (private — read with the matching tool, not shown here)")
             for s in stores:
-                lines.append(f"### {s.label}\n{(s.content or '').strip()}")
+                lines.append(f"- `{s.label}`")
         return "\n".join(lines)
 
     def announce(self) -> None:
@@ -409,10 +411,13 @@ class Engine:
     def matches(self, text: str, phrase: str) -> bool:
         return bool(phrase) and phrase.lower() in (text or "").lower()
 
-    def resource_value(self, res, st: RunState) -> tuple[str, bool]:
+    def resource_value(self, res, st: RunState, args: dict | None = None) -> tuple[str, bool]:
         """The value a tool yields when called, and whether it's poisoned. Emits the
-        attack event at the call site (correct ordering). (Memory is the global
-        board, never read through here.)"""
+        attack event at the call site (correct ordering). A read tool serves its
+        data slice (``res.content``); a write/sink tool has no data and instead
+        acknowledges the action it carried out (echoing its args), so the trace shows
+        the side-effect rather than a placeholder. (Memory is the global board, never
+        read through here.)"""
         m = res.malicious
         if m.enabled:
             st["attacks"].append({"element": res.id, "type": m.attack})
@@ -422,7 +427,8 @@ class Engine:
         content = (res.content or "").strip()
         if content:
             return content, False
-        return f"[tool:{res.label}] returned a normal result", False
+        detail = f" args={json.dumps(args)}" if args else ""
+        return f"[{res.label}] action completed successfully.{detail}", False
 
     # -- one agent activation: real tool-calling loop ----------------------- #
     def run_agent(self, agent, provider, model, system, user_input, tool_res, st: RunState) -> str:
@@ -489,7 +495,7 @@ class Engine:
                     if res is None:
                         val, poisoned, err = f"[error: unknown tool {tc['name']}]", False, True
                     else:
-                        val, poisoned = self.resource_value(res, st)
+                        val, poisoned = self.resource_value(res, st, tc.get("args", {}))
                         err = False
                     self._emit(st, "tool_call", agent=agent.label,
                                function=(res.label if res else tc["name"]),
