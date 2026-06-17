@@ -56,6 +56,20 @@ DEFAULT_MAX_ITERS = _env_int("SAFEMAS_MAX_ROUNDS", 3)    # loop edges with no ex
 STEP_BUDGET = _env_int("SAFEMAS_STEP_BUDGET", 256)       # global cap on activations (runaway backstop)
 PER_AGENT_CAP = _env_int("SAFEMAS_PER_AGENT_CAP", 64)    # cap on activations of a single agent
 TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 6)     # k: tool-calling rounds within one agent activation
+LLM_RETRIES = _env_int("SAFEMAS_LLM_RETRIES", 2)         # retry transient LLM errors per agent call
+LLM_BACKOFF = max(0.0, float(os.environ.get("SAFEMAS_LLM_BACKOFF") or 2.0))  # linear backoff seconds
+
+# A transient LLM error (network reset, timeout, rate limit, 5xx, overload) should
+# be retried, not allowed to poison a whole run by becoming the agent's "answer".
+_TRANSIENT_ERR = ("connection reset", "reset by peer", "timed out", "timeout",
+                  "rate limit", "429", "500", "502", "503", "504",
+                  "temporarily unavailable", "overloaded", "apiconnection",
+                  "serviceunavailable", "internalservererror", "remotedisconnected")
+
+
+def _is_transient(exc: Exception) -> bool:
+    s = f"{type(exc).__name__} {exc}".lower()
+    return any(t in s for t in _TRANSIENT_ERR)
 
 
 def log(msg: str = "") -> None:
@@ -315,10 +329,14 @@ class Engine:
         self.out_channels: dict[str, list] = defaultdict(list)
         for ch in channels:
             self.out_channels[ch.src.id].append(ch)
+        # Inbound channels per agent — used by a join="all" agent to know how many
+        # messages to wait for and aggregate. This INCLUDES loop (feedback) edges:
+        # an orchestrator collects its sub-agents' reports over those edges, so a
+        # join="all" orchestrator must wait for all of them and synthesise — otherwise
+        # it never re-runs and its decomposition plan leaks out as the final answer.
         self.in_channels: dict[str, list] = defaultdict(list)
         for ch in channels:
-            if not ch.loop:
-                self.in_channels[ch.tgt.id].append(ch)
+            self.in_channels[ch.tgt.id].append(ch)
         # Memory is now a single GLOBAL shared board (auto-generated below), read by
         # every agent — not a per-agent attached store. Every memory node's data is
         # folded into it; only TOOLS attach per-agent.
@@ -331,6 +349,7 @@ class Engine:
 
         self.entries = self._dedup(entries) or self._default_entries()
         self.exits = self._dedup(exits)
+        self.exit_ids = {a.id for a in self.exits}
 
         # Compromise surfaces: agent (prompt-injection), channel (AiTM), tool
         # (tool-poisoning). Memory-poisoning was removed when memory became the
@@ -442,6 +461,36 @@ class Engine:
         detail = f" args={json.dumps(args)}" if args else ""
         return f"[{res.label}] action completed successfully.{detail}", False
 
+    def _stream_response(self, llm, msgs):
+        """Stream one LLM response, retrying transient errors (network reset,
+        timeout, rate limit, 5xx) so a single blip doesn't poison the run by
+        becoming the agent's answer. Re-raises after exhausting retries, or
+        immediately for non-transient errors (auth, bad request)."""
+        # Accumulate (no per-token printing): with the parallel drive, several
+        # agents stream at once, so token-level interleaving would shred the log.
+        # run_agent logs each agent's complete output as one labelled block instead.
+        for attempt in range(LLM_RETRIES + 1):
+            acc = None
+            content_parts: list[str] = []
+            reasoning_parts: list[str] = []
+            try:
+                for chunk in llm.stream(msgs):
+                    acc = chunk if acc is None else acc + chunk
+                    c = _chunk_text(chunk.content)
+                    if c:
+                        content_parts.append(c)
+                    rc = (getattr(chunk, "additional_kwargs", None) or {}).get("reasoning_content")
+                    if rc:
+                        reasoning_parts.append(rc)
+                return acc, "".join(content_parts), "".join(reasoning_parts)
+            except Exception as exc:
+                if attempt < LLM_RETRIES and _is_transient(exc):
+                    log(f"{YELLOW}[llm-retry {attempt + 1}/{LLM_RETRIES}] {type(exc).__name__}: "
+                        f"{clip(str(exc), 80)}{RESET}")
+                    time.sleep(LLM_BACKOFF * (attempt + 1))
+                    continue
+                raise
+
     # -- one agent activation: real tool-calling loop ----------------------- #
     def run_agent(self, agent, provider, model, system, user_input, tool_res, st: RunState) -> str:
         engine = provider_engine(provider)
@@ -470,24 +519,7 @@ class Engine:
             msgs = [SystemMessage(content=system), HumanMessage(content=user_input)]
             final_text = ""
             for it in range(TOOL_LOOP_CAP):
-                print(f"{GREY}    out ▸ {RESET}", end="", flush=True)
-                acc = None
-                content_parts: list[str] = []
-                reasoning_parts: list[str] = []
-                for chunk in llm.stream(msgs):
-                    acc = chunk if acc is None else acc + chunk
-                    c = _chunk_text(chunk.content)
-                    if c:
-                        content_parts.append(c)
-                        print(c, end="", flush=True)
-                    rc = (getattr(chunk, "additional_kwargs", None) or {}).get("reasoning_content")
-                    if rc:
-                        reasoning_parts.append(rc)
-                        print(rc, end="", flush=True)
-                print("", flush=True)
-
-                content = "".join(content_parts)
-                reasoning = "".join(reasoning_parts)
+                acc, content, reasoning = self._stream_response(llm, msgs)
                 text = content
                 if reasoning and "<think>" not in content:
                     text = f"<think>{reasoning}</think>\n{content}"
@@ -497,6 +529,9 @@ class Engine:
                            content=content_s,
                            tool_calls=[{"function": tc["name"], "args": tc.get("args", {})}
                                        for tc in tool_calls])
+                # one attributable block per agent (clean under parallel execution)
+                if content_s:
+                    log(f"{GREY}    [{agent.label}] ▸ {clip(content_s, 180)}{RESET}")
                 msgs.append(AIMessage(content=acc.content if acc is not None else "",
                                       tool_calls=tool_calls))
                 final_text = text
@@ -505,14 +540,20 @@ class Engine:
                 for tc in tool_calls:
                     res = by_name.get(tc["name"])
                     if res is None:
-                        val, poisoned, err = f"[error: unknown tool {tc['name']}]", False, True
+                        # A coordinator (no tools of its own) tried to call a tool —
+                        # steer it to delegate instead of repeating the failed call.
+                        val = ("[you have no tools — you are a coordinator: do NOT call "
+                               "tools, delegate the work to your sub-agents and synthesise "
+                               "their results]" if not by_name
+                               else f"[error: unknown tool {tc['name']}]")
+                        poisoned, err = False, True
                     else:
                         val, poisoned = self.resource_value(res, st, tc.get("args", {}))
                         err = False
                     self._emit(st, "tool_call", agent=agent.label,
                                function=(res.label if res else tc["name"]),
                                args=tc.get("args", {}), result=val, poisoned=poisoned, error=err)
-                    log(f"{GREY}    ⟳ {tc['name']}({clip(json.dumps(tc.get('args', {})), 60)}) "
+                    log(f"{GREY}    [{agent.label}] ⟳ {tc['name']}({clip(json.dumps(tc.get('args', {})), 60)}) "
                         f"→ {clip(val, 80)}{RESET}")
                     msgs.append(ToolMessage(content=val, tool_call_id=tc.get("id") or tc["name"]))
             return final_text
@@ -556,26 +597,42 @@ class Engine:
         return output
 
     def chosen_edges(self, agent, output: str, st: RunState) -> list:
+        # An EXIT agent's later activations are TERMINAL: when an orchestrator that is
+        # also the exit re-runs to SYNTHESISE its sub-agents' reports, that output is
+        # the final answer — it must NOT re-dispatch (re-assigning would make the
+        # sub-agents redo work they already did). Its first activation (acting as the
+        # entry) still dispatches normally.
+        if agent.id in self.exit_ids and st["runs"].get(agent.id, 0) > 1:
+            return []
         outs = self.out_channels.get(agent.id, [])
         if not outs:
             return []
-        if not any(ch.when or ch.loop for ch in outs):
-            return outs  # broadcast
 
-        def takeable(ch) -> bool:
+        # ROUTER — only `when=` guards make an agent choose ONE branch. Take the first
+        # guard whose phrase matches the output, else the first plain forward as the
+        # default branch.
+        if any(ch.when for ch in outs):
+            pick = next((ch for ch in outs if ch.when and self.matches(output, ch.when)), None)
+            if pick is None:
+                pick = next((ch for ch in outs if not ch.when and not ch.loop), None)
+            if pick is not None and pick.loop:
+                st["loop_iters"][pick.key] = st["loop_iters"].get(pick.key, 0) + 1
+            return [pick] if pick is not None else []
+
+        # FAN OUT — fire EVERY forward edge plus every non-exhausted loop (feedback)
+        # edge. This is what lets one agent both report upward (loop) AND share
+        # laterally (forward peer edge) in the same step — hybrid and decentralized
+        # need both; without it a sub-agent could only do one or the other.
+        result = []
+        for ch in outs:
             if ch.loop:
                 cap = ch.max_iters if ch.max_iters is not None else DEFAULT_MAX_ITERS
-                return st["loop_iters"].get(ch.key, 0) < cap and not self.matches(output, ch.until)
-            return (not ch.when) or self.matches(output, ch.when)
-
-        pick = next((ch for ch in outs if takeable(ch)), None)
-        if pick is None:
-            forwards = [ch for ch in outs if not ch.loop]
-            pick = next((ch for ch in forwards if not ch.when),
-                        forwards[0] if forwards else None)
-        if pick is not None and pick.loop:
-            st["loop_iters"][pick.key] = st["loop_iters"].get(pick.key, 0) + 1
-        return [pick] if pick is not None else []
+                if st["loop_iters"].get(ch.key, 0) < cap and not self.matches(output, ch.until):
+                    st["loop_iters"][ch.key] = st["loop_iters"].get(ch.key, 0) + 1
+                    result.append(ch)
+            else:
+                result.append(ch)
+        return result
 
     def deliver(self, ch, msg: str, st: RunState) -> None:
         cm = ch.malicious
@@ -605,20 +662,68 @@ class Engine:
         else:
             st["queue"].append([tgt.id, msg])
 
-    # -- the two pure step functions ---------------------------------------- #
-    def scheduler_step(self, st: RunState) -> None:
-        """Seed on first call, then pop the next dispatchable agent (honouring the
-        budgets). When the queue drains, compute the final answer and finish."""
-        if not st["started"]:
-            st["started"] = True
-            self._emit(st, "run_start", arch=self.name, task=self.task,
-                       compromised=self.compromised, global_memory=self.global_memory,
-                       entries=[a.label for a in self.entries],
-                       exits=[a.label for a in self.exits], poison_mode=None)
-            for e in self.entries:
-                self._emit(st, "seed", agent=e.label, message=self.task)
-                st["queue"].append([e.id, self.task])
+    # -- scheduling: seed / wave-collect / finish --------------------------- #
+    def _seed(self, st: RunState) -> None:
+        if st["started"]:
+            return
+        st["started"] = True
+        self._emit(st, "run_start", arch=self.name, task=self.task,
+                   compromised=self.compromised, global_memory=self.global_memory,
+                   entries=[a.label for a in self.entries],
+                   exits=[a.label for a in self.exits], poison_mode=None)
+        for e in self.entries:
+            self._emit(st, "seed", agent=e.label, message=self.task)
+            st["queue"].append([e.id, self.task])
 
+    def _finish(self, st: RunState) -> None:
+        st["dispatch"] = None
+        if self.exits:
+            final_answer = "\n".join(st["outputs"][a.id] for a in self.exits
+                                     if a.id in st["outputs"]) or st["last"]
+        else:
+            final_answer = st["last"]
+        st["final_answer"] = final_answer
+        self._emit(st, "final", answer=final_answer, exits=[a.label for a in self.exits])
+        log("=" * 64)
+        if self.exits:
+            log(f"{GREY}exit agent(s): {', '.join(a.label for a in self.exits)}{RESET}")
+        log(f"{BOLD}final answer:{RESET} {GREEN}{final_answer}{RESET}")
+        if st["attacks"]:
+            log(f"{RED}{BOLD}{len(st['attacks'])} attack(s) fired during execution.{RESET}")
+        else:
+            log(f"{GREY}no malicious elements triggered.{RESET}")
+        st["done"] = True
+
+    def _collect_wave(self, st: RunState) -> list:
+        """Pop every agent that is dispatchable RIGHT NOW (distinct agents, honouring
+        the per-agent + step budgets) — they ran concurrently in the real system, so
+        we run them concurrently too. A second message for an agent already in the
+        wave is held for the next wave."""
+        wave, seen, leftover = [], set(), []
+        while st["queue"]:
+            agent_id, msg = st["queue"].pop(0)
+            if agent_id in seen:
+                leftover.append([agent_id, msg])
+                continue
+            if st["runs"].get(agent_id, 0) >= PER_AGENT_CAP:
+                log(f"{YELLOW}[guard] '{self.by_id[agent_id].label}' hit per-agent activation cap{RESET}")
+                continue
+            if st["steps"] >= STEP_BUDGET:
+                log(f"{YELLOW}[guard] step budget ({STEP_BUDGET}) reached — stopping run{RESET}")
+                leftover.append([agent_id, msg])
+                break
+            st["runs"][agent_id] = st["runs"].get(agent_id, 0) + 1
+            st["steps"] += 1
+            seen.add(agent_id)
+            wave.append((agent_id, msg))
+        if leftover:
+            st["queue"][:0] = leftover
+        return wave
+
+    # -- one-at-a-time step functions (sequential drive: LangGraph / fallback) - #
+    def scheduler_step(self, st: RunState) -> None:
+        """Seed, then dispatch ONE agent; finish when the queue drains."""
+        self._seed(st)
         while st["queue"]:
             if st["steps"] >= STEP_BUDGET:
                 log(f"{YELLOW}[guard] step budget ({STEP_BUDGET}) reached — stopping run{RESET}")
@@ -632,26 +737,7 @@ class Engine:
             st["dispatch"] = agent_id
             st["incoming"] = msg
             return
-
-        # nothing left to dispatch — finish.
-        st["dispatch"] = None
-        if self.exits:
-            final_answer = "\n".join(st["outputs"][a.id] for a in self.exits
-                                     if a.id in st["outputs"]) or st["last"]
-        else:
-            final_answer = st["last"]
-        st["final_answer"] = final_answer
-        self._emit(st, "final", answer=final_answer, exits=[a.label for a in self.exits])
-
-        log("=" * 64)
-        if self.exits:
-            log(f"{GREY}exit agent(s): {', '.join(a.label for a in self.exits)}{RESET}")
-        log(f"{BOLD}final answer:{RESET} {GREEN}{final_answer}{RESET}")
-        if st["attacks"]:
-            log(f"{RED}{BOLD}{len(st['attacks'])} attack(s) fired during execution.{RESET}")
-        else:
-            log(f"{GREY}no malicious elements triggered.{RESET}")
-        st["done"] = True
+        self._finish(st)
 
     def agent_step(self, agent_id: str, incoming: str, st: RunState) -> None:
         agent = self.by_id[agent_id]
@@ -754,6 +840,32 @@ class Engine:
             self.agent_step(st["dispatch"], st["incoming"], st)
         return st
 
+    def run_parallel(self, st: RunState) -> RunState:
+        """Bulk-synchronous parallel drive: every wave of currently-ready agents
+        runs its LLM call CONCURRENTLY (mirroring how independent agents — e.g. an
+        orchestrator's sub-agents, or an ensemble's workers — actually run at the
+        same time), then a barrier, then their outputs are routed sequentially so
+        joins / routers / loops stay correct."""
+        from concurrent.futures import ThreadPoolExecutor
+        self._seed(st)
+        workers = min(16, max(2, len(self.agents)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            while not st["done"]:
+                wave = self._collect_wave(st)
+                if not wave:
+                    self._finish(st)
+                    break
+                if len(wave) > 1:
+                    log(f"{GREY}    ‖ running {len(wave)} agents in parallel: "
+                        f"{', '.join(self.by_id[a].label for a, _ in wave)}{RESET}")
+                # 1) think() concurrently; 2) deliver in wave order (no routing races)
+                futs = {aid: pool.submit(self.think, self.by_id[aid], msg, st) for aid, msg in wave}
+                for aid, _msg in wave:
+                    output = futs[aid].result()
+                    for ch in self.chosen_edges(self.by_id[aid], output, st):
+                        self.deliver(ch, output, st)
+        return st
+
 
 # --------------------------------------------------------------------------- #
 # Public entry point
@@ -762,14 +874,17 @@ def _run(arch: dict, task: str | None) -> dict:
     eng = Engine(arch, task)
     eng.announce()
     st = eng.seed_state()
-    if os.environ.get("SAFEMAS_NO_LANGGRAPH"):
+    # Default: parallel-wave drive (independent agents run concurrently). Opt into
+    # the one-at-a-time drives for debugging: SAFEMAS_SEQUENTIAL (plain loop) or the
+    # LangGraph path when neither parallel nor sequential is forced.
+    if os.environ.get("SAFEMAS_SEQUENTIAL"):
         st = eng.run_fallback(st)
     else:
         try:
-            st = eng.run_via_langgraph(st)
-        except Exception as exc:  # LangGraph missing / incompatible — still run.
-            log(f"{YELLOW}[runtime] LangGraph path unavailable ({exc}); "
-                f"using the built-in scheduler loop{RESET}")
+            st = eng.run_parallel(st)
+        except Exception as exc:  # pragma: no cover - threading/runtime safety net
+            log(f"{YELLOW}[runtime] parallel drive failed ({exc}); "
+                f"falling back to the sequential scheduler loop{RESET}")
             st = eng.run_fallback(st)
     return eng.finalize(st)
 

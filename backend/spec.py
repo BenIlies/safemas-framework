@@ -64,14 +64,16 @@ def build_spec(templates: list[dict]) -> dict:
                   "whole-system toolset + any shared data), regenerated from the architecture and "
                   "read by every agent. It is not an addable node and is never adversarial. "
                   "`memory` nodes may still carry read-only `content` that is folded into the board.",
-        "tool_access": "Every agent is given the WHOLE environment toolset — there is no per-agent "
-                       "tool specialization (following Kim et al., 'Towards a Science of Scaling Agent "
-                       "Systems': one shared tool set T, identical for every agent). When a scenario "
-                       "distributes an environment over an architecture, each env tool becomes one node "
-                       "attached to every agent. A read tool serves its slice of the backing store when "
-                       "called; a sink/write tool just acknowledges the action. A prompt-injection lands "
-                       "on ONE chosen agent (named by id/label; defaults to the entry agent); a "
-                       "tool-poisoning lands on the named tool and affects every agent that calls it.",
+        "tool_access": "Every WORKER agent is given the whole environment toolset (one shared tool set "
+                       "T; no per-agent specialization among workers). COORDINATION agents — "
+                       "orchestrator / dispatcher / aggregator / consensus / supervisor (by role) — get "
+                       "NO tools, so they must DELEGATE the real work to the workers; otherwise a capable "
+                       "orchestrator does everything itself and the multi-agent structure collapses to "
+                       "single-agent. A single-agent system's lone agent is a worker, so it keeps every "
+                       "tool. A read tool serves its slice of the backing store when called; a sink/write "
+                       "tool acknowledges the action. A prompt-injection lands on ONE chosen agent (named "
+                       "by id/label; defaults to the entry agent); a tool-poisoning lands on the named "
+                       "tool and affects every worker that calls it.",
         "malicious": "Set `malicious: {enabled, attack, payload}` on an agent, tool, or channel. "
                      "Attack defaults to the element type's (agent→prompt-injection, "
                      "tool→tool-poisoning, channel→aitm).",

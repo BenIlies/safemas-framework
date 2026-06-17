@@ -265,12 +265,14 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
           {preview?.shared_tools && preview.shared_tools.length > 0 && (
             <div className="scn-dist">
               <div className="scn-payload-head">
-                <span className="field-label">Shared toolset</span>
-                <span className="scn-chain-tag" title="Following the paper's controlled design, every agent is given the whole environment toolset — there is no per-agent tool specialization.">
-                  every agent · all {preview.shared_tools.length} tools
+                <span className="field-label">Worker toolset</span>
+                <span className="scn-chain-tag" title="Every WORKER agent gets the whole toolset; coordination agents (orchestrator / dispatcher / aggregator) get NO tools and must delegate the work to the workers.">
+                  {(preview.tool_agents || []).length} worker(s) · all {preview.shared_tools.length} tools
                   {preview.injected_agent ? <> · infected: <b>{preview.injected_agent}</b></> : null}
                 </span>
               </div>
+              {(preview.tool_agents || []).length > 0 &&
+                <div className="scn-meta">tools on: <b>{preview.tool_agents.join(', ')}</b> · coordinators delegate</div>}
               <div className="scn-dist-tools">{preview.shared_tools.join(', ')}</div>
             </div>
           )}

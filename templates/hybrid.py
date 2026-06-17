@@ -24,12 +24,14 @@ g.add_node('Sub-Agent 3', role='worker', at=(600, 300))
 g.add_edge('Orchestrator', 'Sub-Agent 1', label='assign')
 g.add_edge('Orchestrator', 'Sub-Agent 2', label='assign')
 g.add_edge('Orchestrator', 'Sub-Agent 3', label='assign')
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=2)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=2)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=2)
-# ... plus LIMITED lateral peer edges (not all-to-all)
-g.add_edge('Sub-Agent 1', 'Sub-Agent 2', label='peer')
-g.add_edge('Sub-Agent 2', 'Sub-Agent 3', label='peer')
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=1)
+# ... plus LIMITED lateral peer edges (not all-to-all), bounded (loop, max_iters=1)
+# so a peer shares its findings ONCE and the chain doesn't cascade into endless
+# re-activation.
+g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 2', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
 
 # entry / exit
 g.set_entry('Orchestrator', at=(60, 60))

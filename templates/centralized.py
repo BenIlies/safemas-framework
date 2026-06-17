@@ -27,9 +27,9 @@ g.add_node('Sub-Agent 3', role='worker', at=(600, 300))
 g.add_edge('Orchestrator', 'Sub-Agent 1', label='assign')
 g.add_edge('Orchestrator', 'Sub-Agent 2', label='assign')
 g.add_edge('Orchestrator', 'Sub-Agent 3', label='assign')
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=2)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=2)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=2)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=1)
 
 # entry / exit — the orchestrator is both the entry and the verified sink
 g.set_entry('Orchestrator', at=(60, 60))
