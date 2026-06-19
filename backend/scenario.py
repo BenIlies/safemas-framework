@@ -399,6 +399,17 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         if point["kind"] == "agent":
             op["malicious"] = poison
             point_label = f"{op.get('label') or 'agent'} (prompt-injection)"
+        elif point["kind"] == "aitm":
+            # Intercept an inter-agent channel: the named edge, else the first channel
+            # in flow order. Rewriting a message in flight only exists in a multi-agent
+            # flow — a single-agent template has no such channel.
+            chans = [e for e in arch["edges"] if e.get("kind") == "channel"]
+            tgt = point.get("id")
+            ch = next((e for e in chans if e.get("id") == tgt), None) or (chans[0] if chans else None)
+            if ch is None:
+                raise ValueError("AiTM needs an inter-agent channel; this architecture has none")
+            ch["malicious"] = poison
+            point_label = f"channel {ch.get('source')}→{ch.get('target')} (AiTM)"
         else:
             point_label = point.get("label") or f'{point["kind"]} · {point.get("id")}'
 

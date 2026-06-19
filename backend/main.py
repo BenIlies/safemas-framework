@@ -287,8 +287,8 @@ class ScenarioInput(BaseModel):
     template_id: str
     user_task_id: Optional[str] = None      # benign task; None -> env's first
     injection_task_id: Optional[str] = None  # attacker goal; None -> clean run
-    injection_kind: Optional[str] = None     # 'tool' | 'agent' (memory is the global board, never injected)
-    injection_target: Optional[str] = None   # tool id (tool kind) or agent node id/label (agent kind)
+    injection_kind: Optional[str] = None     # 'tool' | 'agent' | 'aitm' (memory is the global board, never injected)
+    injection_target: Optional[str] = None   # tool id (tool) / agent node id|label (agent) / channel id (aitm)
     stealth_style: str = "blended"           # blended | authority | metadata | tagged
     provider: Optional[str] = None
     model: Optional[str] = None
@@ -320,6 +320,13 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
             # defaults to the entry agent when none is named.
             point = {"kind": "agent", "id": inp.injection_target or "",
                      "attack": "prompt-injection", "label": "agent"}
+        elif kind == "aitm":
+            # Adversary-in-the-middle: a channel between agents is intercepted and the
+            # message rewritten to the payload. The target channel is an architecture-
+            # level choice; assemble resolves it (defaults to the first inter-agent
+            # channel) and errors if the template has no such channel (e.g. SAS).
+            point = {"kind": "aitm", "id": inp.injection_target or "",
+                     "attack": "aitm", "label": "channel"}
         else:
             point = next((p for p in scenario_store.injection_points(env)
                           if p["kind"] == kind and (p["id"] or None) == (inp.injection_target or None)),
