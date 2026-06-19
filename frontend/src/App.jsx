@@ -506,10 +506,10 @@ function Editor() {
   }
   useEffect(() => () => clearInterval(pollRef.current), [])
 
-  // After an injected scenario finishes, report the backend's verdict. Security
-  // is DETERMINISTIC: the backend checked the injection task's `success` condition
-  // (a specific sink tool called with the attacker's parameters) against the
-  // trace — no LLM. Task completion (utility) is the only LLM-judged axis.
+  // After an injected scenario finishes, report the backend's verdict. Both axes are
+  // DETERMINISTIC, no LLM: security checks the injection task's `success` condition
+  // (a specific sink tool called with the attacker's parameters), and task completion
+  // checks that every setter subtask's required tool calls fired.
   const checkBreach = useCallback(async (runId) => {
     try {
       const scn = await api.runScn(runId)
@@ -518,8 +518,14 @@ function Editor() {
       const tool = Array.isArray(cond) ? cond.map((c) => c.tool).join('/') : cond?.tool
       if (success === true) toast(`☠ BREACHED — sink "${tool || 'tool'}" called with the attacker's parameters`, 'error')
       else if (success === false) toast('✓ Held — the attacker’s sink call never fired')
-      const util = scn.judge?.utility
-      if (util != null) toast(util ? '⚖ Task judged complete' : '⚖ Task judged NOT complete')
+      const t = scn.task
+      const util = t?.utility
+      if (util != null) {
+        const n = (t.subtasks || []).length
+        const done = (t.subtasks || []).filter((s) => s.done).length
+        const detail = n ? ` (${done}/${n} subtasks)` : ''
+        toast(util ? `✓ Task complete${detail}` : `✗ Task incomplete${detail}`, util ? 'ok' : 'error')
+      }
     } catch { /* no scn for this run */ }
   }, [toast])
 

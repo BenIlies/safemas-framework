@@ -40,11 +40,11 @@ RESET, RED, YELLOW, CYAN, GREY, GREEN, BOLD = (
     "\033[0m", "\033[91m", "\033[93m", "\033[96m", "\033[90m", "\033[92m", "\033[1m",
 )
 _THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
-# Execution budgets — configurable via env so a benchmark can match the paper's
-# iteration caps (Kim et al., App. E.2: k=10 iters/agent for SAS, 3 iters/agent/round
-# for MAS; d=3 debate / r=5 orchestration rounds). `k` is TOOL_LOOP_CAP (the per-agent
-# "thinking" / tool-calling rounds); STEP_BUDGET / PER_AGENT_CAP bound how many times
-# agents re-activate in a cyclic (debate) topology so a run can't run away.
+# Execution budgets — configurable via env so a benchmark can set its own iteration
+# caps (e.g. k=10 tool rounds/agent for SAS, 3/agent/round for MAS; d=3 debate /
+# r=5 orchestration rounds). `k` is TOOL_LOOP_CAP (the per-agent "thinking" /
+# tool-calling rounds); STEP_BUDGET / PER_AGENT_CAP bound how many times agents
+# re-activate in a cyclic (debate) topology so a run can't run away.
 def _env_int(name: str, default: int) -> int:
     try:
         return max(1, int(os.environ.get(name, default)))
@@ -95,6 +95,45 @@ def split_reasoning(s: str) -> tuple[str | None, str]:
     if not m:
         return None, s
     return m.group(1).strip(), (s[: m.start()] + s[m.end():]).strip()
+
+
+# Some models (notably MiniMax-M2 over an OpenAI-compatible endpoint) emit tool calls
+# as *text* inside the message content instead of via the structured `tool_calls`
+# field, e.g.
+#   <minimax:tool_call><tool_code><tool name="search"><arg name="q">x</arg></tool></tool_code></minimax:tool_call>
+#   <tool_call><invoke name="search"><parameter name="q">x</parameter></invoke></tool_call>
+# Left unparsed, the tool loop sees zero calls, no tools fire, and the raw XML leaks
+# into the answer. We recover these as a fallback when the structured field is empty.
+_TC_INVOKE_RE = re.compile(
+    r"<(?:tool|invoke)\b[^>]*\bname=[\"']([^\"']+)[\"'][^>]*>(.*?)</(?:tool|invoke)>",
+    re.IGNORECASE | re.DOTALL)
+_TC_ARG_RE = re.compile(
+    r"<(?:arg|parameter)\b[^>]*\bname=[\"']([^\"']+)[\"'][^>]*>(.*?)</(?:arg|parameter)>",
+    re.IGNORECASE | re.DOTALL)
+_TC_WRAPPER_RE = re.compile(
+    r"</?(?:minimax:)?tool_call[^>]*>|</?tool_code[^>]*>", re.IGNORECASE)
+
+
+def parse_textual_tool_calls(content: str) -> tuple[list[dict], str]:
+    """Recover tool calls a model wrote as text in ``content``. Returns
+    ``(tool_calls, cleaned_content)`` where each call is ``{name, args, id}`` (the
+    same shape the structured path yields) and ``cleaned_content`` has the tool-call
+    markup stripped out. Returns ``([], content)`` when there is nothing to parse."""
+    if not content:
+        return [], content
+    low = content.lower()
+    if "<tool" not in low and "<invoke" not in low:
+        return [], content
+    calls: list[dict] = []
+    for i, m in enumerate(_TC_INVOKE_RE.finditer(content)):
+        name = m.group(1).strip()
+        args = {a.group(1).strip(): a.group(2).strip()
+                for a in _TC_ARG_RE.finditer(m.group(2))}
+        calls.append({"name": name, "args": args, "id": f"txt-{i}-{name}"})
+    if not calls:
+        return [], content
+    cleaned = _TC_WRAPPER_RE.sub("", _TC_INVOKE_RE.sub("", content)).strip()
+    return calls, cleaned
 
 
 def slug(label: str, taken: set[str]) -> str:
@@ -520,10 +559,17 @@ class Engine:
             final_text = ""
             for it in range(TOOL_LOOP_CAP):
                 acc, content, reasoning = self._stream_response(llm, msgs)
+                tool_calls = list(getattr(acc, "tool_calls", None) or [])
+                ai_content = acc.content if acc is not None else ""
+                # Fallback: recover tool calls a model wrote as text (e.g. MiniMax-M2)
+                # so the loop still fires and the XML doesn't leak into the answer.
+                if not tool_calls:
+                    textual, cleaned = parse_textual_tool_calls(content)
+                    if textual:
+                        tool_calls, content, ai_content = textual, cleaned, cleaned
                 text = content
                 if reasoning and "<think>" not in content:
                     text = f"<think>{reasoning}</think>\n{content}"
-                tool_calls = list(getattr(acc, "tool_calls", None) or [])
                 reasoning_s, content_s = split_reasoning(text)
                 self._emit(st, "llm_call", agent=agent.label, iter=it, reasoning=reasoning_s,
                            content=content_s,
@@ -532,8 +578,7 @@ class Engine:
                 # one attributable block per agent (clean under parallel execution)
                 if content_s:
                     log(f"{GREY}    [{agent.label}] ▸ {clip(content_s, 180)}{RESET}")
-                msgs.append(AIMessage(content=acc.content if acc is not None else "",
-                                      tool_calls=tool_calls))
+                msgs.append(AIMessage(content=ai_content, tool_calls=tool_calls))
                 final_text = text
                 if not tool_calls:
                     break

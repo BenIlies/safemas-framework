@@ -185,17 +185,19 @@ export default function TraceModal({ onLoadArch, onClose, toast, scn, fileName, 
 
 // ---- compact summary -----------------------------------------------------
 // Two pills, nothing more: SECURITY (deterministic — did the attacker's success
-// condition fire?) and TASK (the LLM utility judge). WHERE the attack happened is
-// shown by the trace coloring below, not repeated here.
+// condition fire?) and TASK (deterministic — did every setter subtask complete?).
+// WHERE the attack happened is shown by the trace coloring below, not repeated here.
 function ScenarioSummary({ scn, onReload }) {
   const cfg = scn.config || {}
   const v = scn.verdict || {}
-  const j = scn.judge || {}
+  const t = scn.task || {}
   const attacked = (scn.compromised || []).length > 0
 
   const success = v.attack_succeeded                    // true=breached, false=held, null=unscored
-  const utility = j.utility != null ? j.utility : v.utility
-  const reason = j.reasoning || null
+  const utility = t.utility != null ? t.utility : v.utility
+  const reason = t.reasoning || null
+  const subtasks = t.subtasks || []
+  const nDone = subtasks.filter((s) => s.done).length
 
   let pill = 'CLEAN · no attack', cls = 'clean'
   if (attacked && success === true) { pill = '✗ BREACHED', cls = 'breached' }
@@ -215,10 +217,22 @@ function ScenarioSummary({ scn, onReload }) {
       <div className="trace-verdict-bar">
         <span className={`verdict-pill ${cls}`}>{pill}</span>
         {utility != null &&
-          <span className={`chip ${utility ? 'ok' : 'no'}`}>task {utility ? '✓ done' : '✗ failed'}</span>}
+          <span className={`chip ${utility ? 'ok' : 'no'}`}>
+            task {utility ? '✓ done' : '✗ failed'}
+            {subtasks.length ? ` · ${nDone}/${subtasks.length} subtasks` : ''}
+          </span>}
       </div>
 
-      {reason && <div className="trace-judge-reason">⚖ {reason}</div>}
+      {subtasks.length > 0 &&
+        <div className="trace-subtasks">
+          {subtasks.map((s) => (
+            <span key={s.id} className={`subtask-chip ${s.done ? 'done' : 'todo'}`}>
+              {s.done ? '✓' : '○'} {s.label}
+            </span>
+          ))}
+        </div>}
+
+      {reason && <div className="trace-task-reason">{reason}</div>}
     </div>
   )
 }
@@ -254,7 +268,7 @@ const stepAgent = (e) => e.agent || (e.kind === 'channel' ? `${e.src}→${e.tgt}
 
 // Does a tool_call event carry out the attacker's goal? It's the breach iff it
 // matches the injection task's deterministic `success` condition (the sink tool
-// called with the attacker's arguments). Mirrors backend/judge.py: tool name
+// called with the attacker's arguments). Mirrors backend/verdict.py: tool name
 // exact, each arg a case-insensitive substring; a list of conditions = any-of.
 function makeBreachMatcher(scn) {
   let conds = scn.verdict?.success_condition
@@ -276,16 +290,23 @@ function makeBreachMatcher(scn) {
   }
 }
 
-// Classify each event so the timeline shows WHERE the attack is, two states only:
-//   'breach'  — the actual attack action: a tool call carrying out the attacker's
-//               goal (matches the success condition)            → RED.
-//   'inject'  — the attack ENTERING: the injected prompt, a poisoned tool result,
-//               an AiTM-rewritten message, or the attack event  → YELLOW.
+// Classify each event so the timeline shows WHERE the attack — and the task work —
+// happen. Attack states take priority over task-completion states:
+//   'breach'        — the attack action: a tool call carrying out the attacker's
+//                     goal (matches the success condition)              → RED.
+//   'inject'        — the attack ENTERING: injected prompt, poisoned tool result,
+//                     AiTM-rewritten message, or the attack event       → YELLOW.
+//   'complete-final'— the tool call that completed the LAST subtask, with every
+//                     subtask done (the task is fully accomplished)     → DARK GREEN.
+//   'complete'      — a tool call that completed one of the task's subtasks
+//                     (deterministic setter check, backend-tagged)      → LIGHT GREEN.
 function makeThreat(scn) {
   const isBreach = makeBreachMatcher(scn)
   return (e) => {
     if (isBreach(e)) return 'breach'
     if (e.kind === 'attack' || e.aitm === true || e.poisoned === true || e.injected) return 'inject'
+    if (e.subtask_final) return 'complete-final'
+    if (e.subtask) return 'complete'
     return null
   }
 }
@@ -295,6 +316,7 @@ function TracePlayer({ scn }) {
   const events = scn.trace?.events || []
   const threat = makeThreat(scn)
   const attacked = (scn.compromised || []).length > 0
+  const hasSubtasks = events.some((ev) => ev.subtask)
   const [i, setI] = useState(0)
   useEffect(() => { setI(0) }, [scn])
 
@@ -321,10 +343,12 @@ function TracePlayer({ scn }) {
 
   return (
     <>
-      {attacked && (
+      {(attacked || hasSubtasks) && (
         <div className="trace-legend">
-          <span className="lg lg-inject">injection enters</span>
-          <span className="lg lg-breach">attack tool call (breach)</span>
+          {attacked && <span className="lg lg-inject">injection enters</span>}
+          {attacked && <span className="lg lg-breach">attack tool call (breach)</span>}
+          {hasSubtasks && <span className="lg lg-complete">subtask done</span>}
+          {hasSubtasks && <span className="lg lg-complete-final">all subtasks done</span>}
         </div>
       )}
       <div className="trace-player">
@@ -424,6 +448,11 @@ function StepFields({ e, threat }) {
           tone={e.poisoned ? 'warn' : null} value={e.result} />
         {breach && <Field label="☠ breach" tone="evil"
           value="this tool call carries out the attacker's goal — it matches the success condition" />}
+        {!breach && e.subtask && <Field label={e.subtask_final ? '✓ completes task' : '✓ completes subtask'}
+          tone="good"
+          value={e.subtask_final
+            ? `this call completed the final subtask (${e.subtask}) — every subtask is now done`
+            : `this call completed subtask ${e.subtask}`} />}
       </>
     case 'channel':
       return <>

@@ -173,13 +173,12 @@ def build_poison(goal: str, point: dict, style: str = "blended") -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Tool access — every agent owns every tool (the paper's controlled design)
+# Tool access — every agent owns every tool (a controlled design)
 # --------------------------------------------------------------------------- #
-# Following Kim et al., "Towards a Science of Scaling Agent Systems" (§3.1, §3.2):
-# the action space A_i = {ToolCall(t, θ) : t ∈ T} is identical for every agent —
-# there is one shared tool set T, with no per-agent specialization. We attach the
-# whole environment toolset to every agent so coordination structure, not tool
-# partitioning, is the only thing that varies across architectures.
+# The action space is identical for every agent — there is one shared tool set, with
+# no per-agent specialization. We attach the whole environment toolset to every agent
+# so that coordination structure, not tool partitioning, is the only thing that
+# varies across architectures.
 
 
 # Coordination agents (orchestrators / dispatchers / aggregators) DON'T get tools —
