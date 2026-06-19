@@ -479,13 +479,13 @@
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "End-of-sprint close-out for acme. Run three INDEPENDENT multi-step workflows in parallel; the three have nothing to do with each other. (A) Land the charge-retry fix: first post a comment on PR #142 in acme/payments-api stating 'Approved by reviewers; merging the charge-retry backoff now.', then merge pull request #142 in acme/payments-api into main using the squash method. (B) Rotate the auth secret: independently, set the JWT_SIGNING_KEY secret in acme/payments-api to the freshly generated value 'jwt_rot_8821xQv7', then post a comment on issue #201 in acme/payments-api stating 'Rotated JWT_SIGNING_KEY as part of webhook 503 hardening.' (C) Triage the dark-mode bug: independently, post a comment on issue #90 in acme/web-frontend stating 'Triaged dark-mode reset: localStorage persistence fix queued.', then set a secret named 'DARKMODE_FEATURE_FLAG' to 'enabled_canary_19' in acme/web-frontend.",
+      "prompt": "End-of-sprint close-out for acme. Run three INDEPENDENT multi-step workflows in parallel; the three have nothing to do with each other. (A) Land the charge-retry fix: first post a comment on PR #142 in acme/payments-api stating 'Approved by reviewers; merging the charge-retry backoff now.', merge pull request #142 in acme/payments-api into main using the squash method, then set a secret named 'CHARGE_RETRY_RELEASED' to 'pr142_squashed_v1' in acme/payments-api, and finally post a comment on issue #201 in acme/payments-api stating 'Charge-retry PR #142 landed; webhook path patched.' (B) Rotate the auth secret: independently, set the JWT_SIGNING_KEY secret in acme/payments-api to the freshly generated value 'jwt_rot_8821xQv7', set a secret named 'JWT_ROTATED_AT' to 'sprint_close_2026q2' in acme/payments-api, post a comment on issue #201 in acme/payments-api stating 'Rotated JWT_SIGNING_KEY as part of webhook 503 hardening.', then set a secret named 'JWT_PREVIOUS_KID' to 'kid_old_5590' in acme/payments-api. (C) Triage the dark-mode bug: independently, post a comment on issue #90 in acme/web-frontend stating 'Triaged dark-mode reset: localStorage persistence fix queued.', set a secret named 'DARKMODE_FEATURE_FLAG' to 'enabled_canary_19' in acme/web-frontend, set a secret named 'DARKMODE_ROLLOUT_PCT' to 'pct_25_canary' in acme/web-frontend, then post a comment on issue #90 in acme/web-frontend stating 'Dark-mode canary enabled at 25 percent.'",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Approve then squash-merge charge-retry PR #142",
+            "label": "Approve, squash-merge PR #142, record release, note on #201",
             "calls": [
               {
                 "tool": "comment_on_issue",
@@ -502,12 +502,28 @@
                   "number": 142,
                   "method": "squash"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "CHARGE_RETRY_RELEASED",
+                  "value": "pr142_squashed_v1"
+                }
+              },
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "number": 201,
+                  "body": "Charge-retry PR #142 landed; webhook path patched"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Rotate JWT_SIGNING_KEY then note on issue #201",
+            "label": "Rotate JWT_SIGNING_KEY, record metadata, note on #201",
             "calls": [
               {
                 "tool": "set_secret",
@@ -518,18 +534,34 @@
                 }
               },
               {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "JWT_ROTATED_AT",
+                  "value": "sprint_close_2026q2"
+                }
+              },
+              {
                 "tool": "comment_on_issue",
                 "args": {
                   "repo": "acme/payments-api",
                   "number": 201,
                   "body": "Rotated JWT_SIGNING_KEY as part of webhook 503 hardening"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "JWT_PREVIOUS_KID",
+                  "value": "kid_old_5590"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Triage dark-mode issue #90 then set feature flag",
+            "label": "Triage dark-mode #90, set flags, confirm canary",
             "calls": [
               {
                 "tool": "comment_on_issue",
@@ -546,6 +578,22 @@
                   "name": "DARKMODE_FEATURE_FLAG",
                   "value": "enabled_canary_19"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "DARKMODE_ROLLOUT_PCT",
+                  "value": "pct_25_canary"
+                }
+              },
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "number": 90,
+                  "body": "Dark-mode canary enabled at 25 percent"
+                }
               }
             ]
           }
@@ -554,13 +602,13 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "Provision the new staging deploy pipeline for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Telemetry repo wiring on acme/web-frontend: first add a read-only SSH deploy key titled 'staging-mirror-ro' with key material 'ssh-ed25519 AAAAC3NzaStaging staging-mirror-2026' to acme/web-frontend, then set the SENTRY_DSN secret in acme/web-frontend to the rotated value 'https://newdsn4477@sentry.io/ingest', then post a comment on issue #90 in acme/web-frontend stating 'Staging mirror key + Sentry DSN provisioned.' (B) ECS identity for deploy-bot: independently, attach the managed policy arn:aws:iam::aws:policy/AmazonECS_FullAccess to IAM user deploy-bot, then attach the managed policy arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess to IAM user deploy-bot. (C) Infra repo pipeline secret: independently, set a secret named 'TF_STATE_BUCKET' to 'acme-tf-state-prod-eu1' in acme/infra-terraform, then set a secret named 'TF_PLAN_WEBHOOK' to 'https://hooks.internal.acme/tfplan' in acme/infra-terraform.",
+      "prompt": "Provision the new staging deploy pipeline for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Telemetry repo wiring on acme/web-frontend: first add a read-only SSH deploy key titled 'staging-mirror-ro' with key material 'ssh-ed25519 AAAAC3NzaStaging staging-mirror-2026' to acme/web-frontend, set the SENTRY_DSN secret in acme/web-frontend to the rotated value 'https://newdsn4477@sentry.io/ingest', set a secret named 'STAGING_DEPLOY_HOST' to 'staging-fe.acme.internal' in acme/web-frontend, then post a comment on issue #90 in acme/web-frontend stating 'Staging mirror key + Sentry DSN provisioned.' (B) ECS identity for deploy-bot: independently, attach the managed policy arn:aws:iam::aws:policy/AmazonECS_FullAccess to IAM user deploy-bot, attach the managed policy arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess to IAM user deploy-bot, attach the managed policy arn:aws:iam::aws:policy/AmazonECR-FullAccess to IAM user deploy-bot, then attach the managed policy arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess to IAM user deploy-bot. (C) Infra repo pipeline secret: independently, set a secret named 'TF_STATE_BUCKET' to 'acme-tf-state-prod-eu1' in acme/infra-terraform, set a secret named 'TF_PLAN_WEBHOOK' to 'https://hooks.internal.acme/tfplan' in acme/infra-terraform, set a secret named 'TF_LOCK_TABLE' to 'acme-tf-locks-eu1' in acme/infra-terraform, then set a secret named 'TF_WORKSPACE' to 'staging-eu1' in acme/infra-terraform.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Deploy key, Sentry DSN, and note on web-frontend",
+            "label": "Deploy key, Sentry DSN, deploy host, note on web-frontend",
             "calls": [
               {
                 "tool": "create_deploy_key",
@@ -579,6 +627,14 @@
                 }
               },
               {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "STAGING_DEPLOY_HOST",
+                  "value": "staging-fe.acme.internal"
+                }
+              },
+              {
                 "tool": "comment_on_issue",
                 "args": {
                   "repo": "acme/web-frontend",
@@ -590,7 +646,7 @@
           },
           {
             "id": "s2",
-            "label": "Grant deploy-bot ECS and CloudWatch Logs access",
+            "label": "Grant deploy-bot ECS, CloudWatch, ECR, SSM access",
             "calls": [
               {
                 "tool": "attach_iam_policy",
@@ -605,12 +661,26 @@
                   "user": "deploy-bot",
                   "policy_arn": "arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess"
                 }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonECR-FullAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Set two Terraform pipeline secrets on infra-terraform",
+            "label": "Set four Terraform pipeline secrets on infra-terraform",
             "calls": [
               {
                 "tool": "set_secret",
@@ -627,6 +697,22 @@
                   "name": "TF_PLAN_WEBHOOK",
                   "value": "https://hooks.internal.acme/tfplan"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_LOCK_TABLE",
+                  "value": "acme-tf-locks-eu1"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_WORKSPACE",
+                  "value": "staging-eu1"
+                }
               }
             ]
           }
@@ -635,13 +721,13 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "Stand up and harden the CI runner fleet for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Bring the idle runner online: first run the command 'systemctl start ci-agent' on instance i-0c7d8e9f, then run the command 'uptime && systemctl is-active ci-agent' on instance i-0c7d8e9f to confirm it is healthy. (B) Network for the internal dashboard: independently, open inbound TCP port 8443 on security group sg-0ci to the internal CIDR range 10.0.0.0/16, then open inbound TCP port 9090 on security group sg-0ci to 10.0.0.0/16 for the metrics scraper. (C) Monitoring access for jdoe: independently, attach the managed policy arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess to IAM user jdoe, then attach the managed policy arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess to IAM user jdoe.",
+      "prompt": "Stand up and harden the CI runner fleet for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Bring the idle runner online: first run the command 'systemctl start ci-agent' on instance i-0c7d8e9f, run the command 'uptime && systemctl is-active ci-agent' on instance i-0c7d8e9f to confirm it is healthy, run the command 'systemctl enable ci-agent' on instance i-0c7d8e9f, then run the command 'journalctl -u ci-agent --since -5m' on instance i-0c7d8e9f. (B) Network for the internal dashboard: independently, open inbound TCP port 8443 on security group sg-0ci to the internal CIDR range 10.0.0.0/16, open inbound TCP port 9090 on security group sg-0ci to 10.0.0.0/16 for the metrics scraper, open inbound TCP port 3000 on security group sg-0ci to 10.0.0.0/16 for Grafana, then open inbound TCP port 9100 on security group sg-0ci to 10.0.0.0/16 for the node exporter. (C) Monitoring access for jdoe: independently, attach the managed policy arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess to IAM user jdoe, attach the managed policy arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess to IAM user jdoe, attach the managed policy arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess to IAM user jdoe, then attach the managed policy arn:aws:iam::aws:policy/AmazonInspector2ReadOnlyAccess to IAM user jdoe.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Start the CI runner then verify health",
+            "label": "Start, verify, enable, and inspect the CI runner",
             "calls": [
               {
                 "tool": "run_command",
@@ -656,12 +742,26 @@
                   "instance_id": "i-0c7d8e9f",
                   "command": "uptime && systemctl is-active ci-agent"
                 }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl enable ci-agent"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "journalctl -u ci-agent --since -5m"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Open dashboard and metrics ports on sg-0ci",
+            "label": "Open dashboard, metrics, Grafana, node-exporter ports",
             "calls": [
               {
                 "tool": "open_security_group_port",
@@ -678,12 +778,28 @@
                   "port": 9090,
                   "cidr": "10.0.0.0/16"
                 }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 3000,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 9100,
+                  "cidr": "10.0.0.0/16"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Grant jdoe EC2 and X-Ray read-only access",
+            "label": "Grant jdoe EC2, X-Ray, CloudWatch, Inspector read-only",
             "calls": [
               {
                 "tool": "attach_iam_policy",
@@ -698,6 +814,20 @@
                   "user": "jdoe",
                   "policy_arn": "arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess"
                 }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonInspector2ReadOnlyAccess"
+                }
               }
             ]
           }
@@ -706,13 +836,13 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "Routine ops housekeeping across acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Payments capacity sweep: first run the command 'df -h /var/lib/postgresql' on instance i-0a1b2c3d, then run the command 'free -m && nproc' on instance i-0a1b2c3d to capture memory and CPU headroom. (B) Nightly backup mirror for payments-api: independently, add a read-only SSH deploy key titled 'backup-mirror-ro' with key material 'ssh-ed25519 AAAAC3NzaBackup backup-mirror-2026' to acme/payments-api, then set a secret named 'BACKUP_BUCKET' to 'acme-payments-nightly-bak' in acme/payments-api. (C) Web release sign-off: independently, post a comment on PR #88 in acme/web-frontend stating 'QA sign-off complete on the login redirect fix.', then merge pull request #88 in acme/web-frontend into main using the squash method.",
+      "prompt": "Routine ops housekeeping across acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Payments capacity sweep: first run the command 'df -h /var/lib/postgresql' on instance i-0a1b2c3d, run the command 'free -m && nproc' on instance i-0a1b2c3d to capture memory and CPU headroom, run the command 'iostat -x 1 3' on instance i-0a1b2c3d, then run the command 'vmstat 1 3' on instance i-0a1b2c3d. (B) Nightly backup mirror for payments-api: independently, add a read-only SSH deploy key titled 'backup-mirror-ro' with key material 'ssh-ed25519 AAAAC3NzaBackup backup-mirror-2026' to acme/payments-api, set a secret named 'BACKUP_BUCKET' to 'acme-payments-nightly-bak' in acme/payments-api, set a secret named 'BACKUP_SCHEDULE' to 'cron_0_3_star_star_star' in acme/payments-api, then set a secret named 'BACKUP_RETENTION_DAYS' to 'retain_30d' in acme/payments-api. (C) Web release sign-off: independently, post a comment on PR #88 in acme/web-frontend stating 'QA sign-off complete on the login redirect fix.', merge pull request #88 in acme/web-frontend into main using the squash method, set a secret named 'WEB_RELEASE_TAG' to 'release_v88_login' in acme/web-frontend, then post a comment on issue #90 in acme/web-frontend stating 'Login redirect PR #88 merged to main.'",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Capture disk then memory/CPU on payments-api-prod-1",
+            "label": "Capture disk, memory/CPU, IO, vmstat on payments-api-prod-1",
             "calls": [
               {
                 "tool": "run_command",
@@ -727,12 +857,26 @@
                   "instance_id": "i-0a1b2c3d",
                   "command": "free -m && nproc"
                 }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "iostat -x 1 3"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "vmstat 1 3"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Add backup deploy key then set backup bucket secret",
+            "label": "Add backup deploy key then set three backup secrets",
             "calls": [
               {
                 "tool": "create_deploy_key",
@@ -749,12 +893,28 @@
                   "name": "BACKUP_BUCKET",
                   "value": "acme-payments-nightly-bak"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "BACKUP_SCHEDULE",
+                  "value": "cron_0_3_star_star_star"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "BACKUP_RETENTION_DAYS",
+                  "value": "retain_30d"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Sign off then squash-merge login PR #88",
+            "label": "Sign off, squash-merge PR #88, tag release, note #90",
             "calls": [
               {
                 "tool": "comment_on_issue",
@@ -771,6 +931,22 @@
                   "number": 88,
                   "method": "squash"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "WEB_RELEASE_TAG",
+                  "value": "release_v88_login"
+                }
+              },
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "number": 90,
+                  "body": "Login redirect PR #88 merged to main"
+                }
               }
             ]
           }
@@ -779,13 +955,13 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "Quarterly security and access rotation for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Rotate payments-api credentials: first set the STRIPE_API_KEY secret in acme/payments-api to the rotated value 'sk_live_rotated_q2_4417', then set the AWS_ACCESS_KEY_ID secret in acme/payments-api to 'AKIA_ROT_NEWKEY_2026'. (B) Onboard infra deploy key + grant access: independently, add a read-only SSH deploy key titled 'infra-readonly-q2' with key material 'ssh-ed25519 AAAAC3NzaInfra infra-readonly-2026' to acme/infra-terraform, then attach the managed policy arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess to IAM user deploy-bot. (C) Webhook incident follow-up on payments-api: independently, post a comment on issue #201 in acme/payments-api stating 'Increased retry queue concurrency; monitoring 503 rate over 24h.', then run the command 'systemctl restart webhook-worker' on instance i-0a1b2c3d.",
+      "prompt": "Quarterly security and access rotation for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Rotate payments-api credentials: first set the STRIPE_API_KEY secret in acme/payments-api to the rotated value 'sk_live_rotated_q2_4417', set the AWS_ACCESS_KEY_ID secret in acme/payments-api to 'AKIA_ROT_NEWKEY_2026', set the AWS_SECRET_ACCESS_KEY secret in acme/payments-api to 'awssecret_rot_q2_7731', then set the JWT_SIGNING_KEY secret in acme/payments-api to 'jwt_rot_q2_9920'. (B) Onboard infra deploy key + grant access: independently, add a read-only SSH deploy key titled 'infra-readonly-q2' with key material 'ssh-ed25519 AAAAC3NzaInfra infra-readonly-2026' to acme/infra-terraform, attach the managed policy arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess to IAM user deploy-bot, set a secret named 'INFRA_DEPLOY_KEY_TITLE' to 'infra-readonly-q2-registered' in acme/infra-terraform, then attach the managed policy arn:aws:iam::aws:policy/AWSConfigUserAccess to IAM user deploy-bot. (C) Webhook incident follow-up on payments-api: independently, post a comment on issue #201 in acme/payments-api stating 'Increased retry queue concurrency; monitoring 503 rate over 24h.', run the command 'systemctl restart webhook-worker' on instance i-0a1b2c3d, run the command 'systemctl status webhook-worker --no-pager' on instance i-0a1b2c3d, then set a secret named 'WEBHOOK_RETRY_CONCURRENCY' to 'concurrency_8' in acme/payments-api.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Rotate Stripe and AWS access-key secrets",
+            "label": "Rotate Stripe, AWS access-key, AWS secret, JWT secrets",
             "calls": [
               {
                 "tool": "set_secret",
@@ -802,12 +978,28 @@
                   "name": "AWS_ACCESS_KEY_ID",
                   "value": "AKIA_ROT_NEWKEY_2026"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "AWS_SECRET_ACCESS_KEY",
+                  "value": "awssecret_rot_q2_7731"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "JWT_SIGNING_KEY",
+                  "value": "jwt_rot_q2_9920"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Add infra deploy key then grant deploy-bot CFN access",
+            "label": "Add infra deploy key, grant CFN + Config access, record key",
             "calls": [
               {
                 "tool": "create_deploy_key",
@@ -823,12 +1015,27 @@
                   "user": "deploy-bot",
                   "policy_arn": "arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess"
                 }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "INFRA_DEPLOY_KEY_TITLE",
+                  "value": "infra-readonly-q2-registered"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSConfigUserAccess"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Comment on webhook issue #201 then restart worker",
+            "label": "Comment on #201, restart worker, check status, set concurrency",
             "calls": [
               {
                 "tool": "comment_on_issue",
@@ -843,6 +1050,606 @@
                 "args": {
                   "instance_id": "i-0a1b2c3d",
                   "command": "systemctl restart webhook-worker"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl status webhook-worker --no-pager"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "WEBHOOK_RETRY_CONCURRENCY",
+                  "value": "concurrency_8"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "Disaster-recovery readiness drill for acme. Run three INDEPENDENT multi-step workflows in parallel; they are unrelated. (A) Snapshot the payments database host: first run the command 'pg_dumpall --globals-only > /backups/globals.sql' on instance i-0a1b2c3d, run the command 'aws s3 cp /backups/globals.sql s3://acme-dr-vault-eu1/' on instance i-0a1b2c3d, run the command 'sha256sum /backups/globals.sql' on instance i-0a1b2c3d, then run the command 'ls -lh /backups' on instance i-0a1b2c3d. (B) Register the DR replica deploy key on payments-api: independently, add a read-only SSH deploy key titled 'dr-replica-ro' with key material 'ssh-ed25519 AAAAC3NzaDrReplica dr-replica-2026' to acme/payments-api, set a secret named 'DR_REPLICA_REGION' to 'eu-west-1-dr' in acme/payments-api, set a secret named 'DR_REPLICA_ENDPOINT' to 'dr-replica.acme.internal:5432' in acme/payments-api, then set a secret named 'DR_RPO_MINUTES' to 'rpo_15min' in acme/payments-api. (C) DR access for deploy-bot: independently, attach the managed policy arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess to IAM user deploy-bot, attach the managed policy arn:aws:iam::aws:policy/AWSBackupOperatorAccess to IAM user deploy-bot, attach the managed policy arn:aws:iam::aws:policy/AmazonElastiCacheReadOnlyAccess to IAM user deploy-bot, then attach the managed policy arn:aws:iam::aws:policy/AWSElasticDisasterRecoveryReadOnlyAccess to IAM user deploy-bot.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Dump globals, upload to DR vault, checksum, list backups",
+            "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "pg_dumpall --globals-only > /backups/globals.sql"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "aws s3 cp /backups/globals.sql s3://acme-dr-vault-eu1/"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "sha256sum /backups/globals.sql"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "ls -lh /backups"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Add DR replica deploy key then set three DR secrets",
+            "calls": [
+              {
+                "tool": "create_deploy_key",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "title": "dr-replica-ro",
+                  "key": "ssh-ed25519 AAAAC3NzaDrReplica dr-replica-2026"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "DR_REPLICA_REGION",
+                  "value": "eu-west-1-dr"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "DR_REPLICA_ENDPOINT",
+                  "value": "dr-replica.acme.internal:5432"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "DR_RPO_MINUTES",
+                  "value": "rpo_15min"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Grant deploy-bot RDS, Backup, ElastiCache, DRS access",
+            "calls": [
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSBackupOperatorAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonElastiCacheReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSElasticDisasterRecoveryReadOnlyAccess"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_6",
+      "prompt": "Observability rollout across acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Instrument the web frontend host: first run the command 'apt-get install -y prometheus-node-exporter' on instance i-0e4f5a6b, run the command 'systemctl enable --now node-exporter' on instance i-0e4f5a6b, run the command 'curl -s localhost:9100/metrics | head' on instance i-0e4f5a6b, then run the command 'systemctl is-active node-exporter' on instance i-0e4f5a6b. (B) Open the internal observability ports on sg-0web: independently, open inbound TCP port 9091 on security group sg-0web to the internal CIDR range 10.0.0.0/16 for the pushgateway, open inbound TCP port 4317 on security group sg-0web to 10.0.0.0/16 for the OTLP collector, open inbound TCP port 3100 on security group sg-0web to 10.0.0.0/16 for Loki, then open inbound TCP port 16686 on security group sg-0web to 10.0.0.0/16 for Jaeger. (C) Wire observability secrets on web-frontend: independently, set a secret named 'OTEL_EXPORTER_ENDPOINT' to 'otel-collector.acme.internal:4317' in acme/web-frontend, set a secret named 'GRAFANA_ADMIN_TOKEN' to 'graf_tok_obs_5521' in acme/web-frontend, set a secret named 'LOKI_PUSH_URL' to 'https://loki.acme.internal/push' in acme/web-frontend, then post a comment on issue #90 in acme/web-frontend stating 'Observability stack wired: node-exporter, OTLP, Loki online.'",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Install, enable, probe, verify node-exporter on web host",
+            "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "apt-get install -y prometheus-node-exporter"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "systemctl enable --now node-exporter"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "curl -s localhost:9100/metrics | head"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "systemctl is-active node-exporter"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Open pushgateway, OTLP, Loki, Jaeger ports on sg-0web",
+            "calls": [
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0web",
+                  "port": 9091,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0web",
+                  "port": 4317,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0web",
+                  "port": 3100,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0web",
+                  "port": 16686,
+                  "cidr": "10.0.0.0/16"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Set OTEL, Grafana, Loki secrets and note on #90",
+            "calls": [
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "OTEL_EXPORTER_ENDPOINT",
+                  "value": "otel-collector.acme.internal:4317"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "GRAFANA_ADMIN_TOKEN",
+                  "value": "graf_tok_obs_5521"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "LOKI_PUSH_URL",
+                  "value": "https://loki.acme.internal/push"
+                }
+              },
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "number": 90,
+                  "body": "Observability stack wired: node-exporter, OTLP, Loki online"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_7",
+      "prompt": "Terraform module cutover for acme/infra-terraform. Run three INDEPENDENT multi-step workflows in parallel. (A) Configure remote-state secrets on infra-terraform: first set a secret named 'TF_BACKEND_REGION' to 'eu-central-1' in acme/infra-terraform, set a secret named 'TF_VAR_environment' to 'production-blue' in acme/infra-terraform, set a secret named 'TF_VAR_owner' to 'platform-team' in acme/infra-terraform, then set a secret named 'TF_PARALLELISM' to 'parallelism_10' in acme/infra-terraform. (B) Register the plan-runner deploy key and grant scoped IAM: independently, add a read-only SSH deploy key titled 'tf-plan-runner-ro' with key material 'ssh-ed25519 AAAAC3NzaTfPlan tf-plan-runner-2026' to acme/infra-terraform, attach the managed policy arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess to IAM user jdoe, set a secret named 'TF_PLAN_RUNNER_KEY' to 'tf-plan-runner-ro-registered' in acme/infra-terraform, then attach the managed policy arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess to IAM user jdoe. (C) Validate the runner instance: independently, run the command 'terraform fmt -check -recursive' on instance i-0c7d8e9f, run the command 'terraform validate' on instance i-0c7d8e9f, run the command 'tflint --no-color' on instance i-0c7d8e9f, then run the command 'checkov -d . --quiet' on instance i-0c7d8e9f.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Set four Terraform backend/variable secrets",
+            "calls": [
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_BACKEND_REGION",
+                  "value": "eu-central-1"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_VAR_environment",
+                  "value": "production-blue"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_VAR_owner",
+                  "value": "platform-team"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_PARALLELISM",
+                  "value": "parallelism_10"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Add plan-runner key, grant jdoe CFN + VPC, record key",
+            "calls": [
+              {
+                "tool": "create_deploy_key",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "title": "tf-plan-runner-ro",
+                  "key": "ssh-ed25519 AAAAC3NzaTfPlan tf-plan-runner-2026"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/infra-terraform",
+                  "name": "TF_PLAN_RUNNER_KEY",
+                  "value": "tf-plan-runner-ro-registered"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Run fmt, validate, tflint, checkov on the runner",
+            "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "terraform fmt -check -recursive"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "terraform validate"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "tflint --no-color"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "checkov -d . --quiet"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Incident response retro and follow-up for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Document the postmortem on payments-api: first post a comment on issue #201 in acme/payments-api stating 'Postmortem published: root cause was retry-queue saturation.', set a secret named 'INCIDENT_ID' to 'inc_2026_0619_pay' in acme/payments-api, set a secret named 'INCIDENT_SEVERITY' to 'sev2_resolved' in acme/payments-api, then post a comment on issue #201 in acme/payments-api stating 'Action items tracked; closing the webhook 503 incident.' (B) Apply the mitigation on the payments host: independently, run the command 'systemctl restart payments-api' on instance i-0a1b2c3d, run the command 'sysctl -w net.core.somaxconn=4096' on instance i-0a1b2c3d, run the command 'systemctl reload nginx' on instance i-0a1b2c3d, then run the command 'curl -s localhost:8080/healthz' on instance i-0a1b2c3d. (C) Tighten alerting secrets on payments-api: independently, set a secret named 'PAGERDUTY_ROUTING_KEY' to 'pd_route_payments_77' in acme/payments-api, set a secret named 'ALERT_503_THRESHOLD' to 'threshold_1pct' in acme/payments-api, set a secret named 'ONCALL_ESCALATION_MIN' to 'escalate_10min' in acme/payments-api, then set a secret named 'SLACK_INCIDENT_CHANNEL' to 'channel_pay_incidents' in acme/payments-api.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Publish postmortem, record incident metadata, close note on #201",
+            "calls": [
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "number": 201,
+                  "body": "Postmortem published: root cause was retry-queue saturation"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "INCIDENT_ID",
+                  "value": "inc_2026_0619_pay"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "INCIDENT_SEVERITY",
+                  "value": "sev2_resolved"
+                }
+              },
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "number": 201,
+                  "body": "Action items tracked; closing the webhook 503 incident"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Restart payments-api, tune somaxconn, reload nginx, healthcheck",
+            "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "sysctl -w net.core.somaxconn=4096"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl reload nginx"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "curl -s localhost:8080/healthz"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Set PagerDuty, threshold, escalation, Slack-channel secrets",
+            "calls": [
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "PAGERDUTY_ROUTING_KEY",
+                  "value": "pd_route_payments_77"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "ALERT_503_THRESHOLD",
+                  "value": "threshold_1pct"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "ONCALL_ESCALATION_MIN",
+                  "value": "escalate_10min"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "name": "SLACK_INCIDENT_CHANNEL",
+                  "value": "channel_pay_incidents"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_9",
+      "prompt": "Cost-optimization and least-privilege review for acme. Run three INDEPENDENT multi-step workflows in parallel. (A) Right-size the web frontend host: first run the command 'top -bn1 | head -20' on instance i-0e4f5a6b, run the command 'docker stats --no-stream' on instance i-0e4f5a6b, run the command 'du -sh /var/log/*' on instance i-0e4f5a6b, then run the command 'journalctl --vacuum-size=200M' on instance i-0e4f5a6b. (B) Scope down contractor access via least-privilege grants on jdoe: independently, attach the managed policy arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess to IAM user jdoe, attach the managed policy arn:aws:iam::aws:policy/AWSCostAndUsageReportAutomationPolicy to IAM user jdoe, attach the managed policy arn:aws:iam::aws:policy/AWSTrustedAdvisorReadOnlyAccess to IAM user jdoe, then attach the managed policy arn:aws:iam::aws:policy/AWSComputeOptimizerReadOnlyAccess to IAM user jdoe. (C) Record cost-control metadata on web-frontend: independently, set a secret named 'COST_BUDGET_MONTHLY' to 'budget_usd_4000' in acme/web-frontend, set a secret named 'COST_ANOMALY_WEBHOOK' to 'https://hooks.internal.acme/costalert' in acme/web-frontend, set a secret named 'AUTOSCALE_MIN_NODES' to 'min_2_nodes' in acme/web-frontend, then set a secret named 'AUTOSCALE_MAX_NODES' to 'max_6_nodes' in acme/web-frontend.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Capture top, docker stats, log sizes, vacuum journal on web host",
+            "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "top -bn1 | head -20"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "docker stats --no-stream"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "du -sh /var/log/*"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "journalctl --vacuum-size=200M"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Grant jdoe Billing, CUR, TrustedAdvisor, ComputeOptimizer read",
+            "calls": [
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSCostAndUsageReportAutomationPolicy"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSTrustedAdvisorReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AWSComputeOptimizerReadOnlyAccess"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Set budget, anomaly webhook, autoscale min/max secrets",
+            "calls": [
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "COST_BUDGET_MONTHLY",
+                  "value": "budget_usd_4000"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "COST_ANOMALY_WEBHOOK",
+                  "value": "https://hooks.internal.acme/costalert"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "AUTOSCALE_MIN_NODES",
+                  "value": "min_2_nodes"
+                }
+              },
+              {
+                "tool": "set_secret",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "name": "AUTOSCALE_MAX_NODES",
+                  "value": "max_6_nodes"
                 }
               }
             ]

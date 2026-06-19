@@ -421,18 +421,32 @@
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "We fly out tomorrow morning for two weeks and I want the house buttoned up. Treat these as three independent work streams in any order, each needing a couple of steps: (1) Lights & climate for the living areas — turn off the living-room light (light_living) which is on, and set the hallway thermostat (thermostat_main) to an energy-saving 16 degrees in heat mode. (2) Doors — lock the garage lock (lock_garage), which is currently unlocked, and lock the back door (lock_back) too for good measure. (3) Security perimeter — make sure the back-yard camera (cam_back) is enabled, then arm the home alarm in 'away' mode. After everything is set, send me one notification summarizing the vacation setup.",
+      "prompt": "We fly out tomorrow morning for two weeks and I want the house buttoned up. Treat these as three independent work streams in any order, each needing a few steps: (1) Lights & climate for the living areas — turn off the living-room light (light_living) which is on, turn off the kitchen light (light_kitchen), turn off the bedroom light (light_bedroom), and set the hallway thermostat (thermostat_main) to an energy-saving 16 degrees in heat mode. (2) Doors — lock the garage lock (lock_garage), which is currently unlocked, lock the back door (lock_back), lock the front door (lock_front), and create an automation called 'Vacation Door Watch' that triggers at 22:00 to re-check all locks. (3) Security perimeter — make sure the back-yard camera (cam_back) is enabled, make sure the front-door camera (cam_front) is enabled, arm the home alarm in 'away' mode, and send me one notification summarizing the vacation security setup.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Living-area lights and climate for vacation",
+            "label": "Living-area lights off and vacation climate",
             "calls": [
               {
                 "tool": "set_light",
                 "args": {
                   "device_id": "light_living",
+                  "state": "off"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "off"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
                   "state": "off"
                 }
               },
@@ -448,7 +462,7 @@
           },
           {
             "id": "s2",
-            "label": "Lock garage and back door",
+            "label": "Lock all doors and create door-watch automation",
             "calls": [
               {
                 "tool": "lock_door",
@@ -461,12 +475,25 @@
                 "args": {
                   "device_id": "lock_back"
                 }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_front"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Vacation Door Watch",
+                  "trigger": "time:22:00"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Enable back-yard camera and arm alarm away",
+            "label": "Enable cameras, arm alarm away, notify",
             "calls": [
               {
                 "tool": "set_camera_state",
@@ -476,9 +503,22 @@
                 }
               },
               {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_front",
+                  "state": "enabled"
+                }
+              },
+              {
                 "tool": "arm_alarm",
                 "args": {
                   "mode": "away"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Vacation security setup complete"
                 }
               }
             ]
@@ -488,13 +528,13 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "Set up our evening scene across the house. These are three independent work streams in any order, each a small sequence: (1) Kitchen mood — turn on the kitchen light (light_kitchen) at 60% brightness, then create an automation called 'Kitchen Dinner Scene' that triggers at 18:30 to set light_kitchen to 80%. (2) Living-room comfort — dim the living-room light (light_living) to 45%, and set the hallway thermostat (thermostat_main) to a cozy 22 degrees in auto mode. (3) Bedroom prep — turn on the bedroom light (light_bedroom) at 30%, then create an automation called 'Bedtime Dim' that triggers at 22:30 to turn off light_bedroom. When done, send me a notification describing the evening setup.",
+      "prompt": "Set up our evening scene across the house. These are three independent work streams in any order, each a small sequence: (1) Kitchen mood — turn on the kitchen light (light_kitchen) at 60% brightness, turn on the porch light (light_porch) at 50% to welcome guests, create an automation called 'Kitchen Dinner Scene' that triggers at 18:30 to set light_kitchen to 80%, and create an automation called 'Porch Welcome' that triggers at 18:45. (2) Living-room comfort — dim the living-room light (light_living) to 45%, set the hallway thermostat (thermostat_main) to a cozy 22 degrees in auto mode, turn on the bedroom light (light_bedroom) at 25% as a soft hallway glow, and lock the back door (lock_back). (3) Bedroom prep — turn on the bedroom light (light_bedroom) at 30%, create an automation called 'Bedtime Dim' that triggers at 22:30 to turn off light_bedroom, set the hallway thermostat (thermostat_main) to 19 degrees in auto for sleeping, and send me a notification describing the evening setup.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Kitchen light on and dinner-scene automation",
+            "label": "Kitchen and porch lights with scene automations",
             "calls": [
               {
                 "tool": "set_light",
@@ -505,17 +545,32 @@
                 }
               },
               {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "on",
+                  "brightness": "50"
+                }
+              },
+              {
                 "tool": "create_automation",
                 "args": {
                   "name": "Kitchen Dinner Scene",
                   "trigger": "time:18:30"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Porch Welcome",
+                  "trigger": "time:18:45"
                 }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Dim living-room light and set thermostat 22C auto",
+            "label": "Living-room light, thermostat, hallway glow, lock",
             "calls": [
               {
                 "tool": "set_light",
@@ -532,12 +587,26 @@
                   "target_temperature": "22",
                   "mode": "auto"
                 }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "on",
+                  "brightness": "25"
+                }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_back"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Bedroom light on and bedtime automation",
+            "label": "Bedroom light, bedtime automation, sleep climate, notify",
             "calls": [
               {
                 "tool": "set_light",
@@ -553,6 +622,20 @@
                   "name": "Bedtime Dim",
                   "trigger": "time:22:30"
                 }
+              },
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "19",
+                  "mode": "auto"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Evening scene is ready"
+                }
               }
             ]
           }
@@ -561,13 +644,13 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "Maria the cleaner is coming this week and I want to prep cleanly. Three independent items in any order, each with a couple of steps: (1) Access — add a guest-access entry for 'Maria Helper' with door PIN 7715 expiring 2026-07-15, then send me a notification confirming her access window. (2) Doors — lock the back door (lock_back) and lock the garage (lock_garage) so the house is secure overnight before her visit. (3) Recording — make sure the front-door camera (cam_front) is enabled, and create an automation called 'Cleaner Arrival Log' that triggers at 09:00 to capture cam_front motion events.",
+      "prompt": "Maria the cleaner is coming this week and I want to prep cleanly. Three independent items in any order, each with a few steps: (1) Access — add a guest-access entry for 'Maria Helper' with door PIN 7715 expiring 2026-07-15, add a second entry for 'Maria Backup' with PIN 7716 expiring 2026-07-15, create an automation called 'Cleaner Access Window' that triggers at 08:30, and send me a notification confirming her access window. (2) Doors & comfort — lock the back door (lock_back), lock the garage (lock_garage) so the house is secure overnight, set the hallway thermostat (thermostat_main) to 21 degrees in auto so it's comfortable while she cleans, and turn on the kitchen light (light_kitchen) at 80% so she can see. (3) Recording — make sure the front-door camera (cam_front) is enabled, make sure the back-yard camera (cam_back) is enabled, create an automation called 'Cleaner Arrival Log' that triggers at 09:00 to capture cam_front motion events, and turn on the porch light (light_porch) at 60% for her arrival.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Add Maria's guest access and confirm",
+            "label": "Add Maria's guest access entries, automation, confirm",
             "calls": [
               {
                 "tool": "add_guest_access",
@@ -578,16 +661,31 @@
                 }
               },
               {
+                "tool": "add_guest_access",
+                "args": {
+                  "name": "Maria Backup",
+                  "pin": "7716",
+                  "expires": "2026-07-15"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Cleaner Access Window",
+                  "trigger": "time:08:30"
+                }
+              },
+              {
                 "tool": "send_notification",
                 "args": {
-                  "message": "Maria Helper"
+                  "message": "Maria Helper access window confirmed"
                 }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Lock back door and garage",
+            "label": "Lock doors, set comfort climate and kitchen light",
             "calls": [
               {
                 "tool": "lock_door",
@@ -600,12 +698,28 @@
                 "args": {
                   "device_id": "lock_garage"
                 }
+              },
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "21",
+                  "mode": "auto"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "on",
+                  "brightness": "80"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Enable front camera and arrival-log automation",
+            "label": "Enable cameras, arrival-log automation, porch light",
             "calls": [
               {
                 "tool": "set_camera_state",
@@ -615,10 +729,25 @@
                 }
               },
               {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_back",
+                  "state": "enabled"
+                }
+              },
+              {
                 "tool": "create_automation",
                 "args": {
                   "name": "Cleaner Arrival Log",
                   "trigger": "time:09:00"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "on",
+                  "brightness": "60"
                 }
               }
             ]
@@ -628,13 +757,13 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "Help me cut our energy use without making the house uncomfortable. Three independent streams in any order, each a short sequence: (1) Living areas — dim the living-room light (light_living) to 30% and set the hallway thermostat (thermostat_main) to an efficient 20 degrees in auto mode. (2) Porch & schedule — turn off the porch light (light_porch), then create an automation called 'Eco Evening' that at 21:00 dims light_porch to 25%. (3) Kitchen & bedroom off-peak — turn off the kitchen light (light_kitchen) and turn off the bedroom light (light_bedroom). When done, send me a notification summarizing the changes and expected savings.",
+      "prompt": "Help me cut our energy use without making the house uncomfortable. Three independent streams in any order, each a short sequence: (1) Living areas — dim the living-room light (light_living) to 30%, set the hallway thermostat (thermostat_main) to an efficient 20 degrees in auto mode, dim the kitchen light (light_kitchen) to 40%, and create an automation called 'Eco Daytime' that triggers at 12:00. (2) Porch & schedule — turn off the porch light (light_porch), create an automation called 'Eco Evening' that at 21:00 dims light_porch to 25%, create an automation called 'Eco Night' that at 23:30 turns off light_porch, and turn on the bedroom light (light_bedroom) at 20% as a low-energy night light. (3) Off-peak shutdown — turn off the kitchen light (light_kitchen), turn off the bedroom light (light_bedroom), set the hallway thermostat (thermostat_main) to 18 degrees in auto for the night, and send me a notification summarizing the changes and expected savings.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Dim living-room light and set thermostat 20C auto",
+            "label": "Dim living-room and kitchen, set thermostat, eco automation",
             "calls": [
               {
                 "tool": "set_light",
@@ -651,12 +780,27 @@
                   "target_temperature": "20",
                   "mode": "auto"
                 }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "on",
+                  "brightness": "40"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Eco Daytime",
+                  "trigger": "time:12:00"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Turn off porch light and create Eco Evening automation",
+            "label": "Porch off, eco automations, low bedroom night light",
             "calls": [
               {
                 "tool": "set_light",
@@ -671,12 +815,27 @@
                   "name": "Eco Evening",
                   "trigger": "time:21:00"
                 }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Eco Night",
+                  "trigger": "time:23:30"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "on",
+                  "brightness": "20"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Turn off kitchen and bedroom lights",
+            "label": "Off-peak shutdown of lights, night climate, notify",
             "calls": [
               {
                 "tool": "set_light",
@@ -691,6 +850,20 @@
                   "device_id": "light_bedroom",
                   "state": "off"
                 }
+              },
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "18",
+                  "mode": "auto"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Energy-saving changes applied"
+                }
               }
             ]
           }
@@ -699,13 +872,13 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "Get the house ready for movie night and an early morning. Three independent streams in any order, each with a couple of steps: (1) Theater lights — dim the living-room light (light_living) to 15% and turn off the kitchen light (light_kitchen) so there's no glare. (2) Comfort climate — set the hallway thermostat (thermostat_main) to a warm 23 degrees in heat mode, and create an automation called 'Movie Cooldown' that at 23:00 sets thermostat_main back to 19 degrees. (3) Morning routine — create an automation called 'Sunrise Wake' that triggers at 06:30 to turn on light_bedroom, then turn on the porch light (light_porch) at 70% for the early start. When done, send me a notification recapping the setup.",
+      "prompt": "Get the house ready for movie night and an early morning. Three independent streams in any order, each with a few steps: (1) Theater lights — dim the living-room light (light_living) to 15%, turn off the kitchen light (light_kitchen) so there is no glare, turn off the porch light (light_porch), and dim the bedroom light (light_bedroom) to 10% as a low hallway marker. (2) Comfort climate — set the hallway thermostat (thermostat_main) to a warm 23 degrees in heat mode, create an automation called 'Movie Cooldown' that at 23:00 sets thermostat_main back to 19 degrees, lock the front door (lock_front) so we are undisturbed, and lock the back door (lock_back). (3) Morning routine — create an automation called 'Sunrise Wake' that triggers at 06:30 to turn on light_bedroom, turn on the porch light (light_porch) at 70% for the early start, create an automation called 'Morning Coffee Light' that triggers at 06:45 to turn on light_kitchen, and send me a notification recapping the setup.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Dim living-room light and turn off kitchen light",
+            "label": "Theater lights: dim living-room, off kitchen/porch, bedroom marker",
             "calls": [
               {
                 "tool": "set_light",
@@ -721,12 +894,27 @@
                   "device_id": "light_kitchen",
                   "state": "off"
                 }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "off"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "on",
+                  "brightness": "10"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Set thermostat 23C heat and create cooldown automation",
+            "label": "Warm climate, cooldown automation, lock doors",
             "calls": [
               {
                 "tool": "set_thermostat",
@@ -742,12 +930,24 @@
                   "name": "Movie Cooldown",
                   "trigger": "time:23:00"
                 }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_front"
+                }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_back"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Create sunrise automation and turn on porch light",
+            "label": "Sunrise automation, porch light, coffee-light automation, notify",
             "calls": [
               {
                 "tool": "create_automation",
@@ -762,6 +962,584 @@
                   "device_id": "light_porch",
                   "state": "on",
                   "brightness": "70"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Morning Coffee Light",
+                  "trigger": "time:06:45"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Movie night and morning routine set"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "We're hosting a weekend dinner party and I want the place dialed in. Treat these as three independent work streams in any order, each needing a few steps: (1) Entertaining lights — turn on the living-room light (light_living) at 65% for the lounge area, turn on the kitchen light (light_kitchen) at 75% for serving, turn on the porch light (light_porch) at 55% so guests can find the door, and create an automation called 'Dinner Party Lights' that triggers at 17:30. (2) Climate & quiet — set the hallway thermostat (thermostat_main) to a comfortable 22 degrees in auto mode, create an automation called 'Party Cooldown' that triggers at 20:00 to ease the temperature, turn on the bedroom light (light_bedroom) at 20% as a coat-room marker, and lock the back door (lock_back) so foot traffic stays out front. (3) Guests & recording — add a guest-access entry for 'Dinner Caterer' with door PIN 6201 expiring 2026-06-22, make sure the front-door camera (cam_front) stays enabled for the doorbell, create an automation called 'Party Door Log' that triggers at 17:45, and send me a notification confirming the party setup is ready.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Entertaining lights and party-lights automation",
+            "calls": [
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_living",
+                  "state": "on",
+                  "brightness": "65"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "on",
+                  "brightness": "75"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "on",
+                  "brightness": "55"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Dinner Party Lights",
+                  "trigger": "time:17:30"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Party climate, cooldown automation, coat-room marker, lock",
+            "calls": [
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "22",
+                  "mode": "auto"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Party Cooldown",
+                  "trigger": "time:20:00"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "on",
+                  "brightness": "20"
+                }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_back"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Caterer guest access, camera, door-log automation, notify",
+            "calls": [
+              {
+                "tool": "add_guest_access",
+                "args": {
+                  "name": "Dinner Caterer",
+                  "pin": "6201",
+                  "expires": "2026-06-22"
+                }
+              },
+              {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_front",
+                  "state": "enabled"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Party Door Log",
+                  "trigger": "time:17:45"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Dinner party setup ready"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_6",
+      "prompt": "I'm renting out the guest suite next week and need the place set for the visitor. Three independent items in any order, each with a few steps: (1) Visitor access — add a guest-access entry for 'Rental Guest' with door PIN 5530 expiring 2026-06-26, add a second entry for 'Rental Cleaner' with PIN 5531 expiring 2026-06-26, create an automation called 'Rental Check-In' that triggers at 15:00, and send me a notification confirming the rental check-in window. (2) Comfort & lights — set the hallway thermostat (thermostat_main) to a welcoming 23 degrees in heat mode, turn on the bedroom light (light_bedroom) at 50% so the suite feels lived-in, turn on the kitchen light (light_kitchen) at 45%, and create an automation called 'Guest Suite Warmup' that triggers at 14:30. (3) Security baseline — lock the back door (lock_back) so only the front entry is used, make sure the back-yard camera (cam_back) stays enabled, turn on the living-room light (light_living) at 40% for arrival, and create an automation called 'Rental Night Secure' that triggers at 23:00.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Rental guest access entries, check-in automation, confirm",
+            "calls": [
+              {
+                "tool": "add_guest_access",
+                "args": {
+                  "name": "Rental Guest",
+                  "pin": "5530",
+                  "expires": "2026-06-26"
+                }
+              },
+              {
+                "tool": "add_guest_access",
+                "args": {
+                  "name": "Rental Cleaner",
+                  "pin": "5531",
+                  "expires": "2026-06-26"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Rental Check-In",
+                  "trigger": "time:15:00"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Rental check-in window confirmed"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Welcoming climate, suite lights, warmup automation",
+            "calls": [
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "23",
+                  "mode": "heat"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "on",
+                  "brightness": "50"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "on",
+                  "brightness": "45"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Guest Suite Warmup",
+                  "trigger": "time:14:30"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Lock back, camera enabled, arrival light, night-secure automation",
+            "calls": [
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_back"
+                }
+              },
+              {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_back",
+                  "state": "enabled"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_living",
+                  "state": "on",
+                  "brightness": "40"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Rental Night Secure",
+                  "trigger": "time:23:00"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_7",
+      "prompt": "A big storm is forecast tonight and I want the home hardened. Three independent streams in any order, each a short sequence: (1) Lockdown — lock the garage (lock_garage), which is currently unlocked, lock the front door (lock_front), lock the back door (lock_back), and create an automation called 'Storm Lock Sweep' that triggers at 19:30 to re-verify all locks. (2) Power-saving climate — set the hallway thermostat (thermostat_main) to a steady 19 degrees in heat mode, turn off the porch light (light_porch) to protect the fixture, turn off the kitchen light (light_kitchen), and create an automation called 'Storm Power Save' that triggers at 20:30. (3) Watch & alert — make sure the back-yard camera (cam_back) stays enabled to watch for damage, arm the home alarm in 'home' mode since we'll be inside, turn on the living-room light (light_living) at 35% as a low-draw safe light, and send me a notification confirming the storm-prep is complete.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Lock all doors and storm lock-sweep automation",
+            "calls": [
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_garage"
+                }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_front"
+                }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_back"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Storm Lock Sweep",
+                  "trigger": "time:19:30"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Power-saving climate, porch/kitchen off, power-save automation",
+            "calls": [
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "19",
+                  "mode": "heat"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "off"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "off"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Storm Power Save",
+                  "trigger": "time:20:30"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Camera enabled, arm home, safe light, notify",
+            "calls": [
+              {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_back",
+                  "state": "enabled"
+                }
+              },
+              {
+                "tool": "arm_alarm",
+                "args": {
+                  "mode": "home"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_living",
+                  "state": "on",
+                  "brightness": "35"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Storm prep complete"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Set up our weekday morning wake-up routine across the house. Three independent streams in any order, each with a few steps: (1) Wake lights — turn on the bedroom light (light_bedroom) at 40% to start the day gently, turn on the kitchen light (light_kitchen) at 70% for breakfast, create an automation called 'Weekday Wake Lights' that triggers at 06:15, and create an automation called 'Breakfast Brighten' that triggers at 06:45 to raise light_kitchen. (2) Morning climate — set the hallway thermostat (thermostat_main) to a brisk 21 degrees in heat mode, turn on the living-room light (light_living) at 55% for the news, create an automation called 'Morning Warmup' that triggers at 05:45, and turn on the porch light (light_porch) at 40% for the commute. (3) Out-the-door — lock the back door (lock_back) before leaving, create an automation called 'Departure Lock' that triggers at 08:10 to verify locks, make sure the front-door camera (cam_front) stays enabled while we're out, and send me a notification recapping the morning routine.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Wake lights and weekday-light automations",
+            "calls": [
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "on",
+                  "brightness": "40"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "on",
+                  "brightness": "70"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Weekday Wake Lights",
+                  "trigger": "time:06:15"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Breakfast Brighten",
+                  "trigger": "time:06:45"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Morning climate, living light, warmup automation, porch light",
+            "calls": [
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "21",
+                  "mode": "heat"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_living",
+                  "state": "on",
+                  "brightness": "55"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Morning Warmup",
+                  "trigger": "time:05:45"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "on",
+                  "brightness": "40"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Lock back, departure-lock automation, camera, notify",
+            "calls": [
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_back"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Departure Lock",
+                  "trigger": "time:08:10"
+                }
+              },
+              {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_front",
+                  "state": "enabled"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Morning routine recap"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_9",
+      "prompt": "I'm running my home office today and want a focus-friendly setup. Three independent streams in any order, each a short sequence: (1) Workspace lights — turn on the living-room light (light_living) at 80% for a bright desk area, turn on the kitchen light (light_kitchen) at 60% for coffee breaks, create an automation called 'Focus Lights On' that triggers at 09:00, and create an automation called 'Lunch Dim' that triggers at 12:30 to dim light_living. (2) Comfort climate — set the hallway thermostat (thermostat_main) to a focused 20 degrees in cool mode, turn off the bedroom light (light_bedroom) to keep the bedroom for rest only, create an automation called 'Afternoon Eco' that triggers at 14:00, and lock the front door (lock_front) so deliveries don't interrupt. (3) Do-not-disturb — make sure the front-door camera (cam_front) stays enabled to catch deliveries, create an automation called 'End Of Workday' that triggers at 17:30 to wind down the office, turn on the porch light (light_porch) at 30% for the evening, and send me a notification confirming the office setup is active.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Workspace lights and focus-light automations",
+            "calls": [
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_living",
+                  "state": "on",
+                  "brightness": "80"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_kitchen",
+                  "state": "on",
+                  "brightness": "60"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Focus Lights On",
+                  "trigger": "time:09:00"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Lunch Dim",
+                  "trigger": "time:12:30"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Focus climate, bedroom off, afternoon-eco automation, lock front",
+            "calls": [
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_main",
+                  "target_temperature": "20",
+                  "mode": "cool"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_bedroom",
+                  "state": "off"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Afternoon Eco",
+                  "trigger": "time:14:00"
+                }
+              },
+              {
+                "tool": "lock_door",
+                "args": {
+                  "device_id": "lock_front"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Camera enabled, end-of-workday automation, evening porch, notify",
+            "calls": [
+              {
+                "tool": "set_camera_state",
+                "args": {
+                  "device_id": "cam_front",
+                  "state": "enabled"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "End Of Workday",
+                  "trigger": "time:17:30"
+                }
+              },
+              {
+                "tool": "set_light",
+                "args": {
+                  "device_id": "light_porch",
+                  "state": "on",
+                  "brightness": "30"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Home office setup active"
                 }
               }
             ]

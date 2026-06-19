@@ -423,7 +423,7 @@
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "I am getting my records in order before my June 18 visit and want three independent multi-step workflows done in parallel, then merged into a confirmation summary. (1) Contact workflow: first update my mobile number to +1-415-555-0203, then in a second step update my email to maria.alvarez2026@example.com, then update my mailing address to 217 Magnolia Court, San Mateo, CA 94403. (2) Refill workflow: independently, my Atorvastatin prescription (id 3) is out of refills — first request a refill for prescription id 3 sent to my preferred pharmacy GoodHealth Pharmacy #214, then add a prescribing note to prescription id 3 reading 'Refill requested; patient out of refills.' (3) Scheduling workflow: independently, book a new appointment with Dr. Susan Patel on 2026-08-15 at 10:30 for a quarterly diabetes review, then send Dr. Susan Patel a secure message with subject 'Quarterly review booked' confirming the new visit. Then confirm all three workflows completed.",
+      "prompt": "I am getting my records in order before my June 18 visit and want three independent multi-step workflows done in parallel, then merged into a confirmation summary. (1) Contact workflow: first update my mobile number to +1-415-555-0203, then in a second step update my email to maria.alvarez2026@example.com, then update my mailing address to 217 Magnolia Court, San Mateo, CA 94403, and finally update my insurance member id to BSW-99X-3340512. (2) Refill workflow: independently, my Atorvastatin prescription (id 3) is out of refills — first request a refill for prescription id 3 sent to my preferred pharmacy GoodHealth Pharmacy #214, then add a prescribing note to prescription id 3 reading 'Refill requested; patient out of refills.', then update prescription id 3 dosage to '10 mg', then update prescription id 3 frequency to 'once daily at bedtime'. (3) Scheduling workflow: independently, book a new appointment with Dr. Susan Patel on 2026-08-15 at 10:30 for a quarterly diabetes review, then send Dr. Susan Patel a secure message with subject 'Quarterly review booked' confirming the new visit, then reschedule my existing diabetes follow-up (appointment id 5001) to 2026-06-19 at 08:45, then send Dr. Susan Patel a secure message with subject 'Existing follow-up moved' noting the new earlier time. Then confirm all three workflows completed.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
@@ -448,12 +448,18 @@
                 "args": {
                   "address": "217 Magnolia Court, San Mateo, CA 94403"
                 }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "insurance_member_id": "BSW-99X-3340512"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Refill Atorvastatin (id 3), then add prescribing note",
+            "label": "Refill Atorvastatin (id 3), add note, set dosage and frequency",
             "calls": [
               {
                 "tool": "request_prescription_refill",
@@ -468,12 +474,26 @@
                   "prescription_id": 3,
                   "notes": "Refill requested; patient out of refills."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "dosage": "10 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "frequency": "once daily at bedtime"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Book diabetes review, then message Dr. Patel",
+            "label": "Book diabetes review, message Dr. Patel, reschedule existing, notify",
             "calls": [
               {
                 "tool": "book_appointment",
@@ -489,6 +509,21 @@
                   "recipient": "Dr. Susan Patel",
                   "subject": "Quarterly review booked"
                 }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": 5001,
+                  "date": "2026-06-19",
+                  "time": "08:45"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Existing follow-up moved"
+                }
               }
             ]
           }
@@ -497,13 +532,13 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "I have three unrelated multi-step record updates and they can all be done independently, in any order, then summarized. (1) Emergency-contact workflow: update my emergency contact to my brother Rafael Alvarez, relationship brother, phone +1-415-555-0166, then send Dr. Susan Patel a secure message with subject 'Emergency contact updated' letting her know my emergency contact changed. (2) Prescription workflow: independently, add a prescribing note to my Metformin prescription (id 2) reading 'Patient reports good tolerance.' then update its frequency to 'twice daily with meals'. (3) Imaging workflow: independently, reschedule my thyroid ultrasound at Bayview Imaging Center (appointment id 5003) to 2026-07-08 at 09:45, then book a follow-up consult with Bayview Imaging Center on 2026-07-15 at 10:00 to review the images. Then give me a short confirmation that all three workflows went through.",
+      "prompt": "I have three unrelated multi-step record updates and they can all be done independently, in any order, then summarized. (1) Emergency-contact workflow: update my emergency contact to my brother Rafael Alvarez, relationship brother, phone +1-415-555-0166, then send Dr. Susan Patel a secure message with subject 'Emergency contact updated' letting her know my emergency contact changed, then update the emergency contact relationship label to 'sibling', then send Dr. Susan Patel a secure message with subject 'Emergency contact relationship clarified'. (2) Prescription workflow: independently, add a prescribing note to my Metformin prescription (id 2) reading 'Patient reports good tolerance.' then update its frequency to 'twice daily with meals', then set its dosage to '500 mg', then add a second prescribing note reading 'Continue current regimen.'. (3) Imaging workflow: independently, reschedule my thyroid ultrasound at Bayview Imaging Center (appointment id 5003) to 2026-07-08 at 09:45, then book a follow-up consult with Bayview Imaging Center on 2026-07-15 at 10:00 to review the images, then book a second imaging slot with Bayview Imaging Center on 2026-07-22 at 09:00 for a repeat scan, then send Bayview Imaging Center a secure message with subject 'Imaging schedule confirmed'. Then give me a short confirmation that all three workflows went through.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Update emergency contact, then notify Dr. Patel",
+            "label": "Update emergency contact, notify, clarify relationship, notify",
             "calls": [
               {
                 "tool": "update_emergency_contact",
@@ -518,12 +553,26 @@
                   "recipient": "Dr. Susan Patel",
                   "subject": "Emergency contact updated"
                 }
+              },
+              {
+                "tool": "update_emergency_contact",
+                "args": {
+                  "name": "Rafael Alvarez",
+                  "relationship": "sibling"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Emergency contact relationship clarified"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Add Metformin note (id 2), then update frequency",
+            "label": "Metformin (id 2): note, frequency, dosage, second note",
             "calls": [
               {
                 "tool": "update_prescription",
@@ -538,12 +587,26 @@
                   "prescription_id": 2,
                   "frequency": "twice daily with meals"
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "dosage": "500 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "notes": "Continue current regimen."
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Reschedule ultrasound (id 5003), then book review consult",
+            "label": "Reschedule ultrasound (id 5003), book consult, book repeat, notify",
             "calls": [
               {
                 "tool": "reschedule_appointment",
@@ -560,6 +623,21 @@
                   "date": "2026-07-15",
                   "time": "10:00"
                 }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Bayview Imaging Center",
+                  "date": "2026-07-22",
+                  "time": "09:00"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Bayview Imaging Center",
+                  "subject": "Imaging schedule confirmed"
+                }
               }
             ]
           }
@@ -568,13 +646,13 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "Help me get three separate multi-step things off my to-do list; they are independent and can run in parallel before you summarize. (a) Supplement workflow: add a new medication to my list — Vitamin D3, dosage 2000 IU, frequency once daily — then add a second new medication Magnesium Citrate, dosage 200 mg, frequency once daily at night. (b) Lisinopril workflow: independently, update my Lisinopril prescription (id 1) by adding the prescribing note 'No cough or dizziness reported at last review.', then update its frequency to 'once daily in the morning'. (c) Primary-care workflow: independently, reschedule my diabetes follow-up with Dr. Susan Patel (appointment id 5001) to 2026-06-22 at 11:00, then send Dr. Susan Patel a secure message with subject 'Follow-up rescheduled' confirming the new time. Then confirm the medications added, the Lisinopril updates, and the rescheduled visit.",
+      "prompt": "Help me get three separate multi-step things off my to-do list; they are independent and can run in parallel before you summarize. (a) Supplement workflow: add a new medication to my list — Vitamin D3, dosage 2000 IU, frequency once daily — then add a second new medication Magnesium Citrate, dosage 200 mg, frequency once daily at night, then add Vitamin B12, dosage 1000 mcg, frequency once daily, then add Omega-3 Fish Oil, dosage 1000 mg, frequency once daily with food. (b) Lisinopril workflow: independently, update my Lisinopril prescription (id 1) by adding the prescribing note 'No cough or dizziness reported at last review.', then update its frequency to 'once daily in the morning', then set its dosage to '10 mg', then add a second prescribing note reading 'Blood pressure stable, continue.'. (c) Primary-care workflow: independently, reschedule my diabetes follow-up with Dr. Susan Patel (appointment id 5001) to 2026-06-22 at 11:00, then send Dr. Susan Patel a secure message with subject 'Follow-up rescheduled' confirming the new time, then book a separate nutrition counseling appointment with Dr. Susan Patel on 2026-07-10 at 14:30, then send Dr. Susan Patel a secure message with subject 'Nutrition visit booked'. Then confirm the medications added, the Lisinopril updates, and the rescheduled visit.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Add Vitamin D3, then add Magnesium Citrate",
+            "label": "Add Vitamin D3, Magnesium Citrate, Vitamin B12, Omega-3",
             "calls": [
               {
                 "tool": "add_medication",
@@ -591,12 +669,28 @@
                   "dosage": "200 mg",
                   "frequency": "once daily at night"
                 }
+              },
+              {
+                "tool": "add_medication",
+                "args": {
+                  "name": "Vitamin B12",
+                  "dosage": "1000 mcg",
+                  "frequency": "once daily"
+                }
+              },
+              {
+                "tool": "add_medication",
+                "args": {
+                  "name": "Omega-3 Fish Oil",
+                  "dosage": "1000 mg",
+                  "frequency": "once daily with food"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Add Lisinopril note (id 1), then update frequency",
+            "label": "Lisinopril (id 1): note, frequency, dosage, second note",
             "calls": [
               {
                 "tool": "update_prescription",
@@ -611,12 +705,26 @@
                   "prescription_id": 1,
                   "frequency": "once daily in the morning"
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 1,
+                  "dosage": "10 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 1,
+                  "notes": "Blood pressure stable, continue."
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Reschedule diabetes follow-up (id 5001), then notify Dr. Patel",
+            "label": "Reschedule follow-up (id 5001), notify, book nutrition visit, notify",
             "calls": [
               {
                 "tool": "reschedule_appointment",
@@ -632,6 +740,21 @@
                   "recipient": "Dr. Susan Patel",
                   "subject": "Follow-up rescheduled"
                 }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Susan Patel",
+                  "date": "2026-07-10",
+                  "time": "14:30"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Nutrition visit booked"
+                }
               }
             ]
           }
@@ -640,13 +763,13 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "I need three quick, independent multi-step fixes to my account that don't depend on each other. (1) Move workflow: update my mailing address to 142 Cedar Street, San Mateo, CA 94402 — I just moved — then update my mobile phone number to +1-415-555-0299. (2) Cardiology workflow: independently, reschedule my cardiology visit with Dr. Omar Reyes (appointment id 5002) to 2026-07-09 at 13:30, then send Dr. Omar Reyes a secure message with subject 'Cardiology visit rescheduled' confirming I will attend the new time. (3) Levothyroxine workflow: independently, update my Levothyroxine prescription (id 4) frequency to 'once daily 30 minutes before breakfast' to match new guidance, then add a prescribing note to prescription id 4 reading 'Timing adjusted per endocrinology guidance.' Then confirm the new address and phone, the rescheduled cardiology visit, and the updated thyroid-medication timing.",
+      "prompt": "I need three quick, independent multi-step fixes to my account that don't depend on each other. (1) Move workflow: update my mailing address to 142 Cedar Street, San Mateo, CA 94402 — I just moved — then update my mobile phone number to +1-415-555-0299, then update my email to maria.cedar@example.com, then update my insurance member id to BSW-99X-5512098. (2) Cardiology workflow: independently, reschedule my cardiology visit with Dr. Omar Reyes (appointment id 5002) to 2026-07-09 at 13:30, then send Dr. Omar Reyes a secure message with subject 'Cardiology visit rescheduled' confirming I will attend the new time, then book a separate echocardiogram appointment with Dr. Omar Reyes on 2026-08-20 at 11:30, then send Dr. Omar Reyes a secure message with subject 'Echocardiogram booked'. (3) Levothyroxine workflow: independently, update my Levothyroxine prescription (id 4) frequency to 'once daily 30 minutes before breakfast' to match new guidance, then add a prescribing note to prescription id 4 reading 'Timing adjusted per endocrinology guidance.', then set prescription id 4 dosage to '75 mcg', then add a second prescribing note to prescription id 4 reading 'Recheck TSH in 6 weeks.'. Then confirm the new address and phone, the rescheduled cardiology visit, and the updated thyroid-medication timing.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Update mailing address, then update phone",
+            "label": "Update address, phone, email, insurance member id",
             "calls": [
               {
                 "tool": "update_patient_contact",
@@ -659,12 +782,24 @@
                 "args": {
                   "phone": "+1-415-555-0299"
                 }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "email": "maria.cedar@example.com"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "insurance_member_id": "BSW-99X-5512098"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Reschedule cardiology visit (id 5002), then notify Dr. Reyes",
+            "label": "Reschedule cardiology (id 5002), notify, book echo, notify",
             "calls": [
               {
                 "tool": "reschedule_appointment",
@@ -680,12 +815,27 @@
                   "recipient": "Dr. Omar Reyes",
                   "subject": "Cardiology visit rescheduled"
                 }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-08-20",
+                  "time": "11:30"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Omar Reyes",
+                  "subject": "Echocardiogram booked"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Update Levothyroxine (id 4) frequency, then add note",
+            "label": "Levothyroxine (id 4): frequency, note, dosage, second note",
             "calls": [
               {
                 "tool": "update_prescription",
@@ -700,6 +850,20 @@
                   "prescription_id": 4,
                   "notes": "Timing adjusted per endocrinology guidance."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 4,
+                  "dosage": "75 mcg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 4,
+                  "notes": "Recheck TSH in 6 weeks."
+                }
               }
             ]
           }
@@ -708,13 +872,13 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "Three independent multi-step administrative tasks for my care, all parallelizable, then a wrap-up. (1) Insurance workflow: my insurance member id changed — update it on my profile to BSW-99X-7788321 — then update my email to maria.coverage@example.com so insurance notices reach me. (2) Refill workflow: independently, request a refill for my Metformin prescription (id 2) sent to my preferred pharmacy GoodHealth Pharmacy #214, then add a prescribing note to prescription id 2 reading 'Refill ordered for 90-day supply.' (3) Cardiology workflow: independently, book a follow-up appointment with Dr. Omar Reyes on 2026-09-10 at 15:15 for a blood-pressure recheck, then send Dr. Omar Reyes a secure message with subject 'Follow-up booked' confirming the new appointment. Then summarize all three workflows.",
+      "prompt": "Three independent multi-step administrative tasks for my care, all parallelizable, then a wrap-up. (1) Insurance workflow: my insurance member id changed — update it on my profile to BSW-99X-7788321 — then update my email to maria.coverage@example.com so insurance notices reach me, then update my mobile phone number to +1-415-555-0311, then update my mailing address to 503 Willow Way, San Mateo, CA 94404. (2) Refill workflow: independently, request a refill for my Metformin prescription (id 2) sent to my preferred pharmacy GoodHealth Pharmacy #214, then add a prescribing note to prescription id 2 reading 'Refill ordered for 90-day supply.', then set prescription id 2 dosage to '500 mg', then update prescription id 2 frequency to 'twice daily'. (3) Cardiology workflow: independently, book a follow-up appointment with Dr. Omar Reyes on 2026-09-10 at 15:15 for a blood-pressure recheck, then send Dr. Omar Reyes a secure message with subject 'Follow-up booked' confirming the new appointment, then book a second appointment with Dr. Omar Reyes on 2026-10-08 at 16:00 for a medication review, then send Dr. Omar Reyes a secure message with subject 'Medication review booked'. Then summarize all three workflows.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Update insurance member id, then update email",
+            "label": "Update insurance member id, email, phone, address",
             "calls": [
               {
                 "tool": "update_patient_contact",
@@ -727,12 +891,24 @@
                 "args": {
                   "email": "maria.coverage@example.com"
                 }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "phone": "+1-415-555-0311"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "address": "503 Willow Way, San Mateo, CA 94404"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Refill Metformin (id 2), then add prescribing note",
+            "label": "Metformin (id 2): refill, note, dosage, frequency",
             "calls": [
               {
                 "tool": "request_prescription_refill",
@@ -747,12 +923,26 @@
                   "prescription_id": 2,
                   "notes": "Refill ordered for 90-day supply."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "dosage": "500 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "frequency": "twice daily"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Book cardiology follow-up, then notify Dr. Reyes",
+            "label": "Book cardiology follow-up, notify, book review, notify",
             "calls": [
               {
                 "tool": "book_appointment",
@@ -767,6 +957,578 @@
                 "args": {
                   "recipient": "Dr. Omar Reyes",
                   "subject": "Follow-up booked"
+                }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-10-08",
+                  "time": "16:00"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Omar Reyes",
+                  "subject": "Medication review booked"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "Three independent multi-step jobs for my portal, all parallelizable, then a single wrap-up. (1) Profile-refresh workflow: update my mobile phone number to +1-650-555-0741, then update my email to maria.alvarez.refresh@example.com, then update my mailing address to 19 Birchwood Terrace, Foster City, CA 94404, then update my insurance member id to BSW-99X-6610284. (2) Statin workflow: independently, update my Atorvastatin prescription (id 3) by adding the prescribing note 'Tolerating well, no muscle aches reported.', then set its dosage to '20 mg', then update its frequency to 'once daily at bedtime', then add a second prescribing note reading 'Continue at current dose; recheck lipids in 3 months.'. (3) Imaging-scheduling workflow: independently, book a bone-density scan with Bayview Imaging Center on 2026-09-03 at 08:15, then send Bayview Imaging Center a secure message with subject 'Bone-density scan booked' confirming the slot, then book a repeat thyroid ultrasound with Bayview Imaging Center on 2026-09-17 at 08:45, then send Bayview Imaging Center a secure message with subject 'Repeat ultrasound booked'. Then confirm all three workflows completed.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Update phone, email, address, insurance member id",
+            "calls": [
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "phone": "+1-650-555-0741"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "email": "maria.alvarez.refresh@example.com"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "address": "19 Birchwood Terrace, Foster City, CA 94404"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "insurance_member_id": "BSW-99X-6610284"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Atorvastatin (id 3): note, dosage, frequency, second note",
+            "calls": [
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "notes": "Tolerating well, no muscle aches reported."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "dosage": "20 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "frequency": "once daily at bedtime"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "notes": "Continue at current dose; recheck lipids in 3 months."
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Book bone-density scan, notify, book repeat ultrasound, notify",
+            "calls": [
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Bayview Imaging Center",
+                  "date": "2026-09-03",
+                  "time": "08:15"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Bayview Imaging Center",
+                  "subject": "Bone-density scan booked"
+                }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Bayview Imaging Center",
+                  "date": "2026-09-17",
+                  "time": "08:45"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Bayview Imaging Center",
+                  "subject": "Repeat ultrasound booked"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_6",
+      "prompt": "I have three separate multi-step errands for my account; they're independent and can be done in any order before you summarize. (1) Supplement workflow: add a new medication Coenzyme Q10, dosage 100 mg, frequency once daily, then add Probiotic Blend, dosage 10 billion CFU, frequency once daily before breakfast, then add Vitamin C, dosage 500 mg, frequency twice daily, then add Zinc Picolinate, dosage 25 mg, frequency once daily with food. (2) Metformin workflow: independently, request a refill for my Metformin prescription (id 2) sent to GoodHealth Pharmacy #214, then add a prescribing note to prescription id 2 reading 'Refill approved; 90-day supply requested.', then update prescription id 2 frequency to 'twice daily', then set prescription id 2 dosage to '500 mg'. (3) Primary-care-scheduling workflow: independently, book a wellness physical with Dr. Susan Patel on 2026-09-25 at 09:00, then send Dr. Susan Patel a secure message with subject 'Annual physical booked' confirming the visit, then book a separate vaccination visit with Dr. Susan Patel on 2026-10-02 at 13:45, then send Dr. Susan Patel a secure message with subject 'Vaccination visit booked'. Then confirm the supplements added, the Metformin refill, and the two new visits.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Add Coenzyme Q10, Probiotic Blend, Vitamin C, Zinc Picolinate",
+            "calls": [
+              {
+                "tool": "add_medication",
+                "args": {
+                  "name": "Coenzyme Q10",
+                  "dosage": "100 mg",
+                  "frequency": "once daily"
+                }
+              },
+              {
+                "tool": "add_medication",
+                "args": {
+                  "name": "Probiotic Blend",
+                  "dosage": "10 billion CFU",
+                  "frequency": "once daily before breakfast"
+                }
+              },
+              {
+                "tool": "add_medication",
+                "args": {
+                  "name": "Vitamin C",
+                  "dosage": "500 mg",
+                  "frequency": "twice daily"
+                }
+              },
+              {
+                "tool": "add_medication",
+                "args": {
+                  "name": "Zinc Picolinate",
+                  "dosage": "25 mg",
+                  "frequency": "once daily with food"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Metformin (id 2): refill, note, frequency, dosage",
+            "calls": [
+              {
+                "tool": "request_prescription_refill",
+                "args": {
+                  "prescription_id": 2,
+                  "pharmacy": "GoodHealth Pharmacy #214"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "notes": "Refill approved; 90-day supply requested."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "frequency": "twice daily"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 2,
+                  "dosage": "500 mg"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Book wellness physical, notify, book vaccination visit, notify",
+            "calls": [
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Susan Patel",
+                  "date": "2026-09-25",
+                  "time": "09:00"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Annual physical booked"
+                }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Susan Patel",
+                  "date": "2026-10-02",
+                  "time": "13:45"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Vaccination visit booked"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_7",
+      "prompt": "Please handle three unrelated multi-step requests in parallel, then give me one combined confirmation. (1) Emergency-contact workflow: update my emergency contact to my daughter Lucia Alvarez, relationship daughter, phone +1-650-555-0188, then send Dr. Susan Patel a secure message with subject 'New emergency contact on file' informing her of the change, then update the emergency contact relationship label to 'child', then send Dr. Susan Patel a secure message with subject 'Emergency contact details finalized'. (2) Lisinopril workflow: independently, update my Lisinopril prescription (id 1) by adding the prescribing note 'Home BP readings averaging 128/80.', then update its frequency to 'once daily in the morning', then set its dosage to '10 mg', then add a second prescribing note reading 'No dose change needed at this time.'. (3) Cardiology-scheduling workflow: independently, reschedule my hypertension review with Dr. Omar Reyes (appointment id 5002) to 2026-07-16 at 15:45, then send Dr. Omar Reyes a secure message with subject 'Hypertension review moved' confirming the new time, then book a separate stress-test appointment with Dr. Omar Reyes on 2026-08-27 at 10:15, then send Dr. Omar Reyes a secure message with subject 'Stress test scheduled'. Then confirm the emergency-contact change, the Lisinopril review, and the cardiology scheduling.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Update emergency contact, notify, clarify relationship, notify",
+            "calls": [
+              {
+                "tool": "update_emergency_contact",
+                "args": {
+                  "name": "Lucia Alvarez",
+                  "phone": "+1-650-555-0188"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "New emergency contact on file"
+                }
+              },
+              {
+                "tool": "update_emergency_contact",
+                "args": {
+                  "name": "Lucia Alvarez",
+                  "relationship": "child"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Emergency contact details finalized"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Lisinopril (id 1): note, frequency, dosage, second note",
+            "calls": [
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 1,
+                  "notes": "Home BP readings averaging 128/80."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 1,
+                  "frequency": "once daily in the morning"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 1,
+                  "dosage": "10 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 1,
+                  "notes": "No dose change needed at this time."
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Reschedule cardiology (id 5002), notify, book stress test, notify",
+            "calls": [
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": 5002,
+                  "date": "2026-07-16",
+                  "time": "15:45"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Omar Reyes",
+                  "subject": "Hypertension review moved"
+                }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-08-27",
+                  "time": "10:15"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Omar Reyes",
+                  "subject": "Stress test scheduled"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Three independent multi-step account tasks, all parallelizable, then a short summary. (1) Relocation workflow: I moved across town — update my mailing address to 76 Harbor View Drive, Redwood City, CA 94063, then update my mobile phone number to +1-650-555-0356, then update my email to maria.harbor@example.com, then update my insurance member id to BSW-99X-8845173. (2) Levothyroxine workflow: independently, update my Levothyroxine prescription (id 4) by adding the prescribing note 'Patient prefers morning dosing on empty stomach.', then set its dosage to '75 mcg', then update its frequency to 'once daily in the morning', then add a second prescribing note reading 'Recheck thyroid panel in 8 weeks.'. (3) Diabetes-scheduling workflow: independently, reschedule my diabetes follow-up with Dr. Susan Patel (appointment id 5001) to 2026-06-23 at 10:00, then send Dr. Susan Patel a secure message with subject 'Diabetes follow-up moved' confirming the new time, then book a separate diabetes-education class with Dr. Susan Patel on 2026-07-30 at 16:30, then send Dr. Susan Patel a secure message with subject 'Diabetes class booked'. Then confirm the new address and phone, the Levothyroxine notes, and the diabetes scheduling.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Update address, phone, email, insurance member id",
+            "calls": [
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "address": "76 Harbor View Drive, Redwood City, CA 94063"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "phone": "+1-650-555-0356"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "email": "maria.harbor@example.com"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "insurance_member_id": "BSW-99X-8845173"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Levothyroxine (id 4): note, dosage, frequency, second note",
+            "calls": [
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 4,
+                  "notes": "Patient prefers morning dosing on empty stomach."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 4,
+                  "dosage": "75 mcg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 4,
+                  "frequency": "once daily in the morning"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 4,
+                  "notes": "Recheck thyroid panel in 8 weeks."
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Reschedule diabetes follow-up (id 5001), notify, book class, notify",
+            "calls": [
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": 5001,
+                  "date": "2026-06-23",
+                  "time": "10:00"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Diabetes follow-up moved"
+                }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Susan Patel",
+                  "date": "2026-07-30",
+                  "time": "16:30"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Dr. Susan Patel",
+                  "subject": "Diabetes class booked"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_9",
+      "prompt": "I need three independent multi-step things handled, each on its own, then merged into a confirmation. (1) Insurance-update workflow: my coverage changed — update my insurance member id to BSW-99X-9923640, then update my email to maria.benefits@example.com so benefit notices reach me, then update my mailing address to 410 Seaport Boulevard, Redwood City, CA 94063, then update my mobile phone number to +1-650-555-0422. (2) Atorvastatin-refill workflow: independently, request a refill for my Atorvastatin prescription (id 3) sent to GoodHealth Pharmacy #214, then add a prescribing note to prescription id 3 reading 'Refill submitted; zero refills remained.', then set prescription id 3 dosage to '20 mg', then update prescription id 3 frequency to 'once daily at bedtime'. (3) Imaging-and-message workflow: independently, reschedule my thyroid ultrasound at Bayview Imaging Center (appointment id 5003) to 2026-07-01 at 12:30, then send Bayview Imaging Center a secure message with subject 'Ultrasound rescheduled' confirming attendance, then book a follow-up imaging review with Bayview Imaging Center on 2026-08-05 at 11:00, then send Bayview Imaging Center a secure message with subject 'Imaging review booked'. Then confirm the insurance update, the Atorvastatin refill, and the imaging schedule.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Update insurance member id, email, address, phone",
+            "calls": [
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "insurance_member_id": "BSW-99X-9923640"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "email": "maria.benefits@example.com"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "address": "410 Seaport Boulevard, Redwood City, CA 94063"
+                }
+              },
+              {
+                "tool": "update_patient_contact",
+                "args": {
+                  "phone": "+1-650-555-0422"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Atorvastatin (id 3): refill, note, dosage, frequency",
+            "calls": [
+              {
+                "tool": "request_prescription_refill",
+                "args": {
+                  "prescription_id": 3,
+                  "pharmacy": "GoodHealth Pharmacy #214"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "notes": "Refill submitted; zero refills remained."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "dosage": "20 mg"
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "frequency": "once daily at bedtime"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Reschedule ultrasound (id 5003), notify, book review, notify",
+            "calls": [
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": 5003,
+                  "date": "2026-07-01",
+                  "time": "12:30"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Bayview Imaging Center",
+                  "subject": "Ultrasound rescheduled"
+                }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Bayview Imaging Center",
+                  "date": "2026-08-05",
+                  "time": "11:00"
+                }
+              },
+              {
+                "tool": "send_message",
+                "args": {
+                  "recipient": "Bayview Imaging Center",
+                  "subject": "Imaging review booked"
                 }
               }
             ]

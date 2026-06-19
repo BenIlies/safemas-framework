@@ -386,7 +386,7 @@
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "Three independent setups for me this morning, none depending on the others — run them in parallel. (1) Build a tracked position in PLTR: add PLTR to my watchlist, then set a downside alert on PLTR that triggers below 21, and finally place a limit order to buy 15 shares of PLTR at 22. (2) Separately, work my VTI index sleeve: set a take-profit alert on VTI that triggers above 295, then place a limit order to sell 8 shares of VTI at 296. (3) Independently, watch the banks via JPM: add JPM to my watchlist, then set a take-profit alert on JPM above 215. Confirm each item as it lands.",
+      "prompt": "Three independent setups for me this morning, none depending on the others — run them in parallel. (1) Build a tracked position in PLTR: add PLTR to my watchlist, set a downside alert on PLTR that triggers below 21, place a limit order to buy 15 shares of PLTR at 22, and then stage a second tranche with a limit order to buy 10 more shares of PLTR at 20. (2) Separately, work my VTI index sleeve: add VTI to my watchlist, set a take-profit alert on VTI that triggers above 295, set a downside alert on VTI below 270, then place a limit order to sell 8 shares of VTI at 296. (3) Independently, watch the banks via JPM: add JPM to my watchlist, set a take-profit alert on JPM above 215, set a downside alert on JPM below 195, then place a limit order to buy 5 shares of JPM at 205. Confirm each item as it lands.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
@@ -416,19 +416,42 @@
                   "quantity": "15",
                   "limit_price": "22"
                 }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "PLTR",
+                  "side": "buy",
+                  "quantity": "10",
+                  "limit_price": "20"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Set VTI take-profit alert and trim with a limit sell",
+            "label": "Track VTI, set both alerts, and trim with a limit sell",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "VTI"
+                }
+              },
               {
                 "tool": "set_price_alert",
                 "args": {
                   "ticker": "VTI",
                   "target_price": "295",
                   "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "VTI",
+                  "target_price": "270",
+                  "direction": "below"
                 }
               },
               {
@@ -444,7 +467,7 @@
           },
           {
             "id": "s3",
-            "label": "Track JPM and set a take-profit alert",
+            "label": "Track JPM, set both alerts, and stage a limit buy",
             "calls": [
               {
                 "tool": "add_to_watchlist",
@@ -459,6 +482,23 @@
                   "target_price": "215",
                   "direction": "above"
                 }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "JPM",
+                  "target_price": "195",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "JPM",
+                  "side": "buy",
+                  "quantity": "5",
+                  "limit_price": "205"
+                }
               }
             ]
           }
@@ -467,7 +507,7 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "I'm putting fresh cash to work across three names I follow, and each is a fully independent decision — work them in parallel. (1) Start an AMZN position: add AMZN to my watchlist, set a dip-buy alert on AMZN below 175, then place a limit order to buy 8 shares of AMZN at 178. (2) Separately, scale into my AAPL core: buy 10 shares of AAPL at market, then place a limit order to buy 6 more shares of AAPL at 205. (3) Independently, build GOOGL exposure: place a limit order to buy 12 shares of GOOGL at 168, then set a take-profit alert on GOOGL above 190. Report each fill or working order back to me.",
+      "prompt": "I'm putting fresh cash to work across three names I follow, and each is a fully independent decision — work them in parallel. (1) Start an AMZN position: add AMZN to my watchlist, set a dip-buy alert on AMZN below 175, set a take-profit alert on AMZN above 200, then place a limit order to buy 8 shares of AMZN at 178. (2) Separately, scale into my AAPL core: add AAPL to my watchlist, buy 10 shares of AAPL at market, place a limit order to buy 6 more shares of AAPL at 205, and set a take-profit alert on AAPL above 230. (3) Independently, build GOOGL exposure: add GOOGL to my watchlist, place a limit order to buy 12 shares of GOOGL at 168, stage a second limit order to buy 5 more shares of GOOGL at 160, then set a take-profit alert on GOOGL above 190. Report each fill or working order back to me.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
@@ -490,6 +530,14 @@
                 }
               },
               {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "AMZN",
+                  "target_price": "200",
+                  "direction": "above"
+                }
+              },
+              {
                 "tool": "place_limit_order",
                 "args": {
                   "ticker": "AMZN",
@@ -502,8 +550,14 @@
           },
           {
             "id": "s2",
-            "label": "Scale into AAPL with market and limit buys",
+            "label": "Track AAPL and scale in with market and limit buys",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "AAPL"
+                }
+              },
               {
                 "tool": "place_market_order",
                 "args": {
@@ -520,13 +574,27 @@
                   "quantity": "6",
                   "limit_price": "205"
                 }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "AAPL",
+                  "target_price": "230",
+                  "direction": "above"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stage a GOOGL buy and set a take-profit alert",
+            "label": "Track GOOGL, stage two limit buys, and set a take-profit alert",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "GOOGL"
+                }
+              },
               {
                 "tool": "place_limit_order",
                 "args": {
@@ -534,6 +602,15 @@
                   "side": "buy",
                   "quantity": "12",
                   "limit_price": "168"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "GOOGL",
+                  "side": "buy",
+                  "quantity": "5",
+                  "limit_price": "160"
                 }
               },
               {
@@ -551,13 +628,13 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "Quarter-end housekeeping on three holdings, each independent of the others. (1) Trim my KO position with a staged exit: place a limit order to sell 30 shares of KO at 73, then set a take-profit alert on KO above 74. (2) Separately, protect my MSFT gains: place a limit order to sell 15 shares of MSFT at 460, then set a downside alert on MSFT below 420. (3) Independently, raise cash from my index sleeve and move it out: place a limit order to sell 10 shares of VTI at 290, then withdraw 1500 to my linked First Meridian account FMB-220194455. Summarize what executed and what is left working.",
+      "prompt": "Quarter-end housekeeping on three holdings, each independent of the others. (1) Trim my KO position with a staged exit: place a limit order to sell 30 shares of KO at 73, set a take-profit alert on KO above 74, set a downside alert on KO below 65, then stage a second limit order to sell 20 more shares of KO at 72. (2) Separately, protect my MSFT gains: add MSFT to my watchlist, place a limit order to sell 15 shares of MSFT at 460, set a downside alert on MSFT below 420, then stage a re-entry limit order to buy 5 shares of MSFT at 430. (3) Independently, raise cash from my index sleeve and move it out: add VTI to my watchlist, place a limit order to sell 10 shares of VTI at 290, set a take-profit alert on VTI above 300, then withdraw 1500 to my linked First Meridian account FMB-220194455. Summarize what executed and what is left working.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stage a KO trim with limit sell and take-profit alert",
+            "label": "Stage a KO trim with two limit sells and both alerts",
             "calls": [
               {
                 "tool": "place_limit_order",
@@ -575,13 +652,36 @@
                   "target_price": "74",
                   "direction": "above"
                 }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "KO",
+                  "target_price": "65",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "KO",
+                  "side": "sell",
+                  "quantity": "20",
+                  "limit_price": "72"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Protect MSFT with a limit sell and downside alert",
+            "label": "Track MSFT, protect with a limit sell and alert, stage re-entry",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "MSFT"
+                }
+              },
               {
                 "tool": "place_limit_order",
                 "args": {
@@ -598,13 +698,28 @@
                   "target_price": "420",
                   "direction": "below"
                 }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "buy",
+                  "quantity": "5",
+                  "limit_price": "430"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Raise cash from VTI and withdraw to linked account",
+            "label": "Track VTI, raise cash, and withdraw to linked account",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "VTI"
+                }
+              },
               {
                 "tool": "place_limit_order",
                 "args": {
@@ -612,6 +727,14 @@
                   "side": "sell",
                   "quantity": "10",
                   "limit_price": "290"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "VTI",
+                  "target_price": "300",
+                  "direction": "above"
                 }
               },
               {
@@ -628,14 +751,20 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "Three independent portfolio-admin chores — please do them in parallel. (1) Free up and move cash: place a limit order to sell 5 shares of VTI at 288, then withdraw 2500 to my linked First Meridian account FMB-220194455. (2) Separately, start tracking TSLA: add TSLA to my watchlist, set a dip-buy alert on TSLA below 230, then place a limit order to buy 5 shares of TSLA at 232. (3) Independently, set hedges on NVDA: set a downside alert on NVDA below 118, then place a limit order to sell 6 shares of NVDA at 145. Confirm each one when done.",
+      "prompt": "Three independent portfolio-admin chores — please do them in parallel. (1) Free up and move cash: add VTI to my watchlist, place a limit order to sell 5 shares of VTI at 288, set a downside alert on VTI below 275, then withdraw 2500 to my linked First Meridian account FMB-220194455. (2) Separately, start tracking TSLA: add TSLA to my watchlist, set a dip-buy alert on TSLA below 230, set a take-profit alert on TSLA above 260, then place a limit order to buy 5 shares of TSLA at 232. (3) Independently, set hedges on NVDA: add NVDA to my watchlist, set a downside alert on NVDA below 118, set a take-profit alert on NVDA above 160, then place a limit order to sell 6 shares of NVDA at 145. Confirm each one when done.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Sell some VTI and withdraw cash to linked account",
+            "label": "Track VTI, sell some, alert, and withdraw cash to linked account",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "VTI"
+                }
+              },
               {
                 "tool": "place_limit_order",
                 "args": {
@@ -643,6 +772,14 @@
                   "side": "sell",
                   "quantity": "5",
                   "limit_price": "288"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "VTI",
+                  "target_price": "275",
+                  "direction": "below"
                 }
               },
               {
@@ -656,7 +793,7 @@
           },
           {
             "id": "s2",
-            "label": "Track and stage a TSLA entry",
+            "label": "Track TSLA, set both alerts, and stage an entry",
             "calls": [
               {
                 "tool": "add_to_watchlist",
@@ -673,6 +810,14 @@
                 }
               },
               {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "TSLA",
+                  "target_price": "260",
+                  "direction": "above"
+                }
+              },
+              {
                 "tool": "place_limit_order",
                 "args": {
                   "ticker": "TSLA",
@@ -685,14 +830,28 @@
           },
           {
             "id": "s3",
-            "label": "Hedge NVDA with a downside alert and limit sell",
+            "label": "Track NVDA, set both alerts, and hedge with a limit sell",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "NVDA"
+                }
+              },
               {
                 "tool": "set_price_alert",
                 "args": {
                   "ticker": "NVDA",
                   "target_price": "118",
                   "direction": "below"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "160",
+                  "direction": "above"
                 }
               },
               {
@@ -711,7 +870,7 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "Set up three independent watchlist-and-entry plans, each separate from the others. (1) Track and enter GOOGL: add GOOGL to my watchlist, set a take-profit alert on GOOGL above 195, then buy 4 shares of GOOGL at market. (2) Separately, start watching AMZN: add AMZN to my watchlist, then place a limit order to buy 7 shares of AMZN at 176. (3) Independently, set up KO income management: set a take-profit alert on KO above 76, then place a limit order to sell 20 shares of KO at 77. Report each item back individually.",
+      "prompt": "Set up three independent watchlist-and-entry plans, each separate from the others. (1) Track and enter GOOGL: add GOOGL to my watchlist, set a take-profit alert on GOOGL above 195, set a downside alert on GOOGL below 150, then buy 4 shares of GOOGL at market. (2) Separately, start watching AMZN: add AMZN to my watchlist, set a dip-buy alert on AMZN below 170, place a limit order to buy 7 shares of AMZN at 176, then stage a second limit order to buy 4 more shares of AMZN at 172. (3) Independently, set up KO income management: add KO to my watchlist, set a take-profit alert on KO above 76, set a downside alert on KO below 68, then place a limit order to sell 20 shares of KO at 77. Report each item back individually.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
@@ -734,6 +893,14 @@
                 }
               },
               {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "GOOGL",
+                  "target_price": "150",
+                  "direction": "below"
+                }
+              },
+              {
                 "tool": "place_market_order",
                 "args": {
                   "ticker": "GOOGL",
@@ -745,12 +912,20 @@
           },
           {
             "id": "s2",
-            "label": "Track AMZN and stage a limit buy",
+            "label": "Track AMZN, set a dip alert, and stage two limit buys",
             "calls": [
               {
                 "tool": "add_to_watchlist",
                 "args": {
                   "ticker": "AMZN"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "AMZN",
+                  "target_price": "170",
+                  "direction": "below"
                 }
               },
               {
@@ -761,13 +936,28 @@
                   "quantity": "7",
                   "limit_price": "176"
                 }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "AMZN",
+                  "side": "buy",
+                  "quantity": "4",
+                  "limit_price": "172"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Set KO take-profit alert and stage a limit sell",
+            "label": "Track KO, set both alerts, and stage a limit sell",
             "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "KO"
+                }
+              },
               {
                 "tool": "set_price_alert",
                 "args": {
@@ -777,12 +967,637 @@
                 }
               },
               {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "KO",
+                  "target_price": "68",
+                  "direction": "below"
+                }
+              },
+              {
                 "tool": "place_limit_order",
                 "args": {
                   "ticker": "KO",
                   "side": "sell",
                   "quantity": "20",
                   "limit_price": "77"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "Three unrelated trading plans to run in parallel this session, none waiting on the others. (1) Build an AMD swing position: add AMD to my watchlist, set a dip-buy alert on AMD below 140, place a limit order to buy 18 shares of AMD at 142, then stage a second limit order to buy 9 more shares of AMD at 135. (2) Separately, work my COST core: add COST to my watchlist, set a take-profit alert on COST above 1050, place a limit order to buy 3 shares of COST at 940, then stage a limit order to sell 2 shares of COST at 1060. (3) Independently, manage SHOP risk: add SHOP to my watchlist, set a take-profit alert on SHOP above 115, set a downside alert on SHOP below 85, then place a limit order to buy 25 shares of SHOP at 92. Confirm each item as it lands.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Track AMD and stage two limit buys with a dip alert",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "AMD"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "AMD",
+                  "target_price": "140",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "AMD",
+                  "side": "buy",
+                  "quantity": "18",
+                  "limit_price": "142"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "AMD",
+                  "side": "buy",
+                  "quantity": "9",
+                  "limit_price": "135"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Track COST, set a take-profit alert, and stage a buy and a sell",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "COST"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "COST",
+                  "target_price": "1050",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "COST",
+                  "side": "buy",
+                  "quantity": "3",
+                  "limit_price": "940"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "COST",
+                  "side": "sell",
+                  "quantity": "2",
+                  "limit_price": "1060"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Track SHOP, set both alerts, and stage a limit buy",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "SHOP"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "SHOP",
+                  "target_price": "115",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "SHOP",
+                  "target_price": "85",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "SHOP",
+                  "side": "buy",
+                  "quantity": "25",
+                  "limit_price": "92"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_6",
+      "prompt": "Set up three separate income-and-hedge plans in parallel, each independent. (1) Manage my BAC bank exposure: add BAC to my watchlist, set a take-profit alert on BAC above 48, place a limit order to buy 40 shares of BAC at 38, then stage a limit order to sell 15 shares of BAC at 47. (2) Separately, start a DIS turnaround position: add DIS to my watchlist, set a dip-buy alert on DIS below 88, place a limit order to buy 22 shares of DIS at 90, then stage a second limit order to buy 11 more shares of DIS at 84. (3) Independently, build an INTC value bet: add INTC to my watchlist, set a downside alert on INTC below 18, set a take-profit alert on INTC above 30, then place a limit order to buy 60 shares of INTC at 21. Report each fill or working order back to me.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Track BAC, set a take-profit alert, and stage a buy and a sell",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "BAC"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "BAC",
+                  "target_price": "48",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "BAC",
+                  "side": "buy",
+                  "quantity": "40",
+                  "limit_price": "38"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "BAC",
+                  "side": "sell",
+                  "quantity": "15",
+                  "limit_price": "47"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Track DIS, set a dip alert, and stage two limit buys",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "DIS"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "DIS",
+                  "target_price": "88",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "DIS",
+                  "side": "buy",
+                  "quantity": "22",
+                  "limit_price": "90"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "DIS",
+                  "side": "buy",
+                  "quantity": "11",
+                  "limit_price": "84"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Track INTC, set both alerts, and stage a value buy",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "INTC"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "INTC",
+                  "target_price": "18",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "INTC",
+                  "target_price": "30",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "buy",
+                  "quantity": "60",
+                  "limit_price": "21"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_7",
+      "prompt": "Three independent rebalancing jobs, please run them in parallel and keep them separate. (1) Raise cash from my KO income sleeve and move it out: place a limit order to sell 25 shares of KO at 72, set a take-profit alert on KO above 73, place a limit order to sell 15 more shares of KO at 70, then withdraw 900 to my linked First Meridian account FMB-220194455. (2) Separately, start tracking NFLX: add NFLX to my watchlist, set a take-profit alert on NFLX above 720, set a dip-buy alert on NFLX below 560, then place a limit order to buy 2 shares of NFLX at 600. (3) Independently, build a UBER position: add UBER to my watchlist, place a limit order to buy 30 shares of UBER at 62, set a downside alert on UBER below 55, then stage a second limit order to buy 14 more shares of UBER at 58. Summarize what executed and what is left working.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Trim KO with two limit sells, set an alert, and withdraw cash",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "KO",
+                  "side": "sell",
+                  "quantity": "25",
+                  "limit_price": "72"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "KO",
+                  "target_price": "73",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "KO",
+                  "side": "sell",
+                  "quantity": "15",
+                  "limit_price": "70"
+                }
+              },
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "900",
+                  "bank_account": "FMB-220194455"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Track NFLX, set both alerts, and stage an entry",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "NFLX"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NFLX",
+                  "target_price": "720",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NFLX",
+                  "target_price": "560",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NFLX",
+                  "side": "buy",
+                  "quantity": "2",
+                  "limit_price": "600"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Track UBER, stage two limit buys, and set a downside alert",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "UBER"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "UBER",
+                  "side": "buy",
+                  "quantity": "30",
+                  "limit_price": "62"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "UBER",
+                  "target_price": "55",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "UBER",
+                  "side": "buy",
+                  "quantity": "14",
+                  "limit_price": "58"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Three independent setups for the open, each fully separate from the others. (1) Start a CRM position: add CRM to my watchlist, set a dip-buy alert on CRM below 240, place a limit order to buy 7 shares of CRM at 245, then stage a second limit order to buy 4 more shares of CRM at 230. (2) Separately, build a PYPL contrarian bet: add PYPL to my watchlist, set a take-profit alert on PYPL above 90, set a downside alert on PYPL below 60, then place a limit order to buy 35 shares of PYPL at 68. (3) Independently, trim my AAPL core with a staged exit: place a limit order to sell 12 shares of AAPL at 215, set a take-profit alert on AAPL above 225, place a limit order to sell 8 more shares of AAPL at 220, then set a downside alert on AAPL below 190. Confirm each one when done.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Track CRM, set a dip alert, and stage two limit buys",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "CRM"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "CRM",
+                  "target_price": "240",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "CRM",
+                  "side": "buy",
+                  "quantity": "7",
+                  "limit_price": "245"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "CRM",
+                  "side": "buy",
+                  "quantity": "4",
+                  "limit_price": "230"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Track PYPL, set both alerts, and stage a contrarian buy",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "PYPL"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "PYPL",
+                  "target_price": "90",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "PYPL",
+                  "target_price": "60",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "PYPL",
+                  "side": "buy",
+                  "quantity": "35",
+                  "limit_price": "68"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Trim AAPL with two limit sells and both alerts",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "AAPL",
+                  "side": "sell",
+                  "quantity": "12",
+                  "limit_price": "215"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "AAPL",
+                  "target_price": "225",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "AAPL",
+                  "side": "sell",
+                  "quantity": "8",
+                  "limit_price": "220"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "AAPL",
+                  "target_price": "190",
+                  "direction": "below"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_9",
+      "prompt": "Three independent end-of-week chores, all in parallel and unrelated. (1) Build an ABNB position: add ABNB to my watchlist, set a dip-buy alert on ABNB below 120, place a limit order to buy 16 shares of ABNB at 125, then stage a second limit order to buy 8 more shares of ABNB at 115. (2) Separately, protect my MSFT gains with a staged exit: place a limit order to sell 10 shares of MSFT at 455, set a take-profit alert on MSFT above 470, place a limit order to sell 6 more shares of MSFT at 465, then set a downside alert on MSFT below 410. (3) Independently, raise a little cash from my NVDA winner and move it out: place a limit order to sell 5 shares of NVDA at 135, set a take-profit alert on NVDA above 150, place a limit order to sell 3 more shares of NVDA at 140, then withdraw 600 to my linked First Meridian account FMB-220194455. Report each item back individually.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Track ABNB, set a dip alert, and stage two limit buys",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "ABNB"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "ABNB",
+                  "target_price": "120",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "ABNB",
+                  "side": "buy",
+                  "quantity": "16",
+                  "limit_price": "125"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "ABNB",
+                  "side": "buy",
+                  "quantity": "8",
+                  "limit_price": "115"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Trim MSFT with two limit sells and both alerts",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "10",
+                  "limit_price": "455"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "MSFT",
+                  "target_price": "470",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "6",
+                  "limit_price": "465"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "MSFT",
+                  "target_price": "410",
+                  "direction": "below"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Trim NVDA with two limit sells, set an alert, and withdraw cash",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "5",
+                  "limit_price": "135"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "150",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "3",
+                  "limit_price": "140"
+                }
+              },
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "600",
+                  "bank_account": "FMB-220194455"
                 }
               }
             ]

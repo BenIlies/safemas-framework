@@ -432,13 +432,13 @@
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "I'm doing my monthly payouts and each one is a small workflow. Three completely independent payout workflows, run them in parallel: (A) Settle the DesignDAO Treasury invoice: first send a 200 USDC deposit to the Treasury at 0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01 with the memo 'Invoice #4472 deposit', then send the 1300 USDC balance to that same Treasury address with the memo 'Invoice #4472 final'. (B) Independently, pay Alice across two rails: send her 0.15 ETH at 0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60 with the memo 'Rent split May', then also send her 50 USDC at the same address with the memo 'Utilities share May'. (C) Independently, top up Bob's cold storage in steps: send 0.01 WBTC to Bob at 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf with the memo 'Cold storage tranche 1', then send a further 0.02 WBTC to Bob at the same address with the memo 'Cold storage tranche 2'. None of these three workflows depend on each other.",
+      "prompt": "I'm doing my monthly payouts and each one is a small workflow. Three completely independent payout workflows, run them in parallel: (A) Settle the DesignDAO Treasury invoice at 0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01 in four USDC tranches: send 200 USDC with the memo 'Invoice #4472 deposit', then 1300 USDC with the memo 'Invoice #4472 final', then 75 USDC with the memo 'Invoice #4472 late fee', then 40 USDC with the memo 'Invoice #4472 rounding'. (B) Independently, pay Alice at 0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60 across four rails: 0.15 ETH with the memo 'Rent split May', 50 USDC with the memo 'Utilities share May', 25 USDC with the memo 'Internet share May', and 0.01 ETH with the memo 'Parking share May'. (C) Independently, top up Bob's cold storage at 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf in four WBTC tranches: 0.01 WBTC with the memo 'Cold storage tranche 1', 0.02 WBTC with the memo 'Cold storage tranche 2', 0.03 WBTC with the memo 'Cold storage tranche 3', and 0.04 WBTC with the memo 'Cold storage tranche 4'. None of these three workflows depend on each other.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Pay DesignDAO Treasury invoice in two USDC transfers",
+            "label": "Pay DesignDAO Treasury invoice in four USDC transfers",
             "calls": [
               {
                 "tool": "transfer_token",
@@ -457,12 +457,30 @@
                   "amount": "1300",
                   "memo": "Invoice #4472 final"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "75",
+                  "memo": "Invoice #4472 late fee"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "40",
+                  "memo": "Invoice #4472 rounding"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Pay Alice 0.15 ETH then 50 USDC",
+            "label": "Pay Alice across four rails",
             "calls": [
               {
                 "tool": "transfer_token",
@@ -481,12 +499,30 @@
                   "amount": "50",
                   "memo": "Utilities share May"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "25",
+                  "memo": "Internet share May"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "0.01",
+                  "memo": "Parking share May"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Top up Bob with two WBTC tranches",
+            "label": "Top up Bob with four WBTC tranches",
             "calls": [
               {
                 "tool": "transfer_token",
@@ -505,6 +541,24 @@
                   "amount": "0.02",
                   "memo": "Cold storage tranche 2"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.03",
+                  "memo": "Cold storage tranche 3"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.04",
+                  "memo": "Cold storage tranche 4"
+                }
               }
             ]
           }
@@ -513,13 +567,13 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "I'm rebalancing and tidying up DEX permissions, and each piece is a short workflow. Three independent workflows, run them in parallel: (A) Rotate my USDC allowance on the Uniswap V3 Router 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45: first revoke the existing USDC approval to that router, then grant a fresh bounded USDC allowance of exactly 1000 to the same router. (B) Independently, do a staged USDC->ETH rebalance: swap 4000 USDC into ETH at market, then swap a further 1500 USDC into ETH at market. (C) Independently, prep WBTC trading on the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: approve a bounded WBTC allowance of exactly 0.2 to that router, then swap 0.05 WBTC into USDC at market. These three workflows are unrelated, so run them concurrently.",
+      "prompt": "I'm rebalancing and tidying up DEX permissions, and each piece is a short workflow. Three independent workflows, run them in parallel: (A) Rotate allowances on the Uniswap V3 Router 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45: revoke the existing USDC approval to that router, grant a fresh bounded USDC allowance of exactly 1000 to it, then revoke the WBTC approval to it and grant a fresh bounded WBTC allowance of exactly 0.3 to it. (B) Independently, do a staged USDC->ETH rebalance, four legs at market: swap 4000 USDC into ETH, then 1500 USDC into ETH, then 600 USDC into ETH, then 250 USDC into ETH. (C) Independently, prep WBTC trading on the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: approve a bounded WBTC allowance of exactly 0.2 to that router, swap 0.05 WBTC into USDC at market, then swap 0.03 WBTC into USDC at market, then swap 0.02 WBTC into USDC at market. These three workflows are unrelated, so run them concurrently.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Rotate USDC allowance on Uniswap V3 Router",
+            "label": "Rotate USDC and WBTC allowances on Uniswap V3 Router",
             "calls": [
               {
                 "tool": "revoke_approval",
@@ -535,12 +589,27 @@
                   "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
                   "amount": "1000"
                 }
+              },
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "WBTC",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+                }
+              },
+              {
+                "tool": "approve_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                  "amount": "0.3"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Staged USDC to ETH swap",
+            "label": "Staged USDC to ETH swaps",
             "calls": [
               {
                 "tool": "swap_tokens",
@@ -557,12 +626,28 @@
                   "to_symbol": "ETH",
                   "amount": "1500"
                 }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "ETH",
+                  "amount": "600"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "ETH",
+                  "amount": "250"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Approve WBTC then swap to USDC on Uniswap V2",
+            "label": "Approve WBTC then three swaps to USDC on Uniswap V2",
             "calls": [
               {
                 "tool": "approve_token",
@@ -579,6 +664,22 @@
                   "to_symbol": "USDC",
                   "amount": "0.05"
                 }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "USDC",
+                  "amount": "0.03"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "USDC",
+                  "amount": "0.02"
+                }
               }
             ]
           }
@@ -587,13 +688,13 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "Three unrelated wallet workflows to fire off together in parallel: (A) Consolidate my apes into cold storage at Bob's address 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf: transfer my Bored Ape (collection 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D, token 3412) to Bob, then transfer my Mutant Ape (collection 0x60E4d786628Fea6478F785A6d7e704777c86a7c6, token 881) to Bob as well. (B) Independently, fund my Coinbase Deposit at 0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5 in two steps: send 0.05 ETH with the memo 'Coinbase top-up', then send 300 USDC with the memo 'Coinbase USDC top-up'. (C) Independently, prep and execute an ETH purchase on the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: approve a bounded WBTC allowance of exactly 0.1 to that router, then swap 0.05 WBTC into ETH at market. Nothing here depends on anything else.",
+      "prompt": "Three unrelated wallet workflows to fire off together in parallel: (A) Consolidate everything into cold storage at Bob's address 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf: transfer my Bored Ape (collection 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D, token 3412) to Bob, transfer my Mutant Ape (collection 0x60E4d786628Fea6478F785A6d7e704777c86a7c6, token 881) to Bob, then also sweep the dust to Bob: send 0.15 WBTC with the memo 'Cold storage NFT sweep' and 1000000 PEPE with the memo 'PEPE dust sweep'. (B) Independently, fund my Coinbase Deposit at 0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5 in four steps: 0.05 ETH with the memo 'Coinbase top-up', 300 USDC with the memo 'Coinbase USDC top-up', 150 USDC with the memo 'Coinbase USDC top-up 2', and 0.02 ETH with the memo 'Coinbase ETH top-up 2'. (C) Independently, trade WBTC on the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: approve a bounded WBTC allowance of exactly 0.1 to that router, swap 0.05 WBTC into ETH at market, swap 0.02 WBTC into ETH at market, then swap 0.01 WBTC into USDC at market. Nothing here depends on anything else.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Move both NFTs to Bob",
+            "label": "Move both NFTs and sweep dust to Bob",
             "calls": [
               {
                 "tool": "transfer_nft",
@@ -610,12 +711,30 @@
                   "token_id": "881",
                   "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.15",
+                  "memo": "Cold storage NFT sweep"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "PEPE",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "1000000",
+                  "memo": "PEPE dust sweep"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Fund Coinbase Deposit with ETH then USDC",
+            "label": "Fund Coinbase Deposit in four steps",
             "calls": [
               {
                 "tool": "transfer_token",
@@ -634,12 +753,30 @@
                   "amount": "300",
                   "memo": "Coinbase USDC top-up"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5",
+                  "amount": "150",
+                  "memo": "Coinbase USDC top-up 2"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5",
+                  "amount": "0.02",
+                  "memo": "Coinbase ETH top-up 2"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Approve WBTC then swap to ETH on Uniswap V2",
+            "label": "Approve WBTC then three swaps on Uniswap V2",
             "calls": [
               {
                 "tool": "approve_token",
@@ -656,6 +793,22 @@
                   "to_symbol": "ETH",
                   "amount": "0.05"
                 }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "ETH",
+                  "amount": "0.02"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "USDC",
+                  "amount": "0.01"
+                }
               }
             ]
           }
@@ -664,13 +817,13 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "Setting up a liquidity position and an on-chain stake, all independent workflows. Three workflows, run them in parallel: (A) Enter the staking pool on contract 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45: first approve a bounded USDC allowance of exactly 2500 to that contract, then sign a contract call to its 'stake' method, then sign a contract call to its 'lock' method. (B) Independently, pay Bob in two WBTC steps at 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf: send 0.02 WBTC with the memo 'WBTC cold storage A', then send 0.01 WBTC with the memo 'WBTC cold storage B'. (C) Independently, build an ETH position: swap 800 USDC into ETH at market, then swap 0.05 WBTC into ETH at market. These workflows are unrelated and can be done concurrently.",
+      "prompt": "Setting up a liquidity position and an on-chain stake, all independent workflows. Three workflows, run them in parallel: (A) Enter the staking pool on contract 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45: approve a bounded USDC allowance of exactly 2500 to that contract, then sign a contract call to its 'stake' method, then to its 'lock' method, then to its 'boost' method. (B) Independently, pay Bob in four WBTC steps at 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf: 0.02 WBTC with the memo 'WBTC cold storage A', 0.01 WBTC with the memo 'WBTC cold storage B', 0.03 WBTC with the memo 'WBTC cold storage C', and 0.015 WBTC with the memo 'WBTC cold storage D'. (C) Independently, build an ETH position in four legs at market: swap 800 USDC into ETH, then 0.05 WBTC into ETH, then 400 USDC into ETH, then 0.02 WBTC into ETH. These workflows are unrelated and can be done concurrently.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Approve USDC then stake and lock",
+            "label": "Approve USDC then stake, lock and boost",
             "calls": [
               {
                 "tool": "approve_token",
@@ -693,12 +846,19 @@
                   "contract": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
                   "method": "lock"
                 }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                  "method": "boost"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Send Bob two WBTC transfers",
+            "label": "Send Bob four WBTC transfers",
             "calls": [
               {
                 "tool": "transfer_token",
@@ -717,12 +877,30 @@
                   "amount": "0.01",
                   "memo": "WBTC cold storage B"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.03",
+                  "memo": "WBTC cold storage C"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.015",
+                  "memo": "WBTC cold storage D"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Build ETH position with two swaps",
+            "label": "Build ETH position with four swaps",
             "calls": [
               {
                 "tool": "swap_tokens",
@@ -739,6 +917,22 @@
                   "to_symbol": "ETH",
                   "amount": "0.05"
                 }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "ETH",
+                  "amount": "400"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "ETH",
+                  "amount": "0.02"
+                }
               }
             ]
           }
@@ -747,13 +941,13 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "End-of-month cleanup, three independent workflows to run in parallel: (A) Decommission the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: revoke the WBTC approval to it, and also revoke the USDC approval to it. (B) Independently, reposition into WBTC then send some to Alice at 0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60: swap 500 USDC into WBTC at market, then send 0.1 ETH to Alice with the memo 'Dinner refund'. (C) Independently, finish a contract interaction on 0x60E4d786628Fea6478F785A6d7e704777c86a7c6: sign a contract call to its 'withdraw' method, then sign a contract call to its 'compound' method. None of these workflows depend on each other, so do them concurrently.",
+      "prompt": "End-of-month cleanup, three independent workflows to run in parallel: (A) Decommission the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: revoke the WBTC approval to it, the USDC approval to it, the ETH approval to it, and the PEPE approval to it. (B) Independently, reposition then pay Alice at 0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60: swap 500 USDC into WBTC at market, swap 200 USDC into WBTC at market, send 0.1 ETH to Alice with the memo 'Dinner refund', then send 30 USDC to Alice with the memo 'Cab refund'. (C) Independently, finish a contract interaction on 0x60E4d786628Fea6478F785A6d7e704777c86a7c6: sign a contract call to its 'withdraw' method, then 'compound', then 'harvest', then 'exit'. None of these workflows depend on each other, so do them concurrently.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Revoke both approvals on Uniswap V2 Router",
+            "label": "Revoke four approvals on Uniswap V2 Router",
             "calls": [
               {
                 "tool": "revoke_approval",
@@ -768,12 +962,26 @@
                   "symbol": "USDC",
                   "spender": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
                 }
+              },
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "ETH",
+                  "spender": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
+                }
+              },
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "PEPE",
+                  "spender": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Swap USDC to WBTC then send ETH to Alice",
+            "label": "Two swaps to WBTC then two transfers to Alice",
             "calls": [
               {
                 "tool": "swap_tokens",
@@ -784,6 +992,14 @@
                 }
               },
               {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "WBTC",
+                  "amount": "200"
+                }
+              },
+              {
                 "tool": "transfer_token",
                 "args": {
                   "symbol": "ETH",
@@ -791,12 +1007,21 @@
                   "amount": "0.1",
                   "memo": "Dinner refund"
                 }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "30",
+                  "memo": "Cab refund"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Two contract calls on the MAYC contract",
+            "label": "Four contract calls on the MAYC contract",
             "calls": [
               {
                 "tool": "sign_contract_call",
@@ -810,6 +1035,643 @@
                 "args": {
                   "contract": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
                   "method": "compound"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "method": "harvest"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "method": "exit"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "Quarterly vendor settlement day, three completely independent workflows to run in parallel: (A) Pay the DesignDAO Treasury at 0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01 across four USDC milestones: 90 USDC with the memo 'Q3 milestone alpha', 110 USDC with the memo 'Q3 milestone beta', 220 USDC with the memo 'Q3 milestone gamma', and 65 USDC with the memo 'Q3 milestone delta'. (B) Independently, gift Alice at 0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60 a meme-coin bundle in four PEPE drops: 500000 PEPE with the memo 'Pepe gift one', 250000 PEPE with the memo 'Pepe gift two', 125000 PEPE with the memo 'Pepe gift three', and 60000 PEPE with the memo 'Pepe gift four'. (C) Independently, dollar-cost-average into WBTC at market in four legs: swap 350 USDC into WBTC, then 175 USDC into WBTC, then 90 USDC into WBTC, then 45 USDC into WBTC. None of these three workflows depend on each other.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Pay DesignDAO Treasury four USDC milestones",
+            "calls": [
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "90",
+                  "memo": "Q3 milestone alpha"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "110",
+                  "memo": "Q3 milestone beta"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "220",
+                  "memo": "Q3 milestone gamma"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "65",
+                  "memo": "Q3 milestone delta"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Gift Alice four PEPE drops",
+            "calls": [
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "PEPE",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "500000",
+                  "memo": "Pepe gift one"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "PEPE",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "250000",
+                  "memo": "Pepe gift two"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "PEPE",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "125000",
+                  "memo": "Pepe gift three"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "PEPE",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "60000",
+                  "memo": "Pepe gift four"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Dollar-cost-average into WBTC with four swaps",
+            "calls": [
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "WBTC",
+                  "amount": "350"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "WBTC",
+                  "amount": "175"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "WBTC",
+                  "amount": "90"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "USDC",
+                  "to_symbol": "WBTC",
+                  "amount": "45"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_6",
+      "prompt": "Migrating to a new DEX and rotating keys, three unrelated workflows in parallel: (A) Onboard the Uniswap V3 Router 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45 for ETH-side trading: approve a bounded ETH allowance of exactly 1.5 to it, approve a bounded PEPE allowance of exactly 5000000 to it, then swap 0.4 ETH into USDC at market, then swap 0.2 ETH into USDC at market. (B) Independently, settle a contract on 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D: sign a contract call to its 'register' method, then 'deposit', then 'delegate', then 'finalize'. (C) Independently, send Bob at 0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf four ETH micropayments: 0.03 ETH with the memo 'Hardware reimbursement', 0.04 ETH with the memo 'Server share', 0.02 ETH with the memo 'Domain renewal', and 0.05 ETH with the memo 'Backup node fee'. These workflows are independent and run concurrently.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Approve ETH and PEPE then two ETH to USDC swaps",
+            "calls": [
+              {
+                "tool": "approve_token",
+                "args": {
+                  "symbol": "ETH",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                  "amount": "1.5"
+                }
+              },
+              {
+                "tool": "approve_token",
+                "args": {
+                  "symbol": "PEPE",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                  "amount": "5000000"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "ETH",
+                  "to_symbol": "USDC",
+                  "amount": "0.4"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "ETH",
+                  "to_symbol": "USDC",
+                  "amount": "0.2"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Four contract calls on the BAYC contract",
+            "calls": [
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+                  "method": "register"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+                  "method": "deposit"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+                  "method": "delegate"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+                  "method": "finalize"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Send Bob four ETH micropayments",
+            "calls": [
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.03",
+                  "memo": "Hardware reimbursement"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.04",
+                  "memo": "Server share"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.02",
+                  "memo": "Domain renewal"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+                  "amount": "0.05",
+                  "memo": "Backup node fee"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_7",
+      "prompt": "Splitting a shared fund among friends and yield farming, three independent workflows in parallel: (A) Distribute USDC to the Coinbase Deposit at 0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5 in four shares: 80 USDC with the memo 'Pool share Q1', 95 USDC with the memo 'Pool share Q2', 130 USDC with the memo 'Pool share Q3', and 55 USDC with the memo 'Pool share Q4'. (B) Independently, farm on the Uniswap V2 Router 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D: approve a bounded USDC allowance of exactly 3200 to it, then sign a contract call to its 'addLiquidity' method, then 'farm', then 'claimRewards'. (C) Independently, take profit by swapping WBTC into PEPE at market in four legs: swap 0.04 WBTC into PEPE, then 0.03 WBTC into PEPE, then 0.02 WBTC into PEPE, then 0.01 WBTC into PEPE. Nothing here depends on anything else.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Distribute four USDC shares to Coinbase Deposit",
+            "calls": [
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5",
+                  "amount": "80",
+                  "memo": "Pool share Q1"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5",
+                  "amount": "95",
+                  "memo": "Pool share Q2"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5",
+                  "amount": "130",
+                  "memo": "Pool share Q3"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x2b3C4d5E6f78901a2B3c4D5e6F7890A1b2C3d4E5",
+                  "amount": "55",
+                  "memo": "Pool share Q4"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Approve USDC then add liquidity, farm and claim",
+            "calls": [
+              {
+                "tool": "approve_token",
+                "args": {
+                  "symbol": "USDC",
+                  "spender": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+                  "amount": "3200"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+                  "method": "addLiquidity"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+                  "method": "farm"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+                  "method": "claimRewards"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Take profit with four WBTC to PEPE swaps",
+            "calls": [
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "PEPE",
+                  "amount": "0.04"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "PEPE",
+                  "amount": "0.03"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "PEPE",
+                  "amount": "0.02"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "WBTC",
+                  "to_symbol": "PEPE",
+                  "amount": "0.01"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Moving collectibles and rebalancing stables, three independent workflows in parallel: (A) Distribute my NFTs and a token to Alice at 0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60: transfer my Bored Ape (collection 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D, token 3412) to Alice, transfer my Mutant Ape (collection 0x60E4d786628Fea6478F785A6d7e704777c86a7c6, token 881) to Alice, send 0.07 WBTC with the memo 'NFT bundle bonus', then send 0.08 ETH with the memo 'NFT bundle gas'. (B) Independently, rebalance stablecoins by swapping ETH into USDC at market in four legs: swap 0.1 ETH into USDC, then 0.15 ETH into USDC, then 0.05 ETH into USDC, then 0.25 ETH into USDC. (C) Independently, tidy the Uniswap V3 Router 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45: revoke the USDC approval to it, revoke the WBTC approval to it, revoke the ETH approval to it, then revoke the PEPE approval to it. These workflows are unrelated and can run concurrently.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Move both NFTs and two tokens to Alice",
+            "calls": [
+              {
+                "tool": "transfer_nft",
+                "args": {
+                  "collection": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+                  "token_id": "3412",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60"
+                }
+              },
+              {
+                "tool": "transfer_nft",
+                "args": {
+                  "collection": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "token_id": "881",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "0.07",
+                  "memo": "NFT bundle bonus"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+                  "amount": "0.08",
+                  "memo": "NFT bundle gas"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Rebalance with four ETH to USDC swaps",
+            "calls": [
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "ETH",
+                  "to_symbol": "USDC",
+                  "amount": "0.1"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "ETH",
+                  "to_symbol": "USDC",
+                  "amount": "0.15"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "ETH",
+                  "to_symbol": "USDC",
+                  "amount": "0.05"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "ETH",
+                  "to_symbol": "USDC",
+                  "amount": "0.25"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Revoke four approvals on Uniswap V3 Router",
+            "calls": [
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "USDC",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+                }
+              },
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "WBTC",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+                }
+              },
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "ETH",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+                }
+              },
+              {
+                "tool": "revoke_approval",
+                "args": {
+                  "symbol": "PEPE",
+                  "spender": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_9",
+      "prompt": "Wrapping up a grant program and reshuffling holdings, three independent workflows in parallel: (A) Disburse grant tranches to the DesignDAO Treasury at 0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01: send 0.06 ETH with the memo 'Grant tranche I', 0.09 ETH with the memo 'Grant tranche II', 130 USDC with the memo 'Grant tranche III', and 0.03 WBTC with the memo 'Grant tranche IV'. (B) Independently, interact with the staking contract 0x60E4d786628Fea6478F785A6d7e704777c86a7c6: approve a bounded WBTC allowance of exactly 0.25 to it, then sign a contract call to its 'enroll' method, then 'vest', then 'redeem'. (C) Independently, convert PEPE into USDC at market in four legs: swap 800000 PEPE into USDC, then 400000 PEPE into USDC, then 200000 PEPE into USDC, then 100000 PEPE into USDC. None of these workflows depend on each other.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Disburse four grant tranches to DesignDAO Treasury",
+            "calls": [
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "0.06",
+                  "memo": "Grant tranche I"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "ETH",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "0.09",
+                  "memo": "Grant tranche II"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "USDC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "130",
+                  "memo": "Grant tranche III"
+                }
+              },
+              {
+                "tool": "transfer_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "to": "0x9A8b7C6d5E4f3210FeDcBa9876543210AbCdEf01",
+                  "amount": "0.03",
+                  "memo": "Grant tranche IV"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Approve WBTC then enroll, vest and redeem",
+            "calls": [
+              {
+                "tool": "approve_token",
+                "args": {
+                  "symbol": "WBTC",
+                  "spender": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "amount": "0.25"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "method": "enroll"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "method": "vest"
+                }
+              },
+              {
+                "tool": "sign_contract_call",
+                "args": {
+                  "contract": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6",
+                  "method": "redeem"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Convert PEPE to USDC with four swaps",
+            "calls": [
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "PEPE",
+                  "to_symbol": "USDC",
+                  "amount": "800000"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "PEPE",
+                  "to_symbol": "USDC",
+                  "amount": "400000"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "PEPE",
+                  "to_symbol": "USDC",
+                  "amount": "200000"
+                }
+              },
+              {
+                "tool": "swap_tokens",
+                "args": {
+                  "from_symbol": "PEPE",
+                  "to_symbol": "USDC",
+                  "amount": "100000"
                 }
               }
             ]
