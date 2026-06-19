@@ -597,16 +597,25 @@ class Engine:
         return output
 
     def chosen_edges(self, agent, output: str, st: RunState) -> list:
-        # An EXIT agent's later activations are TERMINAL: when an orchestrator that is
-        # also the exit re-runs to SYNTHESISE its sub-agents' reports, that output is
-        # the final answer — it must NOT re-dispatch (re-assigning would make the
-        # sub-agents redo work they already did). Its first activation (acting as the
-        # entry) still dispatches normally.
-        if agent.id in self.exit_ids and st["runs"].get(agent.id, 0) > 1:
-            return []
         outs = self.out_channels.get(agent.id, [])
         if not outs:
             return []
+
+        # A re-running EXIT agent that is ALSO a dispatcher (an orchestrator) carries
+        # the multi-round coordination loop: each re-activation reviews the round's
+        # reports and re-tasks its sub-agents for the NEXT round. It may continue ONLY
+        # along its non-exhausted LOOP edges (which are bounded by max_iters / the
+        # SAFEMAS_MAX_ROUNDS budget — r orchestration rounds for centralized/hybrid),
+        # never along FORWARD edges (re-firing a plain forward edge would dispatch
+        # unbounded fresh work). When no loop edge can still fire, the round budget is
+        # spent and this activation's output is the final synthesis. Its FIRST
+        # activation (acting as the entry) dispatches normally. Exit agents with no
+        # outbound edges (a plain aggregator / vote sink) fall through the `not outs`
+        # guard above and terminate after one activation, exactly as before.
+        if agent.id in self.exit_ids and st["runs"].get(agent.id, 0) > 1:
+            outs = [ch for ch in outs if ch.loop]
+            if not outs:
+                return []
 
         # ROUTER — only `when=` guards make an agent choose ONE branch. Take the first
         # guard whose phrase matches the output, else the first plain forward as the
