@@ -408,6 +408,13 @@ class Engine:
         for res, ag in attachments:
             if res.type == "tool":
                 self.attached[ag.id].append(res)
+        # Tools are "segregated" when tool-holding agents have DIFFERENT toolsets
+        # (balanced shared-reads / split-writes). Under segregation a coordinator must
+        # BROADCAST the whole task so each worker self-selects the parts its own tools
+        # allow — sending a worker only an addressed slice could hand it a part needing
+        # a tool it doesn't own ("I don't have this tool"). See _dispatch_msg.
+        _sets = [frozenset(t.label for t in ts) for ts in self.attached.values() if ts]
+        self._segregated = len(_sets) >= 2 and any(s != _sets[0] for s in _sets[1:])
 
         self.entries = self._dedup(entries) or self._default_entries()
         self.exits = self._dedup(exits)
@@ -470,6 +477,25 @@ class Engine:
             lines += ["", "## Tools available (whole system)"]
             for t in self.tools:
                 lines.append(f"- `{t.label}` — {(t.spec or '').strip() or 'no signature'}")
+        # Capability-routing note — only when action tools are actually split across
+        # workers (MAS). Every worker shares all READ tools, but each write/action tool
+        # belongs to exactly one worker, so sub-tasks must be routed by capability.
+        tool_holders = [a for a in self.agents if self.attached.get(a.id)]
+        if len(tool_holders) > 1:
+            owners = {t.label for a in tool_holders for t in self.attached.get(a.id, [])}
+            shared = {t.label for t in self.tools
+                      if sum(1 for a in tool_holders if any(x.label == t.label
+                             for x in self.attached.get(a.id, []))) == len(tool_holders)}
+            split = sorted(owners - shared)
+            if split:
+                lines += ["", "## Capability routing (IMPORTANT)",
+                          "Every agent shares all read/inspection tools, but each "
+                          "ACTION tool below belongs to exactly ONE agent (see each "
+                          "agent's 'tools it can call'). Assign or take each sub-task by "
+                          "CAPABILITY: give it to the agent that actually holds the "
+                          "action tool it needs. Do not assign a sub-task to an agent "
+                          "lacking the required tool — read the roster above and match "
+                          f"the tool to its owner. Split action tools: {', '.join(split)}."]
         return "\n".join(lines)
 
     def announce(self) -> None:

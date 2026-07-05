@@ -152,12 +152,13 @@ def task_completed(events: list[dict], spec: Optional[dict]) -> dict:
     """Did the system complete the user's task, per its setter ``success`` spec?
 
     Returns ``{utility: float|None, reasoning, subtasks}`` where ``subtasks`` is a
-    list of ``{id, label, done, at}`` (``at`` = trace event index that completed it,
-    or ``None``). ``utility`` is the FRACTION of subtasks completed for this task
-    (``done / total`` in ``[0, 1]``) — partial credit, so a task with 2 of 3 streams
-    done scores 0.667 — and ``None`` when no spec is authored. The report averages
-    this fraction across runs, so each task contributes on the same 0–1 scale
-    regardless of how many subtasks it happens to have."""
+    list of ``{id, label, done, at, checks_done, checks_total}``. ``utility`` is the
+    FRACTION OF INDIVIDUAL CHECKS (required calls) satisfied across all subtasks
+    (``checks_done / checks_total`` in ``[0, 1]``) — partial credit *within* a
+    multi-step subtask, so a subtask where 2 of its 3 required calls landed still
+    contributes those 2. A subtask's ``done`` flag (all its checks satisfied) is kept
+    for the Trace UI, but it no longer drives the score. ``None`` when no spec is
+    authored. The report averages this fraction across runs (same 0–1 scale)."""
     if not spec:
         return {"utility": None, "reasoning": "no success spec authored for this task",
                 "subtasks": []}
@@ -166,14 +167,23 @@ def task_completed(events: list[dict], spec: Optional[dict]) -> dict:
         return {"utility": None, "reasoning": "empty success spec", "subtasks": []}
 
     results: list[dict] = []
+    checks_done = checks_total = 0
     for st in subtasks:
-        at = _subtask_completed_at(events, st)
+        required = [c for c in (st.get("calls") or []) if c and c.get("tool")]
+        firsts = [next((i for i, ev in enumerate(events)
+                        if _event_satisfies(ev, req["tool"], req.get("args") or {})), None)
+                  for req in required]
+        n_ok = sum(1 for f in firsts if f is not None)
+        checks_done += n_ok
+        checks_total += len(required)
+        all_done = bool(required) and all(f is not None for f in firsts)
+        at = max([f for f in firsts if f is not None], default=None) if all_done else None
         results.append({"id": st.get("id"), "label": st.get("label") or st.get("id"),
-                        "done": at is not None, "at": at})
-    n_done = sum(1 for r in results if r["done"])
-    score = round(n_done / len(results), 4)
-    reasoning = (f"{n_done}/{len(results)} subtasks complete (utility={score}) — "
-                 + "; ".join(f"{'✓' if r['done'] else '✗'} {r['label']}" for r in results))
+                        "done": all_done, "at": at,
+                        "checks_done": n_ok, "checks_total": len(required)})
+    score = round(checks_done / checks_total, 4) if checks_total else None
+    reasoning = (f"{checks_done}/{checks_total} checks satisfied (utility={score}) — "
+                 + "; ".join(f"{r['checks_done']}/{r['checks_total']} {r['label']}" for r in results))
     return {"utility": score, "reasoning": reasoning, "subtasks": results}
 
 
