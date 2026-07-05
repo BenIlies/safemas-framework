@@ -13,17 +13,6 @@ export const NODE_TYPES = {
       temperature: null, max_tokens: null, join: 'any', entry: false, exit: false,
     },
   },
-  // Memory is the auto-generated GLOBAL shared board (who-does-what + tools + any
-  // shared data), not a node you add. It is never adversarial. Memory nodes can
-  // still appear from loaded scenarios/configs (as read-only data stores) and are
-  // rendered/inspected, but `nonAddable` keeps them out of the add menus.
-  memory: {
-    label: 'Memory (shared data)',
-    icon: '🧠',
-    color: '#8b5cf6',
-    nonAddable: true,
-    defaults: { backend: 'in-memory' },
-  },
   tool: {
     label: 'Tool',
     icon: '🛠️',
@@ -89,8 +78,6 @@ export const PROVIDER_KINDS = {
   'anthropic-compatible': { label: 'Anthropic-compatible (custom)', api: 'anthropic', needsBaseUrl: true, models: [] },
   mock: { label: 'Mock (no key)', api: 'mock', needsKey: false, models: ['mock'] },
 }
-
-export const MEMORY_BACKENDS = ['in-memory', 'vector', 'redis', 'sqlite', 'kv']
 
 export function blankMalicious() {
   return { enabled: false, attack: null, payload: '' }

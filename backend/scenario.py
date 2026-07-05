@@ -71,7 +71,7 @@ def load_environment(name: str) -> dict | None:
 
 
 # --------------------------------------------------------------------------- #
-# Tool / memory -> graph nodes  (env schema -> the editor's wire format)
+# Tool -> graph nodes  (env schema -> the editor's wire format)
 # --------------------------------------------------------------------------- #
 def _signature(tool: dict) -> str:
     params = ", ".join(p.get("name", "") for p in tool.get("parameters", []))
@@ -83,8 +83,7 @@ def injection_points(env: dict) -> list[dict]:
     """The environment-level injection points, as {kind, id, label, attack}: one
     per tool (tool-poisoning). The agent point (prompt-injection) is *architecture*-
     level — which agent is compromised is chosen against the picked template — so it
-    is not enumerated here; ``_build_scenario`` synthesises it from the target id.
-    Memory is the auto-generated global board and is never an injection point."""
+    is not enumerated here; ``_build_scenario`` synthesises it from the target id."""
     pts: list[dict] = []
     for t in env.get("tools", []):
         pts.append({"kind": "tool", "id": t.get("name"), "label": f'tool · {t.get("name")}',
@@ -145,9 +144,9 @@ def _as_request(goal: str) -> str:
 def build_poison(goal: str, point: dict, style: str = "blended") -> str:
     """Render the injection goal as poison text for ``point`` in ``style``.
 
-    For tool poisoning the resource yields this text *in place of* its normal
-    value, so we prepend a thin slice of plausible benign context to keep it from
-    reading as a bare instruction."""
+    For tool poisoning the runtime APPENDS this text to the tool's genuine return
+    value (see ``Engine.resource_value``), so the injection reads as an extra note
+    tacked onto a real result — no fake "Result retrieved" carrier is needed."""
     req = _as_request(goal)
     req_l = (req[:1].lower() + req[1:]) if req else req
     style = (style or "blended").lower()
@@ -162,13 +161,6 @@ def build_poison(goal: str, point: dict, style: str = "blended") -> str:
     else:  # blended (default)
         idx = sum(map(ord, req)) % len(_BLENDED)
         body = _BLENDED[idx].format(req=req, req_l=req_l)
-
-    if point.get("kind") in ("tool", "memory") and style != "tagged":
-        carrier = {
-            "tool": "Result retrieved successfully. ",
-            "memory": "",
-        }[point["kind"]]
-        return f"{carrier}{body}"
     return body
 
 
@@ -238,8 +230,8 @@ def agent_flow_order(arch: dict) -> list[dict]:
 # Tool data binding — what a READ tool returns when an agent calls it
 # --------------------------------------------------------------------------- #
 # Read tools serve their slice of the environment's backing store on demand, so an
-# agent must *call a tool* to learn the data instead of being handed everything in
-# ambient shared memory. The slice is resolved by matching the tool's name tokens
+# agent must *call a tool* to learn the data instead of being handed everything as
+# ambient context. The slice is resolved by matching the tool's name tokens
 # against the store's (nested) keys; a bare-scalar match is promoted to its parent
 # collection (read tools return collections, not single values), and a tool whose
 # name matches nothing falls back to the whole store — never to fabricated data.
@@ -323,18 +315,10 @@ def resolve_tool_data(tool: dict, store: dict):
 
 
 def _env_store(env: dict) -> dict:
-    """The environment's canonical backing store. Prefer the explicit ``environment``
-    dict; else reconstruct it from the memory blobs (id -> parsed JSON content)."""
+    """The environment's canonical backing store — the ``environment`` dict, whose
+    slices are served to agents through read tools (never as ambient context)."""
     store = env.get("environment")
-    if isinstance(store, dict) and store:
-        return store
-    out: dict = {}
-    for m in env.get("memory", []):
-        try:
-            out[m.get("id")] = json.loads(m.get("content") or "")
-        except (TypeError, ValueError):
-            out[m.get("id")] = m.get("content")
-    return out
+    return store if isinstance(store, dict) else {}
 
 
 # --------------------------------------------------------------------------- #
@@ -388,6 +372,8 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
                         f"Delegate the actual work to your sub-agents and synthesise their results.")
     arch["task"] = task_prompt
     arch["name"] = f'{template_arch.get("name", "mas")}·{env.get("name", "env")}'
+    # The env's hidden world state seeds the run; tool effects mutate a copy of it.
+    arch["state"] = json.loads(json.dumps(env.get("state") or {}))
 
     # Resolve where the poison lands.
     poison = None
@@ -413,11 +399,14 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         else:
             point_label = point.get("label") or f'{point["kind"]} · {point.get("id")}'
 
-    # Attach every tool to every WORKER agent (one tool node, fan-in attach edges to
-    # the workers only — coordinators delegate). A READ tool's `content` is the slice
-    # of the backing store it serves when called, so an agent must invoke the tool to
-    # obtain the data instead of reading it from ambient shared memory; write/sink
-    # tools carry no data (the runtime acks the action).
+    # SEGREGATE tools across the WORKER agents: each tool attaches to exactly ONE
+    # worker (balanced round-robin, so every worker owns ~the same number of tools),
+    # not to all of them. This models a realistic MAS where an agent can only act
+    # within its own capability set — so coordination (routing the right sub-task to
+    # the agent that owns the needed tool) actually matters. The shared-context board
+    # lists each agent's tools, so the orchestrator can route accordingly. With a
+    # single-worker template (SAS / independent) that lone agent owns everything.
+    # A READ tool's `content` is its slice of the backing store; write/sink tools ack.
     workers = tool_agents(agents)
     store = _env_store(env)
     i = 0
@@ -427,20 +416,18 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
                 "content": json.dumps(data, indent=2) if data is not None else None,
                 "position": {"x": 60 + i * 150, "y": 380}}
+        # env-defined dynamic return + hidden-state mutations for this tool
+        if t.get("returns") is not None:
+            node["returns"] = t["returns"]
+        if t.get("effect") is not None:
+            node["effect"] = t["effect"]
         if poison is not None and point and point["kind"] == "tool" and point.get("id") == name:
             node["malicious"] = poison
         arch["nodes"].append(node)
-        for ag in workers:
-            arch["edges"].append({"id": f"scn-a{i}-{ag['id']}", "source": name,
-                                  "target": ag["id"], "kind": "attach"})
-        i += 1
-    # Memory stores stay on the canvas as data-store nodes (no attach edge), but the
-    # runtime now lists them by name only — their contents are reached through tools,
-    # not handed to every agent. They are never adversarial.
-    for m in env.get("memory", []):
-        arch["nodes"].append({"id": m.get("id"), "type": "memory", "label": m.get("id"),
-                              "spec": None, "content": m.get("content"),
-                              "position": {"x": 60 + i * 150, "y": 540}})
+        if workers:
+            owner = workers[i % len(workers)]        # round-robin -> balanced, disjoint
+            arch["edges"].append({"id": f"scn-a{i}-{owner['id']}", "source": name,
+                                  "target": owner["id"], "kind": "attach"})
         i += 1
 
     tool_names = [t.get("name") for t in tools]

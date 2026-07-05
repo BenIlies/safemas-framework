@@ -81,7 +81,7 @@ const EDGE_COLORS = {
   loop: '#f59e0b',   // feedback / iteration (amber)
   io: '#22d3ee',     // entrance -> agent / agent -> exit
   channel: '#64748b',// agent -> agent information flow
-  attach: '#475569', // memory / tool -> agent (attachment, not flow)
+  attach: '#475569', // tool -> agent (attachment, not flow)
 }
 
 // Style an edge from its kind + flags. Directional edges (channel/io/loop) get

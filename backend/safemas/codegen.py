@@ -31,17 +31,16 @@ def arch_to_code(arch: dict) -> str:
     """Emit a native ``StateGraph`` script for an architecture dict.
 
     Nodes are addressed by label (the graph's address space). Agents are emitted
-    before memory/tool resources so the runtime's slug ordering is preserved;
-    channels keep their original order so a router's first-match branch is exact.
+    before tool resources so the runtime's slug ordering is preserved; channels
+    keep their original order so a router's first-match branch is exact.
     """
     nodes = arch.get("nodes", [])
     edges = arch.get("edges", [])
     by_id = {n["id"]: n for n in nodes}
 
     agents = [n for n in nodes if n.get("type") == "agent"]
-    memories = [n for n in nodes if n.get("type") == "memory"]
     tools = [n for n in nodes if n.get("type") == "tool"]
-    label = {n["id"]: (n.get("label") or "") for n in [*agents, *memories, *tools]}
+    label = {n["id"]: (n.get("label") or "") for n in [*agents, *tools]}
 
     L: list[str] = ["from safemas import StateGraph", ""]
     head = [repr(arch.get("name", "untitled-mas"))]
@@ -72,12 +71,9 @@ def arch_to_code(arch: dict) -> str:
                 _kw("max_tokens", n.get("max_tokens")),
                 _kw("join", n.get("join")) if n.get("join") not in (None, "", "any") else None,
             ]))
-    if memories or tools:
+    if tools:
         L.append("")
         L.append("# resources")
-        for n in memories:
-            L.append(node_line(n, "memory", [_kw("backend", n.get("backend")),
-                                             _kw("content", n.get("content"))]))
         for n in tools:
             L.append(node_line(n, "tool", [_kw("spec", n.get("spec")),
                                            _kw("content", n.get("content"))]))
@@ -116,7 +112,7 @@ def arch_to_code(arch: dict) -> str:
                 L.append(f"g.add_edge({label[res]!r}, {label[agent]!r})")
 
     # adversarial elements: malicious nodes, then malicious channels (by endpoints)
-    evil_nodes = [n for n in [*agents, *memories, *tools]
+    evil_nodes = [n for n in [*agents, *tools]
                   if (n.get("malicious") or {}).get("enabled")]
     if evil_nodes or evil_channels:
         L.append("")
@@ -189,11 +185,6 @@ def mas_to_arch(mas) -> dict:
             "max_tokens": a.max_tokens, "join": getattr(a, "join", "any"),
             "malicious": mal(a),
         })
-    for m in mas.memories:
-        nodes.append({"id": m.id, "type": "memory", "label": m.label,
-                      "position": {"x": m.x, "y": m.y},
-                      "backend": m.backend, "content": getattr(m, "content", ""),
-                      "malicious": mal(m)})
     for t in mas.tools:
         nodes.append({"id": t.id, "type": "tool", "label": t.label,
                       "position": {"x": t.x, "y": t.y},

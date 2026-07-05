@@ -1,17 +1,16 @@
 """Data model for a SafeMAS architecture.
 
-A multi-agent system is a graph of *nodes* (agents, tools, and read-only shared
-data stores) wired by *edges* (channels between agents, or tool attachments).
-Adversarial elements follow the threat model:
+A multi-agent system is a graph of *nodes* (agents and tools) wired by *edges*
+(channels between agents, or tool attachments). Adversarial elements follow the
+threat model:
 
     agent   -> prompt-injection   (direct prompt at one agent)
     channel -> aitm               (agent-in-the-middle message rewrite)
     tool    -> tool-poisoning     (MCP / tool supply-chain compromise)
 
-Memory is the auto-generated GLOBAL shared board (who-does-what + the whole-system
-toolset + any shared data) read by every agent — it is not a per-agent node you
-add, and it is never adversarial (memory-poisoning was retired). ``memory`` nodes
-may still appear as read-only data stores fed into that board.
+Every agent also reads an auto-generated GLOBAL shared-context board (who-does-what
+across the agents + the whole-system toolset), derived from the architecture. It is
+not a node you add and is never adversarial.
 
 This dict is the editor's wire format. The **canonical persisted form is Python
 code** (the SafeMAS DSL — see the ``safemas`` package): the backend generates a
@@ -24,16 +23,15 @@ an agent only references a provider by id.
 """
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-NodeType = Literal["agent", "memory", "tool", "entrance", "exit"]
+NodeType = Literal["agent", "tool", "entrance", "exit"]
 EdgeKind = Literal["channel", "attach", "io"]
 AttackType = Literal[
     "prompt-injection",
     "aitm",
-    "memory-poisoning",
     "tool-poisoning",
 ]
 # Provider "kind" is a free-form preset id (e.g. openai, anthropic, google,
@@ -84,15 +82,27 @@ class Node(BaseModel):
     entry: bool = False
     exit: bool = False
 
-    # memory-specific
-    backend: Optional[str] = None  # e.g. in-memory, vector, redis
-
     # tool-specific
     spec: Optional[str] = None  # tool description / signature
 
-    # resource (tool/memory) payload: what the resource yields when an agent uses
-    # it (a tool's return value, a memory's stored content) — e.g. a captured
-    # calendar/email dump. Empty => the engine's neutral placeholder.
+    # Optional env-defined return for a tool call, so a tool's output can depend on
+    # its input and the live world state. Either:
+    #   * a string  — returned verbatim with ``{arg}`` placeholders filled from the
+    #                  call's input args (``{query}`` or keys parsed from a JSON blob);
+    #   * an object  {"read": "dotted.path.{arg}"} — serialise that slice of the
+    #                  run's hidden STATE (dynamic inspection tool).
+    # When set it overrides the default store-slice / action-ack return.
+    returns: Optional[Any] = None
+
+    # Optional list of mutations this tool applies to the run's hidden STATE, each an
+    # op the engine interprets with the call's args templated in, e.g.
+    #   {"op":"set","path":"lights.{device_id}.state","value":"{state}"}
+    #   {"op":"append","path":"automations","value":{"name":"{name}"}}
+    #   {"op":"delete","path":"guest_access.{name}"}
+    effect: Optional[list] = None
+
+    # tool payload: what the tool yields when an agent calls it (its return value) —
+    # e.g. a captured calendar/email dump. Empty => the engine's neutral placeholder.
     content: Optional[str] = None
 
     malicious: Malicious = Field(default_factory=Malicious)
@@ -128,6 +138,9 @@ class Architecture(BaseModel):
     title: str = ""
     nodes: list[Node] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
+    # The environment's hidden world STATE at run start (a nested dict). Tool
+    # ``effect``s mutate a run-scoped copy; ``returns:{read:...}`` tools inspect it.
+    state: dict = Field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------- #

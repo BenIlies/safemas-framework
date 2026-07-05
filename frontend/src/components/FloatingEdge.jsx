@@ -4,7 +4,7 @@ import { useStore, getStraightPath } from 'reactflow'
 // A "floating" edge for attachments: it draws straight from the border of the
 // resource node to the border of the agent node, picking whichever sides face
 // each other. Unlike a fixed left→right handle edge, it never loops around when a
-// memory/tool sits directly above or below its agent — so an attachment always
+// tool sits directly above or below its agent — so an attachment always
 // clearly points at its agent and can't be mistaken for a resource↔resource link.
 
 // Point where the ray from `node`'s centre toward `other`'s centre exits `node`'s

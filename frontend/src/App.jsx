@@ -40,14 +40,13 @@ function groupTemplates(list) {
   }, [])
 }
 
-// Mirror backend graph_runtime._build_global_memory: the auto-generated shared
-// board (who-does-what + all tools + any shared data) that every agent reads. It
-// is inspect-only — regenerated live from the canvas, never user-authored.
-function buildGlobalMemory(name, task, nodes, edges = []) {
+// Mirror backend graph_runtime._build_shared_context: the auto-generated shared
+// board (who-does-what + all tools) that every agent reads. It is inspect-only —
+// regenerated live from the canvas, never user-authored.
+function buildSharedContext(name, task, nodes, edges = []) {
   const clip = (s, n = 200) => { s = (s || '').replace(/\s+/g, ' ').trim(); return s.length <= n ? s : s.slice(0, n - 1) + '…' }
   const agents = nodes.filter((n) => n.data.type === 'agent')
   const tools = nodes.filter((n) => n.data.type === 'tool')
-  const stores = nodes.filter((n) => n.data.type === 'memory' && (n.data.content || '').trim())
   const typeOf = Object.fromEntries(nodes.map((n) => [n.id, n.data.type]))
   const labelOf = Object.fromEntries(nodes.map((n) => [n.id, n.data.label]))
   const ownedBy = {}  // agent id -> [tool labels]
@@ -56,7 +55,7 @@ function buildGlobalMemory(name, task, nodes, edges = []) {
     const [tool, agent] = typeOf[e.source] === 'tool' ? [e.source, e.target] : [e.target, e.source]
     if (typeOf[tool] === 'tool' && typeOf[agent] === 'agent') (ownedBy[agent] ||= []).push(labelOf[tool])
   }
-  const L = [`# Shared memory — multi-agent system '${name}'`, `Overall task: ${task}`, '', '## Agents (who does what)']
+  const L = [`# Shared context — multi-agent system '${name}'`, `Overall task: ${task}`, '', '## Agents (who does what)']
   for (const a of agents) {
     const role = a.data.role ? ` · role: ${a.data.role}` : ''
     const desc = clip(a.data.prompt)
@@ -67,25 +66,19 @@ function buildGlobalMemory(name, task, nodes, edges = []) {
     L.push('', '## Tools available (whole system)')
     for (const t of tools) L.push(`- \`${t.data.label}\` — ${(t.data.spec || '').trim() || 'no signature'}`)
   }
-  if (stores.length) {
-    // List data stores by NAME only — their contents are private and reached by
-    // calling the relevant tool, not handed to every agent as ambient context.
-    L.push('', '## Data stores (private — read with the matching tool, not shown here)')
-    for (const s of stores) L.push(`- \`${s.data.label}\``)
-  }
   return L.join('\n')
 }
 
 // Validate a connection against the SafeMAS wiring rules and return the edge
 // `kind` (or an error explaining the refusal). `flip` means the edge should be
-// stored in its canonical direction (memory/tool -> agent) regardless of which
-// way it was drawn. This is what guarantees memory and tools only ever attach to
-// agents — never to each other.
+// stored in its canonical direction (tool -> agent) regardless of which way it was
+// drawn. This is what guarantees tools only ever attach to agents — never to each
+// other.
 function classifyConnection(s, t) {
-  const isResource = (x) => x === 'memory' || x === 'tool'
+  const isResource = (x) => x === 'tool'
   if (!s || !t) return { error: 'Unknown node — could not wire that connection.' }
   if (s === t && isResource(s)) {
-    return { error: 'Memory and tools attach to an agent, not to each other.' }
+    return { error: 'Tools attach to an agent, not to each other.' }
   }
   if (t === 'entrance') return { error: 'The entrance is the start of the flow — it takes no inputs.' }
   if (s === 'exit') return { error: 'The exit is the end of the flow — it produces no outputs.' }
@@ -99,7 +92,7 @@ function classifyConnection(s, t) {
   if (s === 'agent' && isResource(t)) return { kind: 'attach', flip: true }
   if (isResource(s) && t === 'agent') return { kind: 'attach' }
   if (isResource(s) && isResource(t)) {
-    return { error: 'Memory and tools attach to an agent, not to each other.' }
+    return { error: 'Tools attach to an agent, not to each other.' }
   }
   return { error: 'Unsupported connection.' }
 }
@@ -149,7 +142,7 @@ function Editor() {
   const [code, setCode] = useState('')              // StateGraph source shown / edited in the panel
   const [codeDirty, setCodeDirty] = useState(false) // user is editing code (suspends auto-regen)
   const [codeError, setCodeError] = useState('')    // last "Apply code" / generation error
-  const [memOpen, setMemOpen] = useState(false)     // the auto-generated shared-memory panel
+  const [memOpen, setMemOpen] = useState(false)     // the auto-generated shared-context panel
   const [execView, setExecView] = useState(false)   // execution lens: run order + diagnostics
   const [saved, setSaved] = useState([])
   const [templates, setTemplates] = useState([])    // built-in templates (from the backend)
@@ -232,8 +225,8 @@ function Editor() {
   }, [loadArch, refreshSaved, refreshProviders])
 
   const arch = useMemo(() => graphToArch({ name, task, nodes, edges }), [name, task, nodes, edges])
-  // The auto-generated shared-memory board, regenerated live as the arch changes.
-  const globalMemory = useMemo(() => buildGlobalMemory(name, task, nodes, edges), [name, task, nodes, edges])
+  // The auto-generated shared-context board, regenerated live as the arch changes.
+  const sharedContext = useMemo(() => buildSharedContext(name, task, nodes, edges), [name, task, nodes, edges])
 
   // How the engine will REALLY run this graph (order, dead edges, diagnostics).
   // Cheap, so always computed; the execution lens decides whether to show it.
@@ -519,12 +512,13 @@ function Editor() {
       if (success === true) toast(`☠ BREACHED — sink "${tool || 'tool'}" called with the attacker's parameters`, 'error')
       else if (success === false) toast('✓ Held — the attacker’s sink call never fired')
       const t = scn.task
-      const util = t?.utility
+      const util = t?.utility   // fraction of subtasks done, 0..1
       if (util != null) {
         const n = (t.subtasks || []).length
         const done = (t.subtasks || []).filter((s) => s.done).length
         const detail = n ? ` (${done}/${n} subtasks)` : ''
-        toast(util ? `✓ Task complete${detail}` : `✗ Task incomplete${detail}`, util ? 'ok' : 'error')
+        const pct = Math.round(util * 100)
+        toast(`Task ${pct}% complete${detail}`, util >= 1 ? 'ok' : util > 0 ? 'warn' : 'error')
       }
     } catch { /* no scn for this run */ }
   }, [toast])
@@ -539,7 +533,7 @@ function Editor() {
     const { run_id, arch } = resp
     setScenarioOpen(false)
     // Switch the canvas to the architecture actually being run — the template
-    // with the environment's tools/memory attached and the injection in place.
+    // with the environment's tools attached and the injection in place.
     if (arch) { loadArch(arch); toast(`Scenario loaded: ${arch.name}`) }
     setRunning(true)
     setRun({ run_id, status: 'queued', log: 'starting…' })
@@ -675,7 +669,7 @@ function Editor() {
         return [
           { icon: '◳', label: execView ? 'Hide execution lens' : 'Show execution lens (run order + diagnostics)', onClick: () => setExecView((v) => !v) },
           { icon: '🧩', label: codeOpen ? 'Hide LangGraph code' : 'Show LangGraph code', onClick: () => setCodeOpen((v) => !v) },
-          { icon: '🧠', label: memOpen ? 'Hide shared memory' : 'Show shared memory (auto)', onClick: () => setMemOpen((v) => !v) },
+          { icon: '🧠', label: memOpen ? 'Hide shared context' : 'Show shared context (auto)', onClick: () => setMemOpen((v) => !v) },
           { icon: '⤢', label: 'Fit view', onClick: () => rf.current?.fitView({ duration: 300 }) },
         ]
       case 'templates':
@@ -943,14 +937,14 @@ function Editor() {
           {memOpen && (
             <div className="yaml-overlay mem-overlay">
               <div className="yaml-head">
-                Shared memory <span className="muted small">· auto · read by every agent</span>
+                Shared context <span className="muted small">· auto · read by every agent</span>
                 <span className="yaml-head-actions">
                   <button className="btn ghost" onClick={() => setMemOpen(false)}>✕</button>
                 </span>
               </div>
-              <textarea className="code-edit" spellCheck={false} readOnly value={globalMemory}
-                placeholder="# add agents/tools to populate the shared memory" />
-              <div className="mem-note">Auto-generated from the architecture — agents, the whole-system toolset, and any shared data. Every agent reads this; it isn’t editable and can’t be attacked.</div>
+              <textarea className="code-edit" spellCheck={false} readOnly value={sharedContext}
+                placeholder="# add agents/tools to populate the shared context" />
+              <div className="mem-note">Auto-generated from the architecture — agents and the whole-system toolset. Every agent reads this; it isn’t editable and can’t be attacked.</div>
             </div>
           )}
           {execView && (

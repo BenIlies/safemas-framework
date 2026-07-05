@@ -21,8 +21,7 @@ runtime, so merely *loading* a template stays lightweight.
 
 Agents, tools and channels can be turned adversarial with ``compromise(...)``; the
 attack type is implied by the element (agent→prompt-injection, channel→aitm,
-tool→tool-poisoning), mirroring the SafeMAS threat model. Memory is the
-auto-generated global shared board and is never adversarial.
+tool→tool-poisoning), mirroring the SafeMAS threat model.
 
 ``at=(x, y)`` carries the editor layout so the visual canvas round-trips
 losslessly; it has no effect on execution (the runtime re-derives ids from labels
@@ -55,7 +54,7 @@ class Malicious:
 
 
 class Element:
-    """Base for the canvas nodes: agents, memory stores and tools."""
+    """Base for the canvas nodes: agents and tools."""
 
     attack: str | None = None  # the attack this element type carries
 
@@ -110,23 +109,10 @@ class Agent(Element):
         return ch
 
     def uses(self, resource: "Element") -> "Attach":
-        """Give this agent access to a memory store or tool (resource ⇒ agent)."""
+        """Give this agent access to a tool (resource ⇒ agent)."""
         att = Attach(resource, self)
         self.mas.attachments.append(att)
         return att
-
-
-class Memory(Element):
-    # Memory is never adversarial: its content is read-only shared data folded into
-    # the auto-generated global memory board.
-    attack = None
-
-    def __init__(self, mas, label, *, backend="in-memory", content="", at=(0, 0)):
-        super().__init__(mas, label, at)
-        self.backend = backend
-        # Read-only shared data folded into the global memory board (e.g. a captured
-        # inbox / notes dump). Empty => omitted from the board.
-        self.content = content
 
 
 class Tool(Element):
@@ -165,7 +151,7 @@ class Channel:
 
 
 class Attach:
-    """A resource (memory/tool) wired to an agent. Undirected by intent; stored
+    """A resource (tool) wired to an agent. Undirected by intent; stored
     canonically as resource → agent."""
 
     def __init__(self, resource: Element, agent: Agent):
@@ -174,9 +160,9 @@ class Attach:
 
 
 class MAS:
-    """A multi-agent system. Build it with :meth:`agent` / :meth:`memory` /
-    :meth:`tool`, wire it with ``a.to(b)`` and ``a.uses(resource)``, mark the
-    entry/exit agents. Serialise it to the architecture dict via
+    """A multi-agent system. Build it with :meth:`agent` / :meth:`tool`, wire it
+    with ``a.to(b)`` and ``a.uses(resource)``, mark the entry/exit agents.
+    Serialise it to the architecture dict via
     :func:`safemas.codegen.mas_to_arch`; execution is the runtime's job."""
 
     def __init__(self, name: str = "untitled-mas",
@@ -188,7 +174,6 @@ class MAS:
         self.title = title   # editor-only: Templates menu display label
         self._ids: set[str] = set()
         self.agents: list[Agent] = []
-        self.memories: list[Memory] = []
         self.tools: list[Tool] = []
         self.channels: list[Channel] = []
         self.attachments: list[Attach] = []
@@ -201,11 +186,6 @@ class MAS:
         a = Agent(self, label, **kw)
         self.agents.append(a)
         return a
-
-    def memory(self, label: str, **kw) -> Memory:
-        m = Memory(self, label, **kw)
-        self.memories.append(m)
-        return m
 
     def tool(self, label: str, **kw) -> Tool:
         t = Tool(self, label, **kw)
@@ -228,13 +208,13 @@ class MAS:
 
     @property
     def elements(self) -> list[Element]:
-        return [*self.agents, *self.memories, *self.tools]
+        return [*self.agents, *self.tools]
 
 
 # --------------------------------------------------------------------------- #
 # StateGraph — the LangGraph-idiom façade over MAS
 # --------------------------------------------------------------------------- #
-_RESOURCE_TYPES = {"memory", "tool"}
+_RESOURCE_TYPES = {"tool"}
 
 
 class StateGraph:
@@ -285,13 +265,13 @@ class StateGraph:
             return (x, 160)
         x = 120 + 240 * self._n_resources
         self._n_resources += 1
-        return (x, 340 if type == "memory" else -20)
+        return (x, -20)
 
     # -- nodes -------------------------------------------------------------- #
     def add_node(self, label: str, *, type: str = "agent",
                  role=None, prompt=None, provider=None, model=None,
                  temperature=None, max_tokens=None, join="any", group=None,
-                 backend="in-memory", spec="", content="",
+                 spec="", content="",
                  at: tuple[float, float] | None = None) -> Element:
         # ``group`` is accepted but ignored — tool specialization was removed (every
         # agent now owns every tool). Kept in the signature so legacy saved configs /
@@ -303,8 +283,6 @@ class StateGraph:
             el: Element = self._mas.agent(
                 label, role=role, prompt=prompt, provider=provider, model=model,
                 temperature=temperature, max_tokens=max_tokens, join=join, at=pos)
-        elif type == "memory":
-            el = self._mas.memory(label, backend=backend, content=content, at=pos)
         elif type == "tool":
             el = self._mas.tool(label, spec=spec, content=content, at=pos)
         else:
@@ -315,10 +293,10 @@ class StateGraph:
     # -- edges -------------------------------------------------------------- #
     def add_edge(self, source, target, *, label: str = "") -> None:
         """A plain edge: an agent→agent channel, or — when either endpoint is a
-        memory/tool — a resource attachment (canonicalised resource→agent)."""
+        tool — a resource attachment (canonicalised resource→agent)."""
         s, t = self._resolve(source), self._resolve(target)
-        s_res = isinstance(s, (Memory, Tool))
-        t_res = isinstance(t, (Memory, Tool))
+        s_res = isinstance(s, Tool)
+        t_res = isinstance(t, Tool)
         if s_res or t_res:
             if s_res and t_res:
                 raise ValueError("cannot wire two resources together")

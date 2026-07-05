@@ -9,10 +9,10 @@ only the lightweight model + builder — the execution runtime
 so the sandboxed runner stays minimal.
 """
 from .model import (
-    MAS, StateGraph, Agent, Memory, Tool, Element, Channel, Attach, Malicious,
+    MAS, StateGraph, Agent, Tool, Element, Channel, Attach, Malicious,
 )
 
 __all__ = [
-    "StateGraph", "MAS", "Agent", "Memory", "Tool", "Element",
+    "StateGraph", "MAS", "Agent", "Tool", "Element",
     "Channel", "Attach", "Malicious",
 ]

@@ -1,8 +1,8 @@
-import { EDGE_ATTACK, MEMORY_BACKENDS, NODE_TYPES, PROVIDER_KINDS } from '../lib/elements.js'
+import { EDGE_ATTACK, NODE_TYPES, PROVIDER_KINDS } from '../lib/elements.js'
 
 const EDGE_KIND_LABEL = {
   channel: 'channel — agent → agent',
-  attach: 'attach — memory / tool → agent',
+  attach: 'attach — tool → agent',
   io: 'io — entrance / exit link',
 }
 
@@ -115,23 +115,6 @@ export default function Inspector({ selected, providers, onChange, onDelete, onM
             : 'The exit takes its final answer from whichever agent links into it. Drag an agent’s port here to re-route it.'}
           <br />This node can’t be deleted — move or re-link it instead.
         </p>
-      )}
-
-      {!isEdge && data.type === 'memory' && (
-        <>
-          <Field label="Backend">
-            <input list="mem-backends" value={data.backend || ''} onChange={(e) => set({ backend: e.target.value })} />
-            <datalist id="mem-backends">
-              {MEMORY_BACKENDS.map((b) => <option key={b} value={b} />)}
-            </datalist>
-          </Field>
-          <Field label="Stored content (what a read returns)">
-            <textarea rows={4} value={data.content || ''}
-              placeholder="Leave empty for a neutral placeholder, or paste the data this memory holds (e.g. a captured inbox / notes dump)."
-              onChange={(e) => set({ content: e.target.value })} />
-            <span className="field-hint">Returned to any agent that reads this memory. Empty → the engine’s neutral “(clean, empty)” placeholder.</span>
-          </Field>
-        </>
       )}
 
       {!isEdge && data.type === 'tool' && (

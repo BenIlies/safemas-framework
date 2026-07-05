@@ -53,9 +53,8 @@ export function reconstructArch(scn) {
   }
   order.filter((a) => exits.has(a.label)).forEach((a) => edges.push({ id: eid(), source: slug(a.label), target: 'out-1', kind: 'io' }))
 
-  // Resource nodes (tools / memory) + their attach edges. They never appear as
-  // node_enter events, so rebuild them from each agent's `tools` list (and infer
-  // tool vs memory from the compromise type when flagged).
+  // Tool nodes + their attach edges. They never appear as node_enter events, so
+  // rebuild them from each agent's `tools` list.
   const compType = {}
   for (const c of (scn.compromised || [])) compType[c.element] = c.type
   const resSeen = new Set()
@@ -66,15 +65,14 @@ export function reconstructArch(scn) {
     const agentId = slug(e.agent)
     for (const tlabel of e.tools) {
       const rid = slug(tlabel)
-      const type = compType[rid] === 'memory-poisoning' ? 'memory' : 'tool'
       if (!resSeen.has(rid)) {
         resSeen.add(rid)
         nodes.push({
-          id: rid, type, label: tlabel,
+          id: rid, type: 'tool', label: tlabel,
           position: { x: 80 + ri * 200, y: 360 },
           malicious: {
             enabled: compromisedIds.has(rid),
-            attack: compType[rid] || (type === 'memory' ? 'memory-poisoning' : 'tool-poisoning'),
+            attack: compType[rid] || 'tool-poisoning',
             payload: '',
           },
         })
@@ -194,10 +192,11 @@ function ScenarioSummary({ scn, onReload }) {
   const attacked = (scn.compromised || []).length > 0
 
   const success = v.attack_succeeded                    // true=breached, false=held, null=unscored
-  const utility = t.utility != null ? t.utility : v.utility
+  const utility = t.utility != null ? t.utility : v.utility   // fraction of subtasks done, 0..1 (null=unscored)
   const reason = t.reasoning || null
   const subtasks = t.subtasks || []
   const nDone = subtasks.filter((s) => s.done).length
+  const utilPct = utility != null ? Math.round(utility * 100) : null
 
   let pill = 'CLEAN · no attack', cls = 'clean'
   if (attacked && success === true) { pill = '✗ BREACHED', cls = 'breached' }
@@ -217,8 +216,8 @@ function ScenarioSummary({ scn, onReload }) {
       <div className="trace-verdict-bar">
         <span className={`verdict-pill ${cls}`}>{pill}</span>
         {utility != null &&
-          <span className={`chip ${utility ? 'ok' : 'no'}`}>
-            task {utility ? '✓ done' : '✗ failed'}
+          <span className={`chip ${utility >= 1 ? 'ok' : utility > 0 ? 'warn' : 'no'}`}>
+            task {utilPct}%
             {subtasks.length ? ` · ${nDone}/${subtasks.length} subtasks` : ''}
           </span>}
       </div>

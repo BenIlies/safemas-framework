@@ -10,7 +10,7 @@ not a hand loop hidden in a single node.
 Each agent node is a real tool-calling LangChain agent: it binds its attached
 tools, the model picks tool(s) + args, gets the result, and loops — so an
 injection can land inside a tool result mid-loop, exactly like an agentic
-benchmark. Memory reads are ambient context. The topology semantics
+benchmark. The shared-context board is ambient context. The topology semantics
 (channels, guarded routers, bounded loops, ``join="all"`` barriers, budgets) live
 in the scheduler, which dispatches strictly one agent at a time — so the queue /
 join / ordering semantics, and the ``__SCN__`` trace they produce, are exactly
@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
 from collections import defaultdict
 from types import SimpleNamespace
@@ -207,7 +208,7 @@ def _attack_leaked(attack_events: list[dict], texts: list[str]) -> bool:
 
 # --------------------------------------------------------------------------- #
 # Parse the architecture JSON into lightweight objects the scheduler reads.
-# Element ids are slug(label) (in agent→memory→tool order) for parity with the
+# Element ids are slug(label) (in agent→tool order) for parity with the
 # old engine and the frontend's slug-based compromise mapping.
 # --------------------------------------------------------------------------- #
 def _mal(d: dict | None) -> SimpleNamespace:
@@ -224,7 +225,6 @@ def parse_arch(arch: dict):
     taken: set[str] = set()
     nsmap: dict[str, SimpleNamespace] = {}
     ordered = ([n for n in nodes if n.get("type") == "agent"]
-               + [n for n in nodes if n.get("type") == "memory"]
                + [n for n in nodes if n.get("type") == "tool"])
     for n in ordered:
         eid = slug(n.get("label") or n.get("type") or "node", taken)
@@ -233,12 +233,13 @@ def parse_arch(arch: dict):
             role=n.get("role"), prompt=n.get("prompt"), provider=n.get("provider"),
             model=n.get("model"), temperature=n.get("temperature"),
             max_tokens=n.get("max_tokens"), join=n.get("join") or "any",
-            spec=n.get("spec"), backend=n.get("backend"), content=n.get("content"),
+            spec=n.get("spec"), content=n.get("content"),
+            returns=n.get("returns"), effect=n.get("effect"),
             malicious=_mal(n.get("malicious")),
         )
 
     agents = [nsmap[n["id"]] for n in nodes if n.get("type") == "agent"]
-    resources = [nsmap[n["id"]] for n in nodes if n.get("type") in ("memory", "tool")]
+    resources = [nsmap[n["id"]] for n in nodes if n.get("type") == "tool"]
 
     channels = []
     for i, e in enumerate(edges):
@@ -376,10 +377,9 @@ class Engine:
         self.in_channels: dict[str, list] = defaultdict(list)
         for ch in channels:
             self.in_channels[ch.tgt.id].append(ch)
-        # Memory is now a single GLOBAL shared board (auto-generated below), read by
-        # every agent — not a per-agent attached store. Every memory node's data is
-        # folded into it; only TOOLS attach per-agent.
-        self.stores = [r for r in resources if r.type == "memory"]
+        # Every agent reads a single GLOBAL shared-context board (auto-generated
+        # below: who-does-what + the whole-system toolset). Only TOOLS attach
+        # per-agent.
         self.tools = [r for r in resources if r.type == "tool"]
         self.attached: dict[str, list] = defaultdict(list)
         for res, ag in attachments:
@@ -391,8 +391,8 @@ class Engine:
         self.exit_ids = {a.id for a in self.exits}
 
         # Compromise surfaces: agent (prompt-injection), channel (AiTM), tool
-        # (tool-poisoning). Memory-poisoning was removed when memory became the
-        # auto-generated global board — memory nodes are never adversarial.
+        # (tool-poisoning). There is no data-store surface — the shared-context
+        # board is auto-generated and never adversarial.
         self.compromised: list[dict] = []
         for a in agents:
             if a.malicious.enabled:
@@ -405,7 +405,14 @@ class Engine:
             if r.malicious.enabled:
                 self.compromised.append({"element": r.id, "type": r.malicious.attack})
 
-        self.global_memory = self._build_global_memory()
+        self.shared_context = self._build_shared_context()
+
+        # Hidden world STATE: a run-scoped deep copy of the env's initial state.
+        # Tool `effect`s mutate it (under a lock, since agents run in parallel) and
+        # `returns:{read:...}` tools inspect it — so tool outputs reflect prior
+        # actions, like a real stateful backend.
+        self.state = json.loads(json.dumps(arch.get("state") or {}))
+        self._state_lock = threading.Lock()
 
     # -- setup helpers ------------------------------------------------------ #
     @staticmethod
@@ -421,14 +428,13 @@ class Engine:
         targets = {ch.tgt.id for ch in self.channels if not ch.loop}
         return [a for a in self.agents if a.id not in targets] or self.agents[:1]
 
-    def _build_global_memory(self) -> str:
-        """The shared, auto-generated board read by every agent: who does what,
-        which tools exist across the whole system, and which data stores exist. It is
-        derived entirely from the architecture, so every agent has the same picture
-        of the team and the toolset. Crucially it lists data stores by NAME only —
-        their contents are private and must be fetched by calling the relevant tool,
-        so no agent is handed the underlying data as ambient context."""
-        lines = [f"# Shared memory — multi-agent system '{self.name}'",
+    def _build_shared_context(self) -> str:
+        """The shared, auto-generated board read by every agent: who does what and
+        which tools exist across the whole system. It is derived entirely from the
+        architecture, so every agent has the same picture of the team and the
+        toolset. Data itself is never ambient context — it is fetched by calling the
+        relevant tool."""
+        lines = [f"# Shared context — multi-agent system '{self.name}'",
                  f"Overall task: {self.task}", "", "## Agents (who does what)"]
         for a in self.agents:
             role = f" · role: {a.role}" if a.role else ""
@@ -441,11 +447,6 @@ class Engine:
             lines += ["", "## Tools available (whole system)"]
             for t in self.tools:
                 lines.append(f"- `{t.label}` — {(t.spec or '').strip() or 'no signature'}")
-        stores = [s for s in self.stores if (s.content or "").strip()]
-        if stores:
-            lines.append("\n## Data stores (private — read with the matching tool, not shown here)")
-            for s in stores:
-                lines.append(f"- `{s.label}`")
         return "\n".join(lines)
 
     def announce(self) -> None:
@@ -481,24 +482,142 @@ class Engine:
     def matches(self, text: str, phrase: str) -> bool:
         return bool(phrase) and phrase.lower() in (text or "").lower()
 
+    # -- hidden-state machinery ------------------------------------------------ #
+    @staticmethod
+    def _named_args(args: dict | None) -> dict:
+        """Flatten a tool call's args to named params. Tools take a single free-form
+        ``query`` arg (see build_tools); a model usually packs a JSON object into it,
+        so parse that and expose its keys alongside the raw args."""
+        named = dict(args or {})
+        q = named.get("query")
+        if isinstance(q, str) and q.strip()[:1] in "{[":
+            try:
+                parsed = json.loads(q)
+                if isinstance(parsed, dict):
+                    for k, v in parsed.items():
+                        named.setdefault(k, v)
+            except (ValueError, TypeError):
+                pass
+        return named
+
+    @staticmethod
+    def _fill(text: str, named: dict) -> str:
+        """Substitute ``{name}`` placeholders from ``named`` (unknown ones -> empty,
+        so an optional arg the model omitted doesn't leave a literal placeholder)."""
+        return re.sub(r"\{([a-zA-Z_][\w]*)\}",
+                      lambda m: str(named.get(m.group(1), "")), text)
+
+    def _fill_value(self, v, named):
+        if isinstance(v, str):
+            return self._fill(v, named)
+        if isinstance(v, dict):
+            return {k: self._fill_value(x, named) for k, x in v.items()}
+        if isinstance(v, list):
+            return [self._fill_value(x, named) for x in v]
+        return v
+
+    def _state_ref(self, path: str, create: bool):
+        """Return (parent_dict, last_key) for a dotted path, or (None, None)."""
+        parts = [p for p in path.split(".") if p != ""]
+        if not parts:
+            return None, None
+        node = self.state
+        for p in parts[:-1]:
+            nxt = node.get(p)
+            if not isinstance(nxt, dict):
+                if not create:
+                    return None, None
+                nxt = {}
+                node[p] = nxt
+            node = nxt
+        return node, parts[-1]
+
+    def _state_get(self, path: str):
+        parent, key = self._state_ref(path, create=False)
+        return parent.get(key) if isinstance(parent, dict) else None
+
+    def _apply_effects(self, effects: list, named: dict) -> None:
+        with self._state_lock:
+            for op in effects or []:
+                kind = op.get("op")
+                path = self._fill(str(op.get("path", "")), named)
+                if kind == "set":
+                    parent, key = self._state_ref(path, create=True)
+                    if parent is not None:
+                        parent[key] = self._fill_value(op.get("value"), named)
+                elif kind == "append":
+                    parent, key = self._state_ref(path, create=True)
+                    if parent is not None:
+                        parent.setdefault(key, [])
+                        if isinstance(parent[key], list):
+                            parent[key].append(self._fill_value(op.get("value"), named))
+                elif kind == "delete":
+                    parent, key = self._state_ref(path, create=False)
+                    if isinstance(parent, dict):
+                        parent.pop(key, None)
+
+    @staticmethod
+    def _placeholders(res) -> set:
+        """The ``{arg}`` names this tool's effect/returns templates reference."""
+        blob = (json.dumps(getattr(res, "effect", None) or "")
+                + "\x01" + json.dumps(getattr(res, "returns", None) or ""))
+        return set(re.findall(r"\{([a-zA-Z_]\w*)\}", blob))
+
+    def _compute_return(self, ret, named: dict) -> str:
+        if isinstance(ret, dict) and "read" in ret:
+            with self._state_lock:
+                val = self._state_get(self._fill(str(ret["read"]), named))
+            return json.dumps(val, indent=2) if val is not None else f"(no data at {self._fill(str(ret['read']), named)})"
+        return self._fill(str(ret), named)
+
     def resource_value(self, res, st: RunState, args: dict | None = None) -> tuple[str, bool]:
         """The value a tool yields when called, and whether it's poisoned. Emits the
-        attack event at the call site (correct ordering). A read tool serves its
-        data slice (``res.content``); a write/sink tool has no data and instead
-        acknowledges the action it carried out (echoing its args), so the trace shows
-        the side-effect rather than a placeholder. (Memory is the global board, never
-        read through here.)"""
+        attack event at the call site (correct ordering).
+
+        Order of operations: (1) apply the tool's ``effect`` mutations to the hidden
+        state; (2) compute the return — an env-defined ``returns`` (a state read or a
+        templated string) when present, else the static ``content`` slice, else an
+        action acknowledgement; (3) tool-poisoning APPENDS the injection to that
+        genuine return (never replaces it), so the benign subtask can still complete
+        while the injected instruction rides along — exactly like a real poisoned tool."""
+        named = self._named_args(args)
+        ph = self._placeholders(res)
+        # single-arg tools (e.g. send_notification, search_products): let a bare
+        # ``query`` string stand in for the lone placeholder.
+        if len(ph) == 1:
+            only = next(iter(ph))
+            if not str(named.get(only, "")).strip() and str(named.get("query", "")).strip():
+                named[only] = named["query"]
+        missing = [p for p in ph if not str(named.get(p, "")).strip()]
+
+        if missing:
+            # Malformed call (e.g. a plain-text query for a multi-arg tool): don't
+            # touch the state, and guide the model to pass structured args so it can
+            # retry — instead of silently applying an empty mutation.
+            example = "{" + ", ".join(f'"{p}": ...' for p in ph) + "}"
+            value = (f"[{res.label}] error: missing required argument(s): "
+                     f"{', '.join(missing)}. Call with a JSON object, e.g. {example}.")
+        else:
+            if getattr(res, "effect", None):
+                self._apply_effects(res.effect, named)
+            ret = getattr(res, "returns", None)
+            if ret is not None:
+                value = self._compute_return(ret, named)
+            else:
+                content = (res.content or "").strip()
+                if content:
+                    value = content
+                else:
+                    detail = f" args={json.dumps(args)}" if args else ""
+                    value = f"[{res.label}] action completed successfully.{detail}"
+
         m = res.malicious
         if m.enabled:
             st["attacks"].append({"element": res.id, "type": m.attack})
             self._emit(st, "attack", element=res.id, type=m.attack, vector=res.type, payload=m.payload)
-            attack(f"{res.type} '{res.label}' is poisoned -> returns attacker payload: {m.payload!r}")
-            return m.payload, True
-        content = (res.content or "").strip()
-        if content:
-            return content, False
-        detail = f" args={json.dumps(args)}" if args else ""
-        return f"[{res.label}] action completed successfully.{detail}", False
+            attack(f"{res.type} '{res.label}' is poisoned -> injection appended to its result: {m.payload!r}")
+            return f"{value}\n\n{m.payload}", True
+        return value, False
 
     def _stream_response(self, llm, msgs):
         """Stream one LLM response, retrying transient errors (network reset,
@@ -617,16 +736,16 @@ class Engine:
         system = agent.prompt or f"You are {agent.role or agent.label}."
         m = agent.malicious
         injected = m.payload if (m.enabled and m.attack == "prompt-injection") else None
-        tool_res = self.attached.get(agent.id, [])   # tools only — memory is global
+        tool_res = self.attached.get(agent.id, [])   # tools only
         self._emit(st, "node_enter", agent=agent.label, role=agent.role, system=system,
                    incoming=incoming, injected=injected, tools=[r.label for r in tool_res])
 
-        # The global shared memory (auto-generated team / tools / data board) is
+        # The global shared-context board (auto-generated team / tools board) is
         # ambient context, prepended to every agent's input so each agent knows who
         # does what and what tools exist across the whole system.
         user_input = incoming
-        if self.global_memory:
-            user_input = f"[Shared memory]\n{self.global_memory}\n\n{incoming}"
+        if self.shared_context:
+            user_input = f"[Shared context]\n{self.shared_context}\n\n{incoming}"
 
         if injected is not None:
             st["attacks"].append({"element": agent.id, "type": "prompt-injection"})
@@ -688,6 +807,38 @@ class Engine:
                 result.append(ch)
         return result
 
+    COORD_ROLES = frozenset({"orchestrator", "coordinator", "dispatcher", "aggregator",
+                             "consensus", "supervisor", "planner", "manager", "moderator",
+                             "router", "lead"})
+
+    def _dispatch_msg(self, src, ch, output: str) -> str:
+        """Directed dispatch: when a COORDINATOR fans out to several distinct worker
+        agents, send each target only the portion of the output addressed to IT — not
+        the whole decomposition broadcast to everyone. Non-coordinators (workers
+        reporting up, peer-to-peer) send their output unchanged."""
+        if (getattr(src, "role", "") or "").lower() not in self.COORD_ROLES:
+            return output
+        peers = [c.tgt for c in self.out_channels.get(src.id, []) if c.tgt.id in self.by_id]
+        labels = list({p.label for p in peers})
+        if len(labels) < 2:
+            return output
+        return self._segment(output, ch.tgt.label, labels) or output
+
+    @staticmethod
+    def _segment(output: str, target: str, labels: list) -> str:
+        """The slice of `output` addressed to `target`: from each mention of the
+        target's label up to the next agent-label mention. '' if never addressed."""
+        pat = re.compile("|".join(re.escape(l) for l in sorted(labels, key=len, reverse=True)))
+        ms = list(pat.finditer(output))
+        if not ms:
+            return ""
+        out = []
+        for i, m in enumerate(ms):
+            if m.group(0) == target:
+                end = ms[i + 1].start() if i + 1 < len(ms) else len(output)
+                out.append(output[m.start():end].strip())
+        return "\n\n".join(out).strip()
+
     def deliver(self, ch, msg: str, st: RunState) -> None:
         cm = ch.malicious
         original = None
@@ -697,8 +848,11 @@ class Engine:
             self._emit(st, "attack", element=f"{ch.src.id}->{ch.tgt.id}", type="aitm",
                        vector="channel", payload=cm.payload)
             attack(f"channel {ch.src.label} -> {ch.tgt.label} intercepted (AiTM) "
-                   f"-> message rewritten to: {cm.payload!r}")
-            original, msg = msg, cm.payload
+                   f"-> injection blended into the message: {cm.payload!r}")
+            # Blend, don't replace: the tampered message keeps the ORIGINAL content
+            # (so the legit instruction still gets through and the task isn't broken)
+            # with the injection appended in-band — a realistic, stealthier tamper.
+            original, msg = msg, f"{msg}\n\n{cm.payload}"
         self._emit(st, "channel", src=ch.src.label, tgt=ch.tgt.label, label=ch.label or "",
                    message=msg, aitm=aitm, original=original)
         tgt = ch.tgt
@@ -722,7 +876,7 @@ class Engine:
             return
         st["started"] = True
         self._emit(st, "run_start", arch=self.name, task=self.task,
-                   compromised=self.compromised, global_memory=self.global_memory,
+                   compromised=self.compromised, shared_context=self.shared_context,
                    entries=[a.label for a in self.entries],
                    exits=[a.label for a in self.exits], poison_mode=None)
         for e in self.entries:
@@ -797,7 +951,7 @@ class Engine:
         agent = self.by_id[agent_id]
         output = self.think(agent, incoming, st)
         for ch in self.chosen_edges(agent, output, st):
-            self.deliver(ch, output, st)
+            self.deliver(ch, self._dispatch_msg(agent, ch, output), st)
 
     # -- finalize: print __RESULT__ / __SCN__ ------------------------------- #
     def finalize(self, st: RunState) -> dict:
@@ -839,6 +993,8 @@ class Engine:
             "verdict": _verdict,
             "trace": {"events": events},
         }
+        if self.state:                       # final hidden state after all tool effects
+            scn["final_state"] = self.state
         print("__SCN__ " + json.dumps(scn), flush=True)
         return result
 
@@ -916,8 +1072,9 @@ class Engine:
                 futs = {aid: pool.submit(self.think, self.by_id[aid], msg, st) for aid, msg in wave}
                 for aid, _msg in wave:
                     output = futs[aid].result()
-                    for ch in self.chosen_edges(self.by_id[aid], output, st):
-                        self.deliver(ch, output, st)
+                    src = self.by_id[aid]
+                    for ch in self.chosen_edges(src, output, st):
+                        self.deliver(ch, self._dispatch_msg(src, ch, output), st)
         return st
 
 

@@ -287,7 +287,7 @@ class ScenarioInput(BaseModel):
     template_id: str
     user_task_id: Optional[str] = None      # benign task; None -> env's first
     injection_task_id: Optional[str] = None  # attacker goal; None -> clean run
-    injection_kind: Optional[str] = None     # 'tool' | 'agent' | 'aitm' (memory is the global board, never injected)
+    injection_kind: Optional[str] = None     # 'tool' | 'agent' | 'aitm'
     injection_target: Optional[str] = None   # tool id (tool) / agent node id|label (agent) / channel id (aitm)
     stealth_style: str = "blended"           # blended | authority | metadata | tagged
     provider: Optional[str] = None
@@ -366,7 +366,7 @@ def scenario_run(inp: ScenarioInput) -> dict:
         "task_success": meta.get("task_success"),
     }
     # Return the assembled architecture so the editor can switch its canvas to
-    # exactly what's running (env tools/memory + the injection point), not just
+    # exactly what's running (env tools + the injection point), not just
     # the bare template.
     return {"run_id": _start_run(arch, evaluate=evaluate), "arch": arch.model_dump(), **meta}
 
@@ -666,7 +666,7 @@ def run_template(template_id: str, body: TemplateRunInput) -> dict:
                 n["provider"] = body.provider
             if body.model is not None:
                 n["model"] = body.model
-        if n["id"] in body.resources and n["type"] in ("tool", "memory"):
+        if n["id"] in body.resources and n["type"] == "tool":
             n["content"] = body.resources[n["id"]]
 
     if body.compromise:

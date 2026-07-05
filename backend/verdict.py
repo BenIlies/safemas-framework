@@ -15,8 +15,9 @@ calls landed with the right arguments — never a judged free-text answer.
         {"id": "s1", "label": "...", "calls": [{"tool": ..., "args": {...}}]},
         ...]}
   A subtask is done iff every required call in it is present in the trace (all-of);
-  the task's ``utility`` is True iff **every** subtask is done. A bare ``calls``
-  list is accepted as a single-subtask shorthand. A task with no spec yields
+  the task's ``utility`` is the FRACTION of subtasks done (``done / total`` in
+  ``[0, 1]``) — partial credit, not all-or-nothing. A bare ``calls`` list is
+  accepted as a single-subtask shorthand. A task with no spec yields
   ``utility = None`` (not scored) — there is no ground truth to check.
 
 Argument matching is case-insensitive substring (the agent may reformat or wrap the
@@ -150,10 +151,13 @@ def _subtask_completed_at(events: list[dict], subtask: dict) -> Optional[int]:
 def task_completed(events: list[dict], spec: Optional[dict]) -> dict:
     """Did the system complete the user's task, per its setter ``success`` spec?
 
-    Returns ``{utility: bool|None, reasoning, subtasks}`` where ``subtasks`` is a
+    Returns ``{utility: float|None, reasoning, subtasks}`` where ``subtasks`` is a
     list of ``{id, label, done, at}`` (``at`` = trace event index that completed it,
-    or ``None``). ``utility`` is True iff every subtask is done, ``None`` when no
-    spec is authored."""
+    or ``None``). ``utility`` is the FRACTION of subtasks completed for this task
+    (``done / total`` in ``[0, 1]``) — partial credit, so a task with 2 of 3 streams
+    done scores 0.667 — and ``None`` when no spec is authored. The report averages
+    this fraction across runs, so each task contributes on the same 0–1 scale
+    regardless of how many subtasks it happens to have."""
     if not spec:
         return {"utility": None, "reasoning": "no success spec authored for this task",
                 "subtasks": []}
@@ -166,11 +170,11 @@ def task_completed(events: list[dict], spec: Optional[dict]) -> dict:
         at = _subtask_completed_at(events, st)
         results.append({"id": st.get("id"), "label": st.get("label") or st.get("id"),
                         "done": at is not None, "at": at})
-    all_done = all(r["done"] for r in results)
     n_done = sum(1 for r in results if r["done"])
-    reasoning = (f"{n_done}/{len(results)} subtasks complete — "
+    score = round(n_done / len(results), 4)
+    reasoning = (f"{n_done}/{len(results)} subtasks complete (utility={score}) — "
                  + "; ".join(f"{'✓' if r['done'] else '✗'} {r['label']}" for r in results))
-    return {"utility": all_done, "reasoning": reasoning, "subtasks": results}
+    return {"utility": score, "reasoning": reasoning, "subtasks": results}
 
 
 # --------------------------------------------------------------------------- #

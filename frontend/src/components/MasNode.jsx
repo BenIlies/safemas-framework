@@ -1,7 +1,7 @@
 import { Handle, Position } from 'reactflow'
 import { NODE_TYPES } from '../lib/elements.js'
 
-// A single canvas element. Agents/memory/tools are full nodes; entrance and exit
+// A single canvas element. Agents and tools are full nodes; entrance and exit
 // are compact structural markers with a single port. Malicious elements render
 // loudly: red hazard border, pulsing glow, ☠ badge and attack label.
 export default function MasNode({ data, selected }) {
@@ -49,7 +49,6 @@ export default function MasNode({ data, selected }) {
       </div>
       <div className="mas-node-sub">
         {data.type === 'agent' && <span>{data.__model || data.model || 'mock'}</span>}
-        {data.type === 'memory' && <span>{data.backend || 'in-memory'}</span>}
         {data.type === 'tool' && <span>tool</span>}
         {data.type === 'agent' && data.join === 'all' && <span className="mas-join" title="waits for all inputs, then aggregates">⋈ join all</span>}
       </div>
