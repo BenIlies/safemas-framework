@@ -234,7 +234,7 @@ def parse_arch(arch: dict):
             model=n.get("model"), temperature=n.get("temperature"),
             max_tokens=n.get("max_tokens"), join=n.get("join") or "any",
             spec=n.get("spec"), content=n.get("content"),
-            returns=n.get("returns"), effect=n.get("effect"),
+            returns=n.get("returns"), effect=n.get("effect"), params=n.get("params"),
             malicious=_mal(n.get("malicious")),
         )
 
@@ -300,21 +300,44 @@ def build_chat_model(provider: dict, model: str, agent):
     return ChatOpenAI(**kw)
 
 
+_PYTYPE = {"string": str, "integer": int, "number": float, "boolean": bool,
+           "array": list, "object": dict}
+
+
 def build_tools(res_list):
-    """LangChain tool stubs (name + description + a free-form ``query`` arg) for
-    each attached tool. Execution is done manually in the loop so we control the
-    scn event ordering, so the stub body is never actually invoked."""
+    """LangChain tool stubs for each attached tool. When the env tool declares
+    ``params``, bind them as a **typed args schema** so the model emits structured
+    arguments (``device_id``, ``state``, …) matching the spec — instead of cramming
+    everything into one free-form ``query`` string. Tools with no declared params
+    fall back to a single ``query`` arg. Execution is manual in the loop (we control
+    scn event ordering), so the stub body is never actually invoked."""
     from langchain_core.tools import StructuredTool
+    from pydantic import create_model, Field
     tools, by_name = [], {}
     for res in res_list:
         name = _tool_name(res.label)
         while name in by_name:           # disambiguate collisions
             name += "_"
         desc = (res.spec or "").strip() or f"Call the '{res.label}' tool."
+        params = [p for p in (getattr(res, "params", None) or []) if p.get("name")]
 
-        def _stub(query: str = "") -> str:  # pragma: no cover - never called
-            return ""
-        tools.append(StructuredTool.from_function(_stub, name=name, description=desc))
+        if params:
+            fields = {}
+            for p in params:
+                pt = _PYTYPE.get(str(p.get("type") or "string").lower(), str)
+                # REQUIRED (in the schema's `required` list) so the model supplies real
+                # values instead of emitting nulls for optional/nullable fields.
+                fields[p["name"]] = (pt, Field(description=(p.get("description") or "")))
+            args_schema = create_model(f"{name}_Args", **fields)
+
+            def _stub(**kw) -> str:  # pragma: no cover - never called
+                return ""
+            tools.append(StructuredTool(name=name, description=desc,
+                                        args_schema=args_schema, func=_stub))
+        else:
+            def _stub_q(query: str = "") -> str:  # pragma: no cover - never called
+                return ""
+            tools.append(StructuredTool.from_function(_stub_q, name=name, description=desc))
         by_name[name] = res
     return tools, by_name
 

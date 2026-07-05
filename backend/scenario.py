@@ -399,13 +399,11 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         else:
             point_label = point.get("label") or f'{point["kind"]} · {point.get("id")}'
 
-    # SEGREGATE tools across the WORKER agents: each tool attaches to exactly ONE
-    # worker (balanced round-robin, so every worker owns ~the same number of tools),
-    # not to all of them. This models a realistic MAS where an agent can only act
-    # within its own capability set — so coordination (routing the right sub-task to
-    # the agent that owns the needed tool) actually matters. The shared-context board
-    # lists each agent's tools, so the orchestrator can route accordingly. With a
-    # single-worker template (SAS / independent) that lone agent owns everything.
+    # Attach EVERY tool to EVERY worker agent. Tools are NOT segregated: a subtask
+    # (e.g. a thermostat stream) needs both a read/inspect tool and its action tools,
+    # so splitting tools across agents would leave an agent unable to complete its
+    # stream (it would report "I don't have a list/read tool"). Every worker holds the
+    # full toolset; coordination structure — not tool partitioning — is the variable.
     # A READ tool's `content` is its slice of the backing store; write/sink tools ack.
     workers = tool_agents(agents)
     store = _env_store(env)
@@ -414,6 +412,7 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         name = t.get("name")
         data = resolve_tool_data(t, store)
         node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
+                "params": t.get("parameters") or None,
                 "content": json.dumps(data, indent=2) if data is not None else None,
                 "position": {"x": 60 + i * 150, "y": 380}}
         # env-defined dynamic return + hidden-state mutations for this tool
@@ -424,10 +423,9 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         if poison is not None and point and point["kind"] == "tool" and point.get("id") == name:
             node["malicious"] = poison
         arch["nodes"].append(node)
-        if workers:
-            owner = workers[i % len(workers)]        # round-robin -> balanced, disjoint
-            arch["edges"].append({"id": f"scn-a{i}-{owner['id']}", "source": name,
-                                  "target": owner["id"], "kind": "attach"})
+        for ag in workers:
+            arch["edges"].append({"id": f"scn-a{i}-{ag['id']}", "source": name,
+                                  "target": ag["id"], "kind": "attach"})
         i += 1
 
     tool_names = [t.get("name") for t in tools]

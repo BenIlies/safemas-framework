@@ -16,10 +16,10 @@ from safemas import StateGraph
 _DONE = "[[TASK_COMPLETE]]"
 _BACKSTOP = 8
 
-g = StateGraph('hybrid',
+g = StateGraph('hybrid3',
                task='Coordinate sub-agents under an orchestrator while allowing limited peer-to-peer exchange.',
                group='Multi-agent architectures',
-               title='MAS · Hybrid (orchestrator + peer)')
+               title='MAS · Hybrid (orchestrator + peer) · 3 workers')
 
 # agents
 g.add_node('Orchestrator', role='orchestrator', join='all',

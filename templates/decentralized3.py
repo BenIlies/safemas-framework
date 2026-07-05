@@ -14,10 +14,10 @@ from safemas import StateGraph
 #   so it waits to hear from BOTH other peers before forming its next position — that
 #   is what makes the rounds SYNCHRONISED (a peer fuses all peers' views per round)
 #   rather than a runaway cascade. Consensus is the post-debate majority.
-g = StateGraph('decentralized',
+g = StateGraph('decentralized3',
                task='Reach a consensus answer through peer-to-peer debate and majority voting.',
                group='Multi-agent architectures',
-               title='MAS · Decentralized (peer debate + vote)')
+               title='MAS · Decentralized (peer debate + vote) · 3 workers')
 
 # agents — three peers, no orchestrator. join='all' = integrate every peer's
 # message each round (synchronised debate), not run on the first one that arrives.

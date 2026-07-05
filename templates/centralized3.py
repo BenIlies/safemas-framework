@@ -18,10 +18,10 @@ from safemas import StateGraph
 _DONE = "[[TASK_COMPLETE]]"
 _BACKSTOP = 8                        # safety cap on rounds; real stop is the sentinel
 
-g = StateGraph('centralized',
+g = StateGraph('centralized3',
                task='Coordinate sub-agents through a central orchestrator that decomposes, verifies and aggregates.',
                group='Multi-agent architectures',
-               title='MAS · Centralized (hierarchical orchestrator)')
+               title='MAS · Centralized (hierarchical orchestrator) · 3 workers')
 
 # agents
 g.add_node('Orchestrator', role='orchestrator', join='all',

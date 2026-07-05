@@ -84,6 +84,10 @@ class Node(BaseModel):
 
     # tool-specific
     spec: Optional[str] = None  # tool description / signature
+    # The tool's parameter schema ([{name, type, description}, …]) — bound to the
+    # model as a typed StructuredTool so it emits structured args (device_id, state, …)
+    # instead of cramming everything into one free-form `query` string.
+    params: Optional[list] = None
 
     # Optional env-defined return for a tool call, so a tool's output can depend on
     # its input and the live world state. Either:

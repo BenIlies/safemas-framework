@@ -8,10 +8,10 @@ from safemas import StateGraph
 #   the aggregator merely CONCATENATES their outputs — no cross-validation, no
 #   majority voting (that is Decentralized's mechanism) — so any delta over SAS comes
 #   from parallel exploration, not error correction.
-g = StateGraph('independent',
+g = StateGraph('independent3',
                task='Answer by running independent agents in parallel and synthesising their outputs.',
                group='Multi-agent architectures',
-               title='MAS · Independent (parallel + synthesis)')
+               title='MAS · Independent (parallel + synthesis) · 3 workers')
 
 # agents — n parallel workers + a synthesis aggregator (no dispatcher node). The same
 # task reaches all three, so each worker SELF-SELECTS a different slice by its number:
