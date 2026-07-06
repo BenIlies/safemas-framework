@@ -319,6 +319,7 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
             # doesn't know the template's agents); assemble resolves the id/label and
             # defaults to the entry agent when none is named.
             point = {"kind": "agent", "id": inp.injection_target or "",
+                     "actor_tool": inj.get("actor_tool"),
                      "attack": "prompt-injection", "label": "agent"}
         elif kind == "aitm":
             # Adversary-in-the-middle: a channel between agents is intercepted and the
@@ -326,6 +327,7 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
             # level choice; assemble resolves it (defaults to the first inter-agent
             # channel) and errors if the template has no such channel (e.g. SAS).
             point = {"kind": "aitm", "id": inp.injection_target or "",
+                     "actor_tool": inj.get("actor_tool"),
                      "attack": "aitm", "label": "channel"}
         else:
             point = next((p for p in scenario_store.injection_points(env)

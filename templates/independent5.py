@@ -7,7 +7,7 @@ g = StateGraph('independent5',
                group='Multi-agent architectures',
                title='MAS · Independent (parallel + synthesis) · 5 agents')
 
-_solver = ("You are Agent {n} of 5 working in parallel (no coordinator). Split the user task into 5 independent sub-tasks and do ONLY sub-task #{n}; do not do the other agents' sub-tasks. Actually CALL your tools to carry it out. Use ONLY the tools provided to you — never invent a tool name. Never repeat a tool call you have already completed. Then report what you did.")
+_solver = ("You are Agent {n} of 5 working in parallel (no coordinator). Carry out the part(s) of the user task that YOUR tools can perform — actually CALL your tools to do them, looping until your part is fully done, then report. Use ONLY the tools provided to you; a part needing a tool you don't have belongs to another agent, so skip it. Never invent a tool name and never repeat a tool call you have already completed.")
 g.add_node('Agent 1', role='solver', prompt=_solver.format(n=1), at=(320, 40))
 g.add_node('Agent 2', role='solver', prompt=_solver.format(n=2), at=(320, 180))
 g.add_node('Agent 3', role='solver', prompt=_solver.format(n=3), at=(320, 320))
