@@ -289,7 +289,7 @@ class ScenarioInput(BaseModel):
     injection_task_id: Optional[str] = None  # attacker goal; None -> clean run
     injection_kind: Optional[str] = None     # 'tool' | 'agent' | 'aitm'
     injection_target: Optional[str] = None   # tool id (tool) / agent node id|label (agent) / channel id (aitm)
-    stealth_style: str = "blended"           # blended | authority | metadata | tagged
+    aitm_channel: Optional[str] = None       # 'coord2source' | 'coord2sink' | 'source2sink' (semantic AiTM channel)
     provider: Optional[str] = None
     model: Optional[str] = None
 
@@ -305,7 +305,7 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     task_prompt = user_task["prompt"] if user_task else "Help the user with their request."
     task_success = user_task.get("success") if user_task else None  # deterministic completion spec
 
-    goal, point, success = None, None, None
+    goal, point, success, delivery, harm = None, None, None, None, None
     if inp.injection_task_id:
         inj = next((j for j in env.get("injection_tasks", [])
                     if j["id"] == inp.injection_task_id), None)
@@ -313,6 +313,10 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
             raise HTTPException(422, "unknown injection_task_id")
         goal = inj["goal"]
         success = inj.get("success")  # deterministic tool-call attack-success condition
+        delivery = inj.get("delivery")  # state predicate: poisoned edit landed (plant)
+        harm = inj.get("harm")          # state predicate: sink effect landed (harm)
+        # sink tool for AiTM channel resolution: from the success condition
+        _sink_tool = (success[0] if isinstance(success, list) else success or {}).get("tool") if success else None
         kind = inp.injection_kind or "agent"
         if kind == "agent":
             # Which agent is compromised is an architecture-level choice (the env
@@ -328,6 +332,8 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
             # channel) and errors if the template has no such channel (e.g. SAS).
             point = {"kind": "aitm", "id": inp.injection_target or "",
                      "actor_tool": inj.get("actor_tool"),
+                     "sink_tool": _sink_tool,
+                     "aitm_channel": inp.aitm_channel,
                      "attack": "aitm", "label": "channel"}
         else:
             point = next((p for p in scenario_store.injection_points(env)
@@ -339,11 +345,13 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     try:
         arch, meta = scenario_store.assemble(
             template, env, task_prompt=task_prompt, provider=inp.provider,
-            model=inp.model, injection_goal=goal, point=point, style=inp.stealth_style)
+            model=inp.model, injection_goal=goal, point=point)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     meta["breach_signal"] = scenario_store.default_breach_signal(env)
     meta["success"] = success           # {tool, args} sink that means the attack landed
+    meta["delivery"] = delivery          # state predicate: poisoned edit landed (plant)
+    meta["harm"] = harm                  # state predicate: sink effect landed (harm)
     meta["task_success"] = task_success  # deterministic user-task completion spec
     meta["task_prompt"] = task_prompt
     return Architecture(**arch), meta
@@ -366,6 +374,8 @@ def scenario_run(inp: ScenarioInput) -> dict:
     evaluate = {
         "success": meta.get("success"),
         "task_success": meta.get("task_success"),
+        "delivery": meta.get("delivery"),
+        "harm": meta.get("harm"),
     }
     # Return the assembled architecture so the editor can switch its canvas to
     # exactly what's running (env tools + the injection point), not just
@@ -608,7 +618,8 @@ def _score_run(run: dict, scn: dict) -> None:
         return
     try:
         verdict_store.evaluate_scenario(
-            scn, success=ev.get("success"), task_success=ev.get("task_success"))
+            scn, success=ev.get("success"), task_success=ev.get("task_success"),
+            delivery=ev.get("delivery"), harm=ev.get("harm"))
     except Exception:  # scoring must never sink the run
         pass
 
