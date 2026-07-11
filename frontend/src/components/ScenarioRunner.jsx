@@ -5,13 +5,6 @@ import * as api from '../lib/api.js'
 // an injection scenario + the point where the poison lands, then assemble and
 // run that single case — to probe "does THIS architecture resist THIS injection
 // at THIS point?" and replay the result in the trace viewer.
-const STYLES = [
-  ['blended', 'Blended (social-engineering)', 'Reads as ordinary content — no tags, no “message to the AI”. Hardest to detect.'],
-  ['authority', 'Authority impersonation', 'Plausible IT/security/admin notice with urgency, untagged.'],
-  ['metadata', 'Spoofed system metadata', 'Disguised as a config/automation directive the agent processes.'],
-  ['tagged', 'Tagged (naive baseline)', 'Classic <INFORMATION> “important instructions” — trivially detectable; for comparison.'],
-]
-
 const pointKey = (p) => `${p.kind}::${p.id || ''}`
 
 export default function ScenarioRunner({ templates, providers, onRun, onClose, toast }) {
@@ -22,7 +15,6 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
   const [userTaskId, setUserTaskId] = useState('')
   const [injTaskId, setInjTaskId] = useState('') // '' => clean (no injection)
   const [point, setPoint] = useState('')         // "kind::id"
-  const [style, setStyle] = useState('blended')
   const [provider, setProvider] = useState('')
   const [model, setModel] = useState('')
   const [preview, setPreview] = useState(null)
@@ -98,11 +90,10 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
       injection_task_id: injTaskId || null,
       injection_kind: injTaskId ? kind : null,
       injection_target: injTaskId ? (id || null) : null,
-      stealth_style: style,
       provider: provider || null,
       model: model || null,
     }
-  }, [envName, templateId, userTaskId, injTaskId, point, style, provider, model])
+  }, [envName, templateId, userTaskId, injTaskId, point, provider, model])
 
   // Live preview of the assembled payload (only meaningful with an injection).
   useEffect(() => {
@@ -205,13 +196,6 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
               </select>
             </label>
 
-            <label className={`field${injTaskId ? '' : ' scn-dim'}`}>
-              <span className="field-label">Stealth style</span>
-              <select value={style} onChange={(e) => setStyle(e.target.value)} disabled={!injTaskId}>
-                {STYLES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-              </select>
-            </label>
-
             <label className="field">
               <span className="field-label">Provider</span>
               <select value={provider} onChange={(e) => {
@@ -257,7 +241,7 @@ export default function ScenarioRunner({ templates, providers, onRun, onClose, t
               </div>
               <pre className="scn-payload-body">{preview?.payload || '…'}</pre>
               <div className="scn-meta">
-                lands at <b>{preview?.injection_point || '—'}</b> · style {style}
+                lands at <b>{preview?.injection_point || '—'}</b>
               </div>
             </div>
           )}

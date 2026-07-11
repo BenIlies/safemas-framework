@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministically validate that every environment's confined-deputy user task (cd_task_5) is
+"""Deterministically validate that every environment's graded user tasks (user_task_0..8) are
 DOABLE and correctly GRADED — with no LLM in the loop.
 
 Two checks per env:
@@ -18,6 +18,7 @@ Exit code is nonzero if any env fails either check (usable as a CI gate).
 """
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))   # the environments/ folder
@@ -28,7 +29,6 @@ from verdict import task_completed, state_hit  # the real deterministic grader +
 import coherence                                # type/format classifier
 
 ENVDIR = HERE
-USER_TASK = "cd_task_5"
 # Only STRUCTURED-IDENTIFIER arg values must be resolvable from state (an agent looks them up).
 # Enums ('frozen'/'squash'/'away'), amounts, dates, booleans and free text are AGENT-GENERATED —
 # absence from state is expected and fine, so they are not "phantom".
@@ -52,9 +52,11 @@ def _synthetic_trace(subtasks):
 
 
 def _fill(s, args):
-    for k, v in (args or {}).items():
-        s = s.replace("{" + k + "}", str(v))
-    return s
+    # Match the runtime (graph_runtime._fill): every {name} placeholder is substituted, and one the
+    # caller omitted resolves to "" (not left as a literal "{name}") — so the partial-update skip in
+    # _apply behaves identically here.
+    return re.sub(r"\{([a-zA-Z_][\w]*)\}",
+                  lambda m: str((args or {}).get(m.group(1), "")), str(s))
 
 
 def _fill_val(val, args):
@@ -66,8 +68,9 @@ def _fill_val(val, args):
 
 
 def _apply(effect, args, state):
-    """Apply a tool effect (set/append) to a state copy, substituting the call's args into the
-    templates — a standalone mirror of the runtime engine, enough to check where a value lands."""
+    """Apply a tool effect (set/append/delete) to a state copy, substituting the call's args into
+    the templates — a standalone mirror of the runtime engine (graph_runtime._apply_effects),
+    enough to check where a value lands."""
     for op in (effect or []):
         path = _fill(str(op.get("path", "")), args).split(".")
         cur = state
@@ -78,25 +81,51 @@ def _apply(effect, args, state):
         if not isinstance(cur, dict):
             continue
         key = path[-1]
-        if op.get("op") == "set":
-            cur[key] = _fill_val(op.get("value"), args)
-        elif op.get("op") == "append":
+        opk = op.get("op")
+        if opk == "set":
+            raw = op.get("value")
+            val = _fill_val(raw, args)
+            # PARTIAL update: a templated field the caller omitted (empty after fill) is skipped,
+            # so it doesn't clobber the record's existing value — mirrors the runtime.
+            if isinstance(raw, str) and "{" in raw and not str(val).strip():
+                continue
+            cur[key] = val
+        elif opk == "append":
             cur.setdefault(key, [])
             if isinstance(cur[key], list):
                 cur[key].append(_fill_val(op.get("value"), args))
+        elif opk == "delete":
+            cur.pop(key, None)
 
 
-def validate_task(env, task, tools, blob):
-    """Grader self-consistency + resolvability for one graded user task."""
+def _perfect_state(env, eff, subtasks):
+    """The world state a PERFECT SOLVER leaves behind: apply every authored write call's effect,
+    in order, to a copy of the env's initial state — so the state-based success checks can be
+    tested against it (the deterministic analogue of the synthetic 'perfect trace')."""
+    state = json.loads(json.dumps(env.get("state", {})))
+    for st in subtasks:
+        for c in (st.get("calls") or []):
+            if c and c.get("tool"):
+                _apply(eff.get(c["tool"]), c.get("args") or {}, state)
+    return state
+
+
+def validate_task(env, task, tools, blob, eff):
+    """Grader self-consistency + resolvability for one graded user task. Self-consistency is now
+    STATE-based: build the perfect-solver final state, then require the task's authored ``checks``
+    to grade to utility 1.0 against it (the spec and the grader must agree)."""
     spec = task.get("success") or {}
-    subtasks = spec.get("subtasks") or ([{"calls": spec["calls"]}] if spec.get("calls") else [])
+    subtasks = spec.get("subtasks") or ([{"calls": spec["calls"], "checks": spec.get("checks")}]
+                                        if spec.get("calls") or spec.get("checks") else [])
     issues = []
-    graded = task_completed(_synthetic_trace(subtasks), spec)
+    final_state = _perfect_state(env, eff, subtasks)
+    graded = task_completed(_synthetic_trace(subtasks), spec, final_state)
     if graded.get("utility") != 1.0:
         for s in graded.get("subtasks", []):
             if not s.get("done"):
                 issues.append(f"GRADER {task['id']}: subtask '{s.get('id')}' scores "
-                              f"{s.get('checks_done')}/{s.get('checks_total')} on its own authored calls")
+                              f"{s.get('checks_done')}/{s.get('checks_total')} state-checks on the "
+                              f"perfect-solver final state")
     for st in subtasks:
         for c in (st.get("calls") or []):
             tn = c.get("tool")
@@ -145,18 +174,29 @@ def _tool_agent_map(env):
     return {t: a for a, ts in (tg.items() if isinstance(tg, dict) else []) for t in ts}
 
 
-def _task_flow(task, tmap):
-    """A utility task as its parallel sub-streams: each subtask, the AGENT that owns it, and the
-    (benign, role='task') tool calls it makes. Every subtask is kept — these run independently."""
+def _task_flow(task, tmap, eff):
+    """A utility task as its parallel sub-streams. Each subtask becomes one CHAIN of nodes, in
+    authored order: a READ (getter, no ``effect`` — universal, held by every worker) or a WRITE
+    (setter, has ``effect`` — owned by the single specialist agent that holds that tool in
+    ``tool_groups``). The sub-stream lane is that acting specialist. Every subtask is kept — the
+    streams run independently/in parallel."""
     spec = task.get("success") or {}
     subs = spec.get("subtasks") or ([{"id": "main", "calls": spec["calls"]}] if spec.get("calls") else [])
     steps = []
     for st in subs:
-        calls = [{"tool": c.get("tool"), "args": c.get("args") or {},
-                  "agent": tmap.get(c.get("tool"), "?"), "role": "task"}
-                 for c in (st.get("calls") or []) if c and c.get("tool")]
+        chain = []
+        for c in (st.get("calls") or []):
+            if not (c and c.get("tool")):
+                continue
+            tn = c["tool"]
+            is_write = bool(eff.get(tn))
+            chain.append({"tool": tn, "args": c.get("args") or {},
+                          "role": "write" if is_write else "read",
+                          # setters route to their owning specialist; reads are shared (no owner)
+                          "agent": tmap.get(tn) if is_write else None})
+        actor = next((n["agent"] for n in chain if n["role"] == "write" and n["agent"]), None)
         steps.append({"subtask": st.get("label") or st.get("id") or "subtask",
-                      "agent": (calls[0]["agent"] if calls else "?"), "calls": calls})
+                      "agent": actor or "?", "chain": chain})
     return {"kind": "utility", "prompt": task.get("prompt", "")[:300], "steps": steps}
 
 
@@ -200,7 +240,7 @@ def build_flows(env, eff):
               if (t.get("success") or {}).get("subtasks") or (t.get("success") or {}).get("calls")]
     return {
         "agents": env.get("tool_groups") or {},   # theoretical agents -> their owned tools
-        "utility_tasks": {t["id"]: _task_flow(t, tmap) for t in graded},
+        "utility_tasks": {t["id"]: _task_flow(t, tmap, eff) for t in graded},
         "attacks": {t["id"]: _attack_flow(env, t, eff, tmap) for t in env.get("injection_tasks", [])},
     }
 
@@ -220,7 +260,7 @@ def main():
                         if (t.get("success") or {}).get("subtasks") or (t.get("success") or {}).get("calls")]
         issues, worst_util = [], 1.0
         for t in graded_tasks:
-            u, iss = validate_task(env, t, tools, blob)
+            u, iss = validate_task(env, t, tools, blob, eff)
             issues += iss
             if u is not None and u < worst_util:
                 worst_util = u

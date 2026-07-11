@@ -622,9 +622,17 @@ class Engine:
                 kind = op.get("op")
                 path = self._fill(str(op.get("path", "")), named)
                 if kind == "set":
+                    raw = op.get("value")
+                    val = self._fill_value(raw, named)
+                    # A PARTIAL update must not clobber: if this field's value is a template the
+                    # caller didn't supply (missing arg -> empty after fill), skip the op so the
+                    # record keeps its existing value instead of being blanked. Literal values and
+                    # supplied args still set normally.
+                    if isinstance(raw, str) and "{" in raw and not str(val).strip():
+                        continue
                     parent, key = self._state_ref(path, create=True)
                     if parent is not None:
-                        parent[key] = self._fill_value(op.get("value"), named)
+                        parent[key] = val
                 elif kind == "append":
                     parent, key = self._state_ref(path, create=True)
                     if parent is not None:

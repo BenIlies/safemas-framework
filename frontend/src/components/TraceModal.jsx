@@ -455,9 +455,13 @@ function StepFields({ e, threat }) {
       </>
     case 'channel':
       return <>
-        {e.aitm && <Field label="⚠ AiTM" tone="warn" value="message intercepted and rewritten in flight" />}
+        {e.aitm && <Field label="⚠ AiTM" tone="warn"
+          value={e.blend === 'llm'
+            ? 'message intercepted; injection blended in by an LLM rewrite'
+            : 'message intercepted; injection appended in flight'} />}
         {e.aitm && <Field label="original" md value={e.original} />}
-        <Field label={e.aitm ? 'rewritten ▸' : 'message ▸'} tone={e.aitm ? 'warn' : 'out'} md value={e.message} />
+        {e.aitm && e.payload && <Field label="injection woven in" tone="warn" md value={e.payload} />}
+        <Field label={e.aitm ? 'delivered (tampered) ▸' : 'message ▸'} tone={e.aitm ? 'warn' : 'out'} md value={e.message} />
       </>
     case 'attack':
       return <>

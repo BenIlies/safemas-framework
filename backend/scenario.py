@@ -268,9 +268,11 @@ def resolve_tool_data(tool: dict, store: dict):
 
 
 def _env_store(env: dict) -> dict:
-    """The environment's canonical backing store — the ``environment`` dict, whose
-    slices are served to agents through read tools (never as ambient context)."""
-    store = env.get("environment")
+    """The environment's canonical backing store — the ``state`` dict, whose slices are
+    served to agents through read tools (never as ambient context). Read tools resolve
+    their live value from ``state`` via ``returns.read`` at call time; this only seeds the
+    static ``content`` slice shown for a tool that declares no ``returns``."""
+    store = env.get("state")
     return store if isinstance(store, dict) else {}
 
 
