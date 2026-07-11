@@ -206,6 +206,23 @@ def _subtask_completed_at(events: list[dict], subtask: dict) -> Optional[int]:
     return max(completing)
 
 
+def _subtask_agents(events: list[dict], subtask: dict) -> list[str]:
+    """The worker(s) that actually performed this subtask's reference calls, in first-seen order —
+    so the verdict records WHO did each subtask (under tool segregation this is the capability
+    owner). Reads are universal, so a subtask's setter calls are the discriminating ones."""
+    agents: list[str] = []
+    for req in (subtask.get("calls") or []):
+        if not (req and req.get("tool")):
+            continue
+        for ev in events:
+            if _event_satisfies(ev, req["tool"], req.get("args") or {}):
+                a = ev.get("agent")
+                if a and a not in agents:
+                    agents.append(a)
+                break
+    return agents
+
+
 def task_completed(events: list[dict], spec: Optional[dict],
                    final_state: Optional[dict] = None) -> dict:
     """Did the system complete the user's task, per its ``success`` spec?
@@ -230,7 +247,7 @@ def task_completed(events: list[dict], spec: Optional[dict],
 
     results: list[dict] = []
     checks_done = checks_total = 0
-    for st in subtasks:
+    for idx, st in enumerate(subtasks):
         checks = st.get("checks")
         if checks and isinstance(final_state, dict):
             n_ok = sum(1 for c in checks if _check_hit(final_state, c))
@@ -249,9 +266,14 @@ def task_completed(events: list[dict], spec: Optional[dict],
             at = max([f for f in firsts if f is not None], default=None) if all_done else None
         checks_done += n_ok
         checks_total += total
+        # WHO did it: the worker(s) whose tool calls satisfied this subtask's reference calls, plus
+        # the canonical capability slot (subtask i is Sub-Agent i's job, even in a smaller arch) so
+        # the logs/UI can read "Task i -> Sub-Agent i".
         results.append({"id": st.get("id"), "label": st.get("label") or st.get("id"),
                         "done": all_done, "at": at,
-                        "checks_done": n_ok, "checks_total": total})
+                        "checks_done": n_ok, "checks_total": total,
+                        "capability": f"Sub-Agent {idx + 1}",
+                        "agents": _subtask_agents(events, st)})
     score = round(checks_done / checks_total, 4) if checks_total else None
     reasoning = (f"{checks_done}/{checks_total} checks satisfied (utility={score}) — "
                  + "; ".join(f"{r['checks_done']}/{r['checks_total']} {r['label']}" for r in results))
