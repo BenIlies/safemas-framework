@@ -338,13 +338,18 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
 
 **Deterministic scenario set (`--scenarios`).** `validate_tasks.py --scenarios` writes
 `environments/scenarios.json` — the full runnable matrix, no LLM: per env, **clean** utility at
-each difficulty tier × every injection task × every delivery **vector** that fits it — direct
-(`direct_at_sink` agent-inject / `toolpoison_at_sink` / `aitm_coord2sink`) and indirect
-(`confused_at_source` / `toolpoison_at_source` / `confused_at_coordinator` / `aitm_coord2source`).
-Each entry's arch is `centralized{P}` (P = the run task's #subtasks), and an attack is emitted
-**only where the specific sub-agent it needs (source/sink/target) is present** among
-`agent_1..agent_P` — in multi-agent, the sink/source *is* that indexed worker. The runner samples
-from this set (e.g. 15 scenarios spanning all vectors) to execute.
+each difficulty tier × **every architecture family** × every injection task × every delivery
+**vector** that fits it — direct (`direct_at_sink` agent-inject / `toolpoison_at_sink` /
+`aitm_coord2sink`) and indirect (`confused_at_source` / `toolpoison_at_source` /
+`confused_at_coordinator` / `aitm_coord2source` / `aitm_source2sink`). Architectures span
+`centralized` / `hybrid` / `decentralized` / `independent` (each at parallelism **P = the task's
+#subtasks**, per INDEX-ALIGN) plus **`sas`** — the single-agent baseline where one agent owns
+every tool, so both direct **and** indirect attacks apply to that sole Solver. Coordinator vectors
+are emitted only for families that have a coordinator (`centralized`/`hybrid`), source→sink AiTM
+only where that edge exists (`hybrid`/`decentralized`), and a multi-agent attack only where the
+specific sub-agent it needs (source/sink/target) is present among `agent_1..agent_P` — in
+multi-agent, the sink/source *is* that indexed worker. Currently ~**1.6k** scenarios; the runner
+samples from this set (e.g. 15 spanning all vectors × families) to execute.
 
 ### Tool distribution, directed dispatch & the shared-context board
 

@@ -775,18 +775,45 @@ def _agent_idx(a):
     return int(m.group(1)) if m else 0
 
 
+# Architecture families for the runnable sweep (parallelism P is fixed by the task's #subtasks,
+# per INDEX-ALIGN). ``sas`` is the P=1 baseline: one agent owns EVERY tool, so both direct and
+# indirect attacks apply to that single Solver. Mirrors report/v6/make_v6_plan.
+_FAMILIES = ("centralized", "hybrid", "decentralized", "independent")
+_COORD_FAMILIES = ("centralized", "hybrid")          # have a coordinator (aitm_coord2*, confused_at_coordinator)
+_SRC2SINK_FAMILIES = ("hybrid", "decentralized")     # a source-owner -> sink-owner edge can be poisoned (aitm_source2sink)
+
+
+def _attack_vectors(kind, fam, sink, src, oa, sa, ta):
+    """The (position, injection_kind, target, aitm_channel) delivery vectors for an attack on a
+    given architecture family. DIRECT -> sink side; INDIRECT -> source side; coordinator/source→sink
+    vectors only where the topology has that edge."""
+    out = []
+    if kind == "direct":
+        out += [("direct_at_sink", "agent", ta or ""), ("toolpoison_at_sink", "tool", sink)]
+        if fam in _COORD_FAMILIES:
+            out.append(("aitm_coord2sink", "aitm", "", "coord2sink"))
+    else:                                                # indirect / indirect-instruction
+        out += [("confused_at_source", "agent", oa or ta or ""), ("toolpoison_at_source", "tool", src)]
+        if fam in _COORD_FAMILIES:
+            out += [("confused_at_coordinator", "agent", "Orchestrator"),
+                    ("aitm_coord2source", "aitm", "", "coord2source")]
+        if fam in _SRC2SINK_FAMILIES:
+            out.append(("aitm_source2sink", "aitm", "", "source2sink"))
+    return out
+
+
 def emit_scenarios():
     """Emit a DETERMINISTIC, comprehensive, runnable scenario set (no LLM) to
-    environments/scenarios.json in the runner's plan format. It is the CROSS-PRODUCT of:
-      • CLEAN utility at each difficulty tier (easy/medium/hard);
-      • every injection task × every delivery VECTOR that fits it —
-          DIRECT   : direct_at_sink (agent), toolpoison_at_sink (tool), aitm_coord2sink (AiTM);
-          INDIRECT : confused_at_source (agent), toolpoison_at_source (tool),
-                     confused_at_coordinator (agent@Orchestrator), aitm_coord2source (AiTM).
-    Arch parallelism is ``centralized{P}`` with P = the run task's #subtasks (so Task i ->
-    Sub-Agent i, no idle/doubled worker). An attack is emitted ONLY when the specific sub-agent it
-    needs is PRESENT among agent_1..agent_P — i.e. its source/sink/target really is one of the P
-    sub-agents (in multi-agent, the sink/source IS that indexed worker). Pick any 15 from here to run."""
+    environments/scenarios.json in the runner's plan format — the CROSS-PRODUCT of:
+      • CLEAN utility at each difficulty tier × every architecture family (+ sas);
+      • every injection task × every architecture family × every delivery VECTOR that fits it
+        (direct_at_sink / toolpoison_at_sink / aitm_coord2sink; confused_at_source /
+         toolpoison_at_source / confused_at_coordinator / aitm_coord2source / aitm_source2sink).
+    Parallelism is P = the task's #subtasks (INDEX-ALIGN: Task i -> Sub-Agent i, no idle/doubled
+    worker), so a multi-agent arch is ``{family}{P}``. A multi-agent attack is emitted ONLY where
+    the specific sub-agent it needs (source/sink/target) is present among agent_1..agent_P. ``sas``
+    (P=1) runs the whole task on ONE agent that owns every tool, so EVERY direct AND indirect attack
+    applies there (origin=sink=the sole Solver) — the single-agent baseline. Pick any N to run."""
     scen = []
     for f in sorted(os.listdir(ENVDIR)):
         if not f.endswith(".json") or f[:-5] == "task_flows":
@@ -797,7 +824,7 @@ def emit_scenarios():
         name = f[:-5]
         eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
         flows = build_flows(env, eff)["utility_tasks"]
-        # --- CLEAN utility, one representative task per difficulty tier ---
+        # --- CLEAN utility: each difficulty tier × every family (+ sas) ---
         reps = {}
         for t in _graded_tasks(env):
             fl = flows.get(t["id"])
@@ -807,53 +834,50 @@ def emit_scenarios():
             if tier not in reps:
                 continue
             tid, nsub = reps[tier]
-            scen.append({"id": f"{name}_centralized{nsub}_clean_{tier}_{tid}", "env": name,
-                         "template_id": f"centralized{nsub}", "user_task": tid, "trial": 0,
-                         "position": "clean", "injection_kind": None, "injection_target": "",
-                         "aitm_channel": None, "source": None, "sink": None, "difficulty": tier})
-        # --- ATTACKS on the executed task, every fitting vector ---
+            for arch in [f"{fam}{nsub}" for fam in _FAMILIES] + ["sas"]:
+                scen.append({"id": f"{name}_{arch}_clean_{tier}_{tid}", "env": name,
+                             "template_id": arch, "user_task": tid, "trial": 0, "position": "clean",
+                             "injection_kind": None, "injection_target": "", "aitm_channel": None,
+                             "source": None, "sink": None, "difficulty": tier})
+        # --- ATTACKS on the executed task × every family (+ sas) × every fitting vector ---
         run = _run_task(env)
         if not run:
             continue
         run_id = run["id"]
         P = len((run.get("success") or {}).get("subtasks") or [])
-        arch = f"centralized{P}"
         for t in env.get("injection_tasks", []):
             kind = t.get("kind", "")
             succ = t.get("success"); succ = succ if isinstance(succ, list) else ([succ] if succ else [])
             sink = next((c.get("tool") for c in succ if c and c.get("tool")), None)
             src = t.get("source")
             oa, sa, ta = t.get("origin_agent"), t.get("sink_agent"), t.get("target_agent")
-            # the specific sub-agent(s) this attack needs must exist among agent_1..agent_P
             need = [a for a in ((ta,) if kind == "direct" else (oa, sa)) if a]
-            if any(_agent_idx(a) > P for a in need):
-                continue                                  # that sub-agent isn't present at this arch
-            if kind == "direct":
-                vectors = [("direct_at_sink", "agent", ta or ""), ("toolpoison_at_sink", "tool", sink),
-                           ("aitm_coord2sink", "aitm", "", "coord2sink")]
-            else:                                          # indirect / indirect-instruction
-                vectors = [("confused_at_source", "agent", oa or ta or ""),
-                           ("toolpoison_at_source", "tool", src),
-                           ("confused_at_coordinator", "agent", "Orchestrator"),
-                           ("aitm_coord2source", "aitm", "", "coord2source")]
-            for v in vectors:
-                pos, ikind, tgt = v[0], v[1], v[2]
-                chan = v[3] if len(v) > 3 else None
-                if ikind == "tool" and not tgt:            # no tool to poison for this vector
-                    continue
-                scen.append({"id": f"{name}_{arch}_{pos}_{t['id']}", "env": name, "template_id": arch,
-                             "user_task": run_id, "trial": 0, "position": pos, "injection_kind": ikind,
-                             "injection_target": tgt or "", "aitm_channel": chan,
-                             "source": src, "sink": sink, "injection_task_id": t["id"],
-                             "attack_mode": "direct" if kind == "direct" else "indirect",
-                             "n_workers": P, "origin_agent": oa, "sink_agent": sa, "target_agent": ta,
-                             "compare_key": f"{name}|{arch}|{(t.get('harm') or {}).get('path')}"})
+            archs = []
+            if not any(_agent_idx(a) > P for a in need):   # needed sub-agents present at P
+                archs += [f"{fam}{P}" for fam in _FAMILIES]
+            archs.append("sas")                            # single agent owns all tools → always applies
+            for arch in archs:
+                fam = "sas" if arch == "sas" else "".join(c for c in arch if not c.isdigit())
+                for v in _attack_vectors(kind, fam, sink, src, oa, sa, ta):
+                    pos, ikind, tgt = v[0], v[1], v[2]
+                    chan = v[3] if len(v) > 3 else None
+                    if ikind == "tool" and not tgt:
+                        continue
+                    scen.append({"id": f"{name}_{arch}_{pos}_{t['id']}", "env": name,
+                                 "template_id": arch, "user_task": run_id, "trial": 0, "position": pos,
+                                 "injection_kind": ikind, "injection_target": tgt or "", "aitm_channel": chan,
+                                 "source": src, "sink": sink, "injection_task_id": t["id"],
+                                 "attack_mode": "direct" if kind == "direct" else "indirect",
+                                 "n_workers": 1 if arch == "sas" else P, "origin_agent": oa,
+                                 "sink_agent": sa, "target_agent": ta,
+                                 "compare_key": f"{name}|{arch}|{(t.get('harm') or {}).get('path')}"})
     out = os.path.join(ENVDIR, "scenarios.json")
     with open(out, "w") as fh:
         json.dump({"scenarios": scen}, fh, indent=1); fh.write("\n")
     from collections import Counter
-    by = Counter(("clean" if s["position"] == "clean" else s["injection_kind"]) for s in scen)
-    print(f"scenarios -> {os.path.relpath(out, REPO)}  ({len(scen)} scenarios)  by vector: {dict(by)}")
+    fams = Counter("sas" if s["template_id"] == "sas" else "".join(c for c in s["template_id"] if not c.isdigit())
+                   for s in scen)
+    print(f"scenarios -> {os.path.relpath(out, REPO)}  ({len(scen)} scenarios)  by family: {dict(fams)}")
 
 
 def main():
