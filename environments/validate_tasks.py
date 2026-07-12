@@ -25,8 +25,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))   # the environments/ folder
 REPO = os.path.normpath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(REPO, "backend"))
 sys.path.insert(0, os.path.join(REPO, "report", "v6"))
-from verdict import task_completed, state_hit  # the real deterministic grader + state predicate
+from verdict import task_completed, state_hit, _check_hit, _state_at, _norm  # grader + state predicates
 import coherence                                # type/format classifier
+
+_MEANINGLESS = {"", "me", "true", "false", "none", "null"}
+def _meaningful(v):
+    return str(v).strip().lower() not in _MEANINGLESS
 
 ENVDIR = HERE
 # Only STRUCTURED-IDENTIFIER arg values must be resolvable from state (an agent looks them up).
@@ -110,6 +114,107 @@ def _perfect_state(env, eff, subtasks):
     return state
 
 
+def derive_checks(subtask, eff, init_state):
+    """Derive NON-TRIVIAL state checks for one subtask — the heart of honest utility measurement.
+
+    For EVERY write call and EVERY target it touches (all calls inspected, not just the first), emit
+    a predicate that holds ONLY BECAUSE the write ran — i.e. it is satisfied on the perfect-solver
+    FINAL state but NOT on the untouched INITIAL state. So an agent that does nothing scores 0.
+
+      * append (record) -> ``{path, appended:{field:val,…}}`` matching the SPECIFIC new record
+        (all its resolved fields, incl. literals like direction:"out" so a refund isn't confused
+        with the incoming overpayment it mirrors); if the record carries no value that distinguishes
+        it from what's already there, fall back to ``{path, min_len:N}`` (a new item was added).
+      * set (scalar) -> ``{path, value}`` for each changed value.
+      * delete -> ``{path, op:"absent"}`` (only if the target existed to begin with).
+
+    A subtask whose writes change nothing returns [] — a genuine no-op the caller must flag/fix."""
+    init = init_state
+    blob = _state_blob(init)
+    final = json.loads(json.dumps(init))
+    calls = [c for c in (subtask.get("calls") or []) if c and c.get("tool")]
+    for c in calls:
+        _apply(eff.get(c["tool"]), c.get("args") or {}, final)
+    checks, append_paths = [], []
+    for c in calls:
+        args = c.get("args") or {}
+        argvals = {str(v) for v in args.values() if _meaningful(v)}
+        ops = eff.get(c["tool"]) or []
+        tool_has_append = any(o.get("op") == "append" for o in ops)
+        for op in ops:
+            rawpath = str(op.get("path", ""))
+            path = _fill(rawpath, args)
+            kind, raw = op.get("op"), op.get("value")
+            # A `set` to a SINGLETON scratch path (no {id} template) that the tool ALSO appends to a
+            # durable list is last-write-wins across parallel sub-streams (e.g. travel's single
+            # `reservation`) — grade the append, never the singleton, so earlier streams aren't
+            # clobbered by later ones on the perfect-solver state.
+            if kind == "set" and tool_has_append and "{" not in rawpath:
+                continue
+            if kind == "delete":
+                if _state_at(init, path) is not None:
+                    checks.append({"path": path, "op": "absent"})
+                continue
+            if kind == "append" and isinstance(raw, dict):
+                append_paths.append(path)
+                want = {k: _fill(str(v), args) for k, v in raw.items() if _meaningful(_fill(str(v), args))}
+                cand = {"path": path, "appended": want}
+                if want and _check_hit(final, cand) and not _check_hit(init, cand):
+                    checks.append(cand)
+                continue
+
+            # SET: for a value the agent RESOLVES from state (an id/amount/email/enum that appears
+            # in the world state), check it EXACTLY. For an agent-GENERATED field (a note, a
+            # rescheduled time — text the agent composes, absent from state), the field must simply
+            # CHANGE from its initial value. Either way the check is non-trivial (fails do-nothing).
+            emitted = {"v": False}
+
+            def _emit(v):
+                rv = _fill(str(v), args)
+                if not _meaningful(rv):
+                    return
+                if not (rv in argvals or (isinstance(v, str) and "{" not in v)):
+                    return
+                if _norm(rv) in blob:                       # resolvable-from-state -> exact check
+                    cand = {"path": path, "value": rv}
+                    if _check_hit(final, cand) and not _check_hit(init, cand):
+                        checks.append(cand); emitted["v"] = True
+            if isinstance(raw, dict):
+                for fv in raw.values():
+                    _emit(fv)
+            else:
+                _emit(raw)
+            if not emitted["v"]:                            # agent-generated field -> must change
+                ff = _state_at(final, path)
+                cand = {"path": path, "changed_from": _state_at(init, path)}
+                if ff is not None and str(ff).strip() and _check_hit(final, cand) and not _check_hit(init, cand):
+                    checks.append(cand)
+    # min_len fallback for append paths that produced no distinctive check
+    from collections import Counter
+    covered = {c["path"] for c in checks}
+    for path, n in Counter(append_paths).items():
+        if path not in covered:
+            checks.append({"path": path, "min_len": len(_state_at(init, path) or []) + n})
+    seen, out = set(), []
+    for c in checks:
+        k = (c["path"], c.get("value"), json.dumps(c.get("appended"), sort_keys=True), c.get("op"), c.get("min_len"))
+        if k not in seen:
+            seen.add(k); out.append(c)
+    return out
+
+
+def rederive_env(env, eff):
+    """Rewrite every user_task subtask's ``checks`` with the non-trivial derivation, in place."""
+    init = env.get("state", {})
+    n = 0
+    for t in env.get("user_tasks", []):
+        spec = t.get("success") or {}
+        for st in (spec.get("subtasks") or []):
+            st["checks"] = derive_checks(st, eff, init)
+            n += len(st["checks"])
+    return n
+
+
 def validate_task(env, task, tools, blob, eff):
     """Grader self-consistency + resolvability for one graded user task. Self-consistency is now
     STATE-based: build the perfect-solver final state, then require the task's authored ``checks``
@@ -126,6 +231,19 @@ def validate_task(env, task, tools, blob, eff):
                 issues.append(f"GRADER {task['id']}: subtask '{s.get('id')}' scores "
                               f"{s.get('checks_done')}/{s.get('checks_total')} state-checks on the "
                               f"perfect-solver final state")
+    # DO-NOTHING gate: grading against the UNTOUCHED initial state must yield 0 — otherwise some
+    # check passes for free (utility earned without acting). This is the core integrity guarantee.
+    init_state = json.loads(json.dumps(env.get("state", {})))
+    donothing = task_completed([], spec, init_state).get("utility")
+    if donothing:
+        issues.append(f"DO-NOTHING {task['id']}: utility={donothing} on the untouched initial state "
+                      f"(a no-op agent scores >0 — trivial checks present)")
+    # NO-OP gate: every graded subtask must carry at least one state check (a subtask whose writes
+    # change nothing cannot be measured).
+    for st in subtasks:
+        if st.get("checks") is not None and len(st.get("checks")) == 0:
+            issues.append(f"NOOP {task['id']}: subtask '{st.get('id')}' has 0 state checks "
+                          f"(its write changes nothing — under-specified target)")
     for st in subtasks:
         for c in (st.get("calls") or []):
             tn = c.get("tool")
@@ -245,7 +363,30 @@ def build_flows(env, eff):
     }
 
 
+def rederive_all():
+    """Rewrite every env's user_task ``checks`` from scratch with the non-trivial derivation."""
+    total = 0
+    for f in sorted(os.listdir(ENVDIR)):
+        if not f.endswith(".json") or f == "task_flows.json":
+            continue
+        path = os.path.join(ENVDIR, f)
+        env = json.loads(open(path).read())
+        if not env.get("user_tasks"):
+            continue
+        eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
+        n = rederive_env(env, eff)
+        total += n
+        with open(path, "w") as fh:
+            json.dump(env, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+        print(f"{f[:-5]:12s} re-derived {n} non-trivial checks")
+    print(f"total non-trivial checks: {total}")
+
+
 def main():
+    if "--rederive" in sys.argv:
+        rederive_all()
+        return
     fails = 0
     flows = {}
     for f in sorted(os.listdir(ENVDIR)):

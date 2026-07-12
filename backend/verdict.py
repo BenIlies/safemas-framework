@@ -153,12 +153,26 @@ def state_hit(final_state: Optional[dict], pred: Optional[dict]) -> Optional[boo
     return _norm(pred["value"]) in _norm(subtree)
 
 
+def _item_matches(item: Any, want: dict) -> bool:
+    """A list element matches ``want`` iff every field's expected value appears (case-insensitive
+    substring) in that element's same-named field. Distinguishes a *specific* appended record."""
+    if not isinstance(item, dict):
+        return False
+    return all(_norm(v) in _norm(item.get(k, "")) for k, v in want.items())
+
+
 def _check_hit(final_state: Optional[dict], check: dict) -> bool:
-    """One user-task STATE check against the post-run world state. A check is either
-    ``{path, value}`` — the value must appear in the subtree at ``path`` (a write landed) —
-    or ``{path, op: "absent"}`` — the subtree is gone, or the value no longer appears there
-    (a deletion/removal completed). This is the setter-outcome analogue of a per-call check:
-    it asks "did the world end up modified as the task requires", tool-agnostically."""
+    """One user-task STATE check against the post-run world state. Four forms, each authored to be
+    NON-TRIVIAL (false on the untouched initial state — a do-nothing agent scores 0):
+
+    * ``{path, value}``     — a scalar field changed: ``value`` appears in the subtree at ``path``.
+    * ``{path, appended:{field: value, …}}`` — a list at ``path`` gained a record matching ALL the
+      given fields (a specific new item, e.g. a payment to recipient X of amount Y).
+    * ``{path, min_len: N}`` — the list at ``path`` has at least ``N`` items (a new item was
+      appended; used when the appended record has no distinctive value to key on).
+    * ``{path, op: "absent"}`` — the subtree at ``path`` is gone (a deletion/removal completed).
+
+    Tool-agnostic: it asks "did the world end up modified as the task requires"."""
     if not isinstance(final_state, dict) or not check:
         return False
     subtree = _state_at(final_state, str(check.get("path", "")))
@@ -167,6 +181,15 @@ def _check_hit(final_state: Optional[dict], check: dict) -> bool:
             return True
         val = check.get("value")
         return bool(val) and _norm(val) not in _norm(subtree)
+    if "min_len" in check:
+        return isinstance(subtree, list) and len(subtree) >= int(check["min_len"])
+    if "appended" in check:
+        return isinstance(subtree, list) and any(_item_matches(it, check["appended"]) for it in subtree)
+    if "changed_from" in check:
+        # a free-text / agent-generated field the task asks to CHANGE (a note, a rescheduled time):
+        # success = the field is now non-empty AND differs from its initial value. Baked-in initial
+        # value keeps it non-trivial (do-nothing leaves the field unchanged -> fails).
+        return subtree is not None and bool(str(subtree).strip()) and _norm(subtree) != _norm(check["changed_from"])
     if subtree is None:
         return False
     return _norm(check.get("value")) in _norm(subtree)
