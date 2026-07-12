@@ -306,6 +306,12 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
 - **CHECK-COUNT** — exactly **one check per write call**: each write is inspected by its own
   related check (`#checks == #setter-calls`), so utility is the fraction of writes actually
   done and a duplicate/idempotent write can't pad the score.
+- **GRADEABILITY** — a check may not hinge on a **free-text field the prompt doesn't dictate**
+  (a review body, message text, notes, reason). An LLM won't reproduce exact prose, so such a
+  check would fail a correct run purely on wording. `derive_checks` drops those fields — grading a
+  structural field (the product/recipient/amount/rating) or falling back to `changed_from`/`min_len`
+  ("the field changed" / "the list grew") — and this gate fails loudly if an exact free-text check
+  ever slips through.
 - **DEPTH-TIER** — difficulty = **writes per sub-agent** (uniform across a task): each env offers
   easy/medium/hard = **2/3/4** distinct graded writes per sub-agent, so every worker does real,
   increasing work (no thin "hard" task where an agent writes once).
