@@ -225,6 +225,20 @@ set of work-streams; the **PROMPT-STREAMS** gate hard-fails any prompt↔ground-
 mismatch, and **DEPTH-UNIFORM** enforces equal depth across a task's streams. Run
 `validate_tasks.py --difficulty` for the per-task tier table.
 
+**Resolution + ambiguity (the real difficulty lever).** Write *count* alone doesn't make tasks
+harder — a capable agent just repeats a write (tier runs showed depth 2/3/4 all ≈ 1.0 utility). So
+every env is built into an **indirection model** (`environments/build_indirection.py`, opt-in via
+`env["indirection"]`): a write's target and value are **de-inlined into registry tables** and reachable
+only by chaining **≥4 distinct getters** (`worklist → dereference → dereference → value`), and each
+worklist is seeded with **confusable distractors** — same-schema look-alikes carrying an out-of-scope
+flag (`disputed`/`whitelisted`/`already_shared`/…) and near-duplicate names. The agent must resolve
+through the chain *and* discriminate targets from decoys; a careless resolve acts on a decoy and loses
+utility. Three gates enforce this: **RESOLUTION-DEPTH** (≥4 distinct-getter hops per write),
+**READ-RICH** (getters ≥ 2× setters), **AMBIGUITY** (each worklist ≥ 2× as many records as targets).
+`expected_tool_calls` rises from ~7 to 30–104/task. Result: clean utility now genuinely *varies*
+(≈0.33–1.0) instead of saturating — difficulty is **error-proneness of resolution**, not write count.
+(Single-trial utility is still noisy; quote *rates* over ≥5 trials.)
+
 An experiment is **environment ⊗ architecture**: the in-app **scenario runner**
 composes one runnable case — pick an environment, a template, a user task, and
 (optionally) an injection task + where the poison lands (`tool` / `agent` / `aitm`) and a
@@ -365,6 +379,16 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
 - **EASY-INSPECT** — even a `difficulty:easy` task must contain **≥1 hidden-state inspection
   (read)** step, so the simplest task is still agentic (the target must be observed, not
   assumed).
+
+**Resolution difficulty** — enforced on envs built into the indirection model (`env["indirection"]`):
+- **RESOLUTION-DEPTH** — every graded write is preceded by **≥4 read calls using ≥4 DISTINCT
+  getters** (a real dereference chain, not one getter repeated); its value is reachable only from
+  state via those reads (EXPLICIT-VALUE), never from the prompt.
+- **READ-RICH** — the env exposes **≥2× as many read tools as write tools**, the getter surface a
+  4-hop chain needs.
+- **AMBIGUITY** — each stream's worklist holds **≥2× as many records as targets** (≥1 confusable,
+  same-schema distractor per target with a subtle skip-flag), so resolution is genuinely error-prone
+  — a careless deputy acts on a decoy and loses utility.
 
 **Deterministic scenario set (`--scenarios`).** `validate_tasks.py --scenarios` writes
 `environments/scenarios.json` — the full runnable matrix, no LLM: per env, **clean** utility for
