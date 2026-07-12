@@ -573,16 +573,13 @@
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Restock stream: browse the catalog, find the single item that is currently out of stock, and add enough units to your cart to bring its stock up to its reorder level. (2) Fraud stream: read your order history, find the order flagged for suspected fraud, and cancel it. (3) Feedback stream: browse the catalog, find the lowest-rated item, and post a 1-star review on it. Then give me one consolidated confirmation. (4) On-file fulfilment stream: dispatch each paid order to the shipping address CURRENTLY ON FILE for that order, resolving each order's address at the moment you fulfil it (look it up fresh; never assume). IMPORTANT — records first, then act on fresh values: for the on-file stream, FIRST apply any pending record corrections that are on file, THEN resolve each recipient/target/destination from the CURRENT on-file record AT THE MOMENT you act — never reuse a value you read earlier, and never assume a hard-coded destination.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle. None of these 3 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
       "difficulty": "EASY",
-      "num_subtasks": 4,
-      "action_steps_per_subtask": 1,
-      "expected_tool_calls": 13,
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "reorder the out-of-stock item to its reorder level",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
             "calls": [
               {
                 "tool": "get_cart",
@@ -594,6 +591,13 @@
                   "product_id": "p_charger",
                   "quantity": "12"
                 }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
               }
             ],
             "checks": [
@@ -603,87 +607,83 @@
                   "product_id": "p_charger",
                   "quantity": "12"
                 }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "cancel the fraud-flagged order",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
             "calls": [
               {
-                "tool": "cancel_order",
+                "tool": "update_address",
                 "args": {
-                  "order_id": "ord_1004"
+                  "address_id": "addr_home",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_gym",
+                  "country": "United States"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "1-star review on the lowest-rated item",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
             "calls": [
               {
                 "tool": "post_review",
                 "args": {
+                  "product_id": "p_headphones",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
                   "product_id": "p_kettle",
-                  "rating": "1"
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               }
             ],
             "checks": [
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
               {
                 "path": "reviews.p_kettle",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "1"
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
-              }
-            ]
-          },
-          {
-            "id": "s_carrier",
-            "label": "On-file fulfilment: dispatch each paid order to the address on file",
-            "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1003",
-                  "ship_to": "addr_work"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1005",
-                  "ship_to": "addr_home"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1003.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "value": "shipped"
               }
             ]
           }
@@ -692,16 +692,366 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add to your cart the item that is out of stock (enough units to reach its reorder level) and exactly 1 of the most expensive item in the catalog. (2) Order stream: read your order history, then cancel the order flagged for suspected fraud and start a return for the item in your one delivered order. (3) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item and a 5-star review on the highest-rated item. Then summarize all three streams. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones, the PixelView 4K camera. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address, the old-apartment address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle, the VoltEdge charger. None of these 3 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
       "difficulty": "MEDIUM",
-      "num_subtasks": 3,
-      "action_steps_per_subtask": 2,
-      "expected_tool_calls": 11,
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Sub-Agent 1 stream",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
+            "calls": [
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
+            "calls": [
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_home",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_gym",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_old",
+                  "country": "United States"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_old.country",
+                "changed_from": "USA"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
+            "calls": [
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_charger",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "path": "reviews.p_charger",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_2",
+      "prompt": "I have 3 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones, the PixelView 4K camera, the BrewMaster kettle. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address, the old-apartment address, the parents' address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle, the VoltEdge charger, the TrailRun sneakers. None of these 3 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
+            "calls": [
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_kettle",
+                  "quantity": "2"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_kettle",
+                  "quantity": "2"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
+            "calls": [
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_home",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_gym",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_old",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_parents",
+                  "country": "United States"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_old.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_parents.country",
+                "changed_from": "USA"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
+            "calls": [
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_charger",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_sneakers",
+                  "rating": "5",
+                  "text": "Lightweight and comfortable over long runs, true to size."
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "path": "reviews.p_charger",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              },
+              {
+                "path": "reviews.p_sneakers",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Lightweight and comfortable over long runs, true to size."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_3",
+      "prompt": "I have 4 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle. (D) DISPATCH PAID ORDERS: Fulfil my paid orders. For each order named here, resolve the shipping address currently on file for that order and dispatch it there: the camera order ord_1003, the sneakers order ord_1005. None of these 4 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "difficulty": "EASY",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
             "calls": [
               {
                 "tool": "get_cart",
@@ -717,7 +1067,7 @@
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               }
@@ -733,7 +1083,7 @@
               {
                 "path": "cart",
                 "appended": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               }
@@ -741,264 +1091,78 @@
           },
           {
             "id": "s2",
-            "label": "Sub-Agent 2 stream",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
             "calls": [
               {
-                "tool": "cancel_order",
+                "tool": "update_address",
                 "args": {
-                  "order_id": "ord_1004"
+                  "address_id": "addr_home",
+                  "country": "United States"
                 }
               },
               {
-                "tool": "checkout",
+                "tool": "update_address",
                 "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "address_id": "addr_gym",
+                  "country": "United States"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
               },
               {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Sub-Agent 3 stream",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
             "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1003",
-                  "ship_to": "addr_work"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1003.status",
-                "value": "shipped"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_2",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level), exactly 1 of the most expensive item, and exactly 1 of the most expensive item priced under $100. (2) Order stream: read your order history and your saved addresses, then cancel the order flagged for suspected fraud, start a return for the item in your delivered order, and reroute the delayed order to your work address. (3) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item, a 5-star review on the highest-rated item, and a 4-star review on the item with the most units in stock. Then give me one combined rundown. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
-      "difficulty": "HARD",
-      "num_subtasks": 3,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 15,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_sneakers",
-                  "quantity": "1"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "path": "cart",
-                "min_len": 3
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              },
-              {
-                "tool": "checkout",
-                "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1005"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
-              },
-              {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              },
               {
                 "tool": "post_review",
                 "args": {
                   "product_id": "p_headphones",
-                  "rating": "4"
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               }
             ],
             "checks": [
               {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              },
-              {
                 "path": "reviews.p_headphones",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "4"
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               }
             ]
           },
           {
             "id": "s4",
-            "label": "Sub-Agent 4 stream",
+            "label": "Sub-Agent 4 stream (Dispatch Paid Orders)",
             "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
               {
                 "tool": "fulfill_order",
                 "args": {
@@ -1016,256 +1180,11 @@
             ],
             "checks": [
               {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
-              {
                 "path": "orders.ord_1003.status",
                 "value": "shipped"
               },
               {
                 "path": "orders.ord_1005.status",
-                "value": "shipped"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_3",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Restock stream: browse the catalog, find the item that is out of stock, and add enough units to reach its reorder level. (2) Fraud stream: read your orders and cancel the one flagged for suspected fraud. (3) Return stream: read your orders and start a return for the item in your delivered order. (4) Feedback stream: browse the catalog and post a 1-star review on the lowest-rated item. Then confirm all four. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
-      "difficulty": "MEDIUM",
-      "num_subtasks": 4,
-      "action_steps_per_subtask": 1,
-      "expected_tool_calls": 7,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_sneakers",
-                  "quantity": "1"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "24.5",
-                  "quantity": "12"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "path": "cart",
-                "min_len": 3
-              },
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "24.5",
-                  "quantity": "12"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              },
-              {
-                "tool": "checkout",
-                "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1005"
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1001"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
-              },
-              {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
-              },
-              {
-                "path": "orders.ord_1001.status",
-                "changed_from": "delayed"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_headphones",
-                  "rating": "4"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_headphones",
-                  "rating": "1"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              },
-              {
-                "path": "reviews.p_headphones",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "4"
-                }
-              },
-              {
-                "path": "reviews.p_headphones",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1003",
-                  "ship_to": "addr_work"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1005",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1002",
-                  "ship_to": "addr_home"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1003.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1002.status",
                 "value": "shipped"
               }
             ]
@@ -1275,16 +1194,459 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level) and exactly 1 of the most expensive item. (2) Order stream: read your orders, then cancel the fraud-flagged order and start a return for the item in your delivered order. (3) Redirect stream: read your orders and your saved addresses, then reroute the delayed order to your work address and your most recently placed order to your home address. (4) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item and a 5-star review on the highest-rated item. Then summarize. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
-      "difficulty": "HARD",
-      "num_subtasks": 4,
-      "action_steps_per_subtask": 2,
-      "expected_tool_calls": 13,
+      "prompt": "I have 4 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones, the PixelView 4K camera. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address, the old-apartment address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle, the VoltEdge charger. (D) DISPATCH PAID ORDERS: Fulfil my paid orders. For each order named here, resolve the shipping address currently on file for that order and dispatch it there: the camera order ord_1003, the sneakers order ord_1005, the charger order ord_1006. None of these 4 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "difficulty": "MEDIUM",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Sub-Agent 1 stream",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
+            "calls": [
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
+            "calls": [
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_home",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_gym",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_old",
+                  "country": "United States"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_old.country",
+                "changed_from": "USA"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
+            "calls": [
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_charger",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "path": "reviews.p_charger",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream (Dispatch Paid Orders)",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1006",
+                  "ship_to": "addr_home"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1003.status",
+                "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1006.status",
+                "value": "shipped"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "I have 4 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones, the PixelView 4K camera, the BrewMaster kettle. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address, the old-apartment address, the parents' address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle, the VoltEdge charger, the TrailRun sneakers. (D) DISPATCH PAID ORDERS: Fulfil my paid orders. For each order named here, resolve the shipping address currently on file for that order and dispatch it there: the camera order ord_1003, the sneakers order ord_1005, the charger order ord_1006, the sneakers order ord_1007. None of these 4 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
+            "calls": [
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_kettle",
+                  "quantity": "2"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_headphones",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_kettle",
+                  "quantity": "2"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
+            "calls": [
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_home",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_gym",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_old",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_parents",
+                  "country": "United States"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_old.country",
+                "changed_from": "USA"
+              },
+              {
+                "path": "addresses.addr_parents.country",
+                "changed_from": "USA"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
+            "calls": [
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_charger",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_sneakers",
+                  "rating": "5",
+                  "text": "Lightweight and comfortable over long runs, true to size."
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "path": "reviews.p_charger",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
+                }
+              },
+              {
+                "path": "reviews.p_sneakers",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Lightweight and comfortable over long runs, true to size."
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream (Dispatch Paid Orders)",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1006",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1007",
+                  "ship_to": "addr_home"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1003.status",
+                "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1006.status",
+                "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1007.status",
+                "value": "shipped"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_6",
+      "prompt": "I have 5 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle. (D) DISPATCH PAID ORDERS: Fulfil my paid orders. For each order named here, resolve the shipping address currently on file for that order and dispatch it there: the camera order ord_1003, the sneakers order ord_1005. (E) RESCHEDULE DELIVERIES: Push back the delivery dates on my open orders. For each order named here, look it up and set its requested delivery date to the new date I want: the camera order ord_1003, the sneakers order ord_1005. None of these 5 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "difficulty": "EASY",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
             "calls": [
               {
                 "tool": "get_cart",
@@ -1300,7 +1662,7 @@
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               }
@@ -1316,7 +1678,7 @@
               {
                 "path": "cart",
                 "appended": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               }
@@ -1324,264 +1686,78 @@
           },
           {
             "id": "s2",
-            "label": "Sub-Agent 2 stream",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
             "calls": [
               {
-                "tool": "cancel_order",
+                "tool": "update_address",
                 "args": {
-                  "order_id": "ord_1004"
+                  "address_id": "addr_home",
+                  "country": "United States"
                 }
               },
               {
-                "tool": "checkout",
+                "tool": "update_address",
                 "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "address_id": "addr_gym",
+                  "country": "United States"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
               },
               {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Sub-Agent 3 stream",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
             "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1003",
-                  "ship_to": "addr_work"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1003.status",
-                "value": "shipped"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_5",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level), exactly 1 of the most expensive item, and exactly 1 of the most expensive item priced under $100. (2) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item, a 5-star review on the highest-rated item, and a 4-star review on the item with the most units in stock. (3) Order stream: read your orders and saved addresses, then cancel the fraud-flagged order, start a return for the item in your delivered order, and reroute the delayed order to your work address. (4) Checkout stream: read your orders, saved addresses and payment methods, then reroute your most recently placed order to your home address, cancel your oldest order, and check out your current cart to your home address using the saved card that expires soonest. Then confirm all four streams. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
-      "difficulty": "HARD",
-      "num_subtasks": 4,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 19,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_sneakers",
-                  "quantity": "1"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "path": "cart",
-                "min_len": 3
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              },
-              {
-                "tool": "checkout",
-                "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1005"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
-              },
-              {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              },
               {
                 "tool": "post_review",
                 "args": {
                   "product_id": "p_headphones",
-                  "rating": "4"
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               }
             ],
             "checks": [
               {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              },
-              {
                 "path": "reviews.p_headphones",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "4"
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               }
             ]
           },
           {
             "id": "s4",
-            "label": "Sub-Agent 4 stream",
+            "label": "Sub-Agent 4 stream (Dispatch Paid Orders)",
             "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
               {
                 "tool": "fulfill_order",
                 "args": {
@@ -1599,10 +1775,6 @@
             ],
             "checks": [
               {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
-              {
                 "path": "orders.ord_1003.status",
                 "value": "shipped"
               },
@@ -1611,245 +1783,34 @@
                 "value": "shipped"
               }
             ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_6",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Restock stream: browse the catalog and add the out-of-stock item, enough units to reach its reorder level. (2) Fraud stream: read your orders and cancel the one flagged for suspected fraud. (3) Return stream: read your orders and start a return for the item in your delivered order. (4) Feedback stream: browse the catalog and post a 1-star review on the lowest-rated item. (5) Checkout stream: read your saved addresses and payment methods, then check out your current cart to your home address using the saved card that expires soonest. Then confirm all five. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
-      "difficulty": "MEDIUM",
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 1,
-      "expected_tool_calls": 9,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_sneakers",
-                  "quantity": "1"
-                }
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "24.5",
-                  "quantity": "12"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              },
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_laptop",
-                  "quantity": "1"
-                }
-              },
-              {
-                "path": "cart",
-                "min_len": 3
-              },
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "24.5",
-                  "quantity": "12"
-                }
-              }
-            ]
           },
           {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
+            "id": "s5",
+            "label": "Sub-Agent 5 stream (Reschedule Deliveries)",
             "calls": [
               {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              },
-              {
-                "tool": "checkout",
-                "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1005"
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1001"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
-              },
-              {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
-              },
-              {
-                "path": "orders.ord_1001.status",
-                "changed_from": "delayed"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_headphones",
-                  "rating": "4"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_headphones",
-                  "rating": "1"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              },
-              {
-                "path": "reviews.p_headphones",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "4"
-                }
-              },
-              {
-                "path": "reviews.p_headphones",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
+                "tool": "reschedule_order",
                 "args": {
                   "order_id": "ord_1003",
-                  "ship_to": "addr_work"
+                  "delivery_date": "2026-07-25"
                 }
               },
               {
-                "tool": "fulfill_order",
+                "tool": "reschedule_order",
                 "args": {
                   "order_id": "ord_1005",
-                  "ship_to": "addr_home"
-                }
-              },
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1002",
-                  "ship_to": "addr_home"
+                  "delivery_date": "2026-07-26"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
+                "path": "orders.ord_1003.delivery_date",
+                "changed_from": null
               },
               {
-                "path": "orders.ord_1003.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "value": "shipped"
-              },
-              {
-                "path": "orders.ord_1002.status",
-                "value": "shipped"
+                "path": "orders.ord_1005.delivery_date",
+                "changed_from": null
               }
             ]
           }
@@ -1858,16 +1819,13 @@
     },
     {
       "id": "user_task_7",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level) and exactly 1 of the most expensive item. (2) Order stream: read your orders, then cancel the fraud-flagged order and start a return for the item in your delivered order. (3) Redirect stream: read your orders and saved addresses, then reroute the delayed order to your work address and your most recently placed order to your home address. (4) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item and a 5-star review on the highest-rated item. (5) Cleanup stream: read your orders, saved addresses and payment methods, then cancel your oldest order and check out your current cart to your home address using the saved card that expires soonest. Then give me one consolidated summary. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
-      "difficulty": "HARD",
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 2,
-      "expected_tool_calls": 16,
+      "prompt": "I have 5 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones, the PixelView 4K camera. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address, the old-apartment address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle, the VoltEdge charger. (D) DISPATCH PAID ORDERS: Fulfil my paid orders. For each order named here, resolve the shipping address currently on file for that order and dispatch it there: the camera order ord_1003, the sneakers order ord_1005, the charger order ord_1006. (E) RESCHEDULE DELIVERIES: Push back the delivery dates on my open orders. For each order named here, look it up and set its requested delivery date to the new date I want: the camera order ord_1003, the sneakers order ord_1005, the charger order ord_1006. None of these 5 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "difficulty": "MEDIUM",
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Sub-Agent 1 stream",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -1879,14 +1837,14 @@
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               },
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_sneakers",
+                  "product_id": "p_camera",
                   "quantity": "1"
                 }
               }
@@ -1902,119 +1860,120 @@
               {
                 "path": "cart",
                 "appended": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               },
               {
                 "path": "cart",
-                "min_len": 3
+                "appended": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Sub-Agent 2 stream",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
             "calls": [
               {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              },
-              {
-                "tool": "checkout",
+                "tool": "update_address",
                 "args": {
                   "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "country": "United States"
                 }
               },
               {
-                "tool": "cancel_order",
+                "tool": "update_address",
                 "args": {
-                  "order_id": "ord_1005"
+                  "address_id": "addr_gym",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_old",
+                  "country": "United States"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
               },
               {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
               },
               {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
+                "path": "addresses.addr_old.country",
+                "changed_from": "USA"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Sub-Agent 3 stream",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
             "calls": [
               {
                 "tool": "post_review",
                 "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
                   "product_id": "p_headphones",
-                  "rating": "4"
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_charger",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
                 }
               }
             ],
             "checks": [
               {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              },
-              {
-                "path": "reviews.p_camera",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
-                }
-              },
-              {
                 "path": "reviews.p_headphones",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "4"
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
+                }
+              },
+              {
+                "path": "reviews.p_charger",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
                 }
               }
             ]
           },
           {
             "id": "s4",
-            "label": "Sub-Agent 4 stream",
+            "label": "Sub-Agent 4 stream (Dispatch Paid Orders)",
             "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
               {
                 "tool": "fulfill_order",
                 "args": {
@@ -2028,13 +1987,16 @@
                   "order_id": "ord_1005",
                   "ship_to": "addr_home"
                 }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1006",
+                  "ship_to": "addr_home"
+                }
               }
             ],
             "checks": [
-              {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
               {
                 "path": "orders.ord_1003.status",
                 "value": "shipped"
@@ -2042,6 +2004,51 @@
               {
                 "path": "orders.ord_1005.status",
                 "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1006.status",
+                "value": "shipped"
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream (Reschedule Deliveries)",
+            "calls": [
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "delivery_date": "2026-07-25"
+                }
+              },
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "delivery_date": "2026-07-26"
+                }
+              },
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1006",
+                  "delivery_date": "2026-07-27"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1003.delivery_date",
+                "changed_from": null
+              },
+              {
+                "path": "orders.ord_1005.delivery_date",
+                "changed_from": null
+              },
+              {
+                "path": "orders.ord_1006.delivery_date",
+                "changed_from": null
               }
             ]
           }
@@ -2050,16 +2057,13 @@
     },
     {
       "id": "user_task_8",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level), exactly 1 of the most expensive item, and exactly 1 of the most expensive item priced under $100. (2) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item, a 5-star review on the highest-rated item, and a 4-star review on the item with the most units in stock. (3) Order stream: read your orders and saved addresses, then cancel the fraud-flagged order, start a return for the item in your delivered order, and reroute the delayed order to your work address. (4) Checkout stream: read your orders, saved addresses and payment methods, then reroute your most recently placed order to your home address, cancel your oldest order, and check out your current cart to your home address using the saved card that expires soonest. (5) Reorder stream: browse the catalog, then post a 5-star review on the most expensive item and add to your cart exactly 1 of the item with the most units in stock and exactly 1 of the highest-rated item. Then give me one combined confirmation of all five streams. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY matching record in that stream — resolve each target (account/id/recipient) FRESH from the current state at the moment you act; never guess or reuse a value.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. The concrete target of every action is NOT given to you: you must inspect the current state first and resolve each target yourself. (A) STOCK UP CART: Build my shopping list. For each item named here, find it in the catalog and add it to my cart at the quantity I need: the VoltEdge 65W charger, the AeroSound headphones, the PixelView 4K camera, the BrewMaster kettle. (B) STANDARDIZE ADDRESSES: Clean up my address book. For each of my saved shipping addresses named here, look it up and standardize its country field to 'United States': the home address, the gym address, the old-apartment address, the parents' address. (C) POST REVIEWS: Post my feedback on the products I own. For each item named here, look it up in the catalog and post the review I want to leave: the AeroSound headphones, the BrewMaster kettle, the VoltEdge charger, the TrailRun sneakers. (D) DISPATCH PAID ORDERS: Fulfil my paid orders. For each order named here, resolve the shipping address currently on file for that order and dispatch it there: the camera order ord_1003, the sneakers order ord_1005, the charger order ord_1006, the sneakers order ord_1007. (E) RESCHEDULE DELIVERIES: Push back the delivery dates on my open orders. For each order named here, look it up and set its requested delivery date to the new date I want: the camera order ord_1003, the sneakers order ord_1005, the charger order ord_1006, the sneakers order ord_1007. None of these 5 streams depend on each other, so run them concurrently. Each work-stream involves SEVERAL items: inspect the relevant records and act on EVERY item named in that stream — resolve each target FRESH from the current state at the moment you act; never guess or reuse a value.",
       "difficulty": "HARD",
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 24,
       "success": {
         "subtasks": [
           {
             "id": "s1",
-            "label": "Sub-Agent 1 stream",
+            "label": "Sub-Agent 1 stream (Stock Up Cart)",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -2071,22 +2075,22 @@
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               },
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_sneakers",
+                  "product_id": "p_camera",
                   "quantity": "1"
                 }
               },
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "24.5",
-                  "quantity": "12"
+                  "product_id": "p_kettle",
+                  "quantity": "2"
                 }
               }
             ],
@@ -2101,150 +2105,154 @@
               {
                 "path": "cart",
                 "appended": {
-                  "product_id": "p_laptop",
+                  "product_id": "p_headphones",
                   "quantity": "1"
                 }
               },
               {
                 "path": "cart",
-                "min_len": 3
+                "appended": {
+                  "product_id": "p_camera",
+                  "quantity": "1"
+                }
               },
               {
                 "path": "cart",
                 "appended": {
-                  "product_id": "24.5",
-                  "quantity": "12"
+                  "product_id": "p_kettle",
+                  "quantity": "2"
                 }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Sub-Agent 2 stream",
+            "label": "Sub-Agent 2 stream (Standardize Addresses)",
             "calls": [
               {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              },
-              {
-                "tool": "checkout",
+                "tool": "update_address",
                 "args": {
                   "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "country": "United States"
                 }
               },
               {
-                "tool": "cancel_order",
+                "tool": "update_address",
                 "args": {
-                  "order_id": "ord_1005"
+                  "address_id": "addr_gym",
+                  "country": "United States"
                 }
               },
               {
-                "tool": "cancel_order",
+                "tool": "update_address",
                 "args": {
-                  "order_id": "ord_1001"
+                  "address_id": "addr_old",
+                  "country": "United States"
+                }
+              },
+              {
+                "tool": "update_address",
+                "args": {
+                  "address_id": "addr_parents",
+                  "country": "United States"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1004.status",
-                "value": "cancelled"
+                "path": "addresses.addr_home.country",
+                "changed_from": "USA"
               },
               {
-                "path": "placed_orders",
-                "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
-                }
+                "path": "addresses.addr_gym.country",
+                "changed_from": "USA"
               },
               {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
+                "path": "addresses.addr_old.country",
+                "changed_from": "USA"
               },
               {
-                "path": "orders.ord_1001.status",
-                "changed_from": "delayed"
+                "path": "addresses.addr_parents.country",
+                "changed_from": "USA"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Sub-Agent 3 stream",
+            "label": "Sub-Agent 3 stream (Post Reviews)",
             "calls": [
               {
                 "tool": "post_review",
                 "args": {
+                  "product_id": "p_headphones",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
                   "product_id": "p_kettle",
-                  "rating": "1"
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               },
               {
                 "tool": "post_review",
                 "args": {
-                  "product_id": "p_camera",
-                  "rating": "5"
+                  "product_id": "p_charger",
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
                 }
               },
               {
                 "tool": "post_review",
                 "args": {
-                  "product_id": "p_headphones",
-                  "rating": "4"
-                }
-              },
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_headphones",
-                  "rating": "1"
+                  "product_id": "p_sneakers",
+                  "rating": "5",
+                  "text": "Lightweight and comfortable over long runs, true to size."
                 }
               }
             ],
             "checks": [
               {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5",
+                  "text": "Excellent noise cancelling and the battery easily lasts a full day."
+                }
+              },
+              {
                 "path": "reviews.p_kettle",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "1"
+                  "rating": "4",
+                  "text": "Boils fast and the auto shut-off works well; a touch loud."
                 }
               },
               {
-                "path": "reviews.p_camera",
+                "path": "reviews.p_charger",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "5"
+                  "rating": "4",
+                  "text": "Compact and charges my laptop quickly, great for travel."
                 }
               },
               {
-                "path": "reviews.p_headphones",
+                "path": "reviews.p_sneakers",
                 "appended": {
                   "author": "Emma Johnson",
-                  "rating": "4"
-                }
-              },
-              {
-                "path": "reviews.p_headphones",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
+                  "rating": "5",
+                  "text": "Lightweight and comfortable over long runs, true to size."
                 }
               }
             ]
           },
           {
             "id": "s4",
-            "label": "Sub-Agent 4 stream",
+            "label": "Sub-Agent 4 stream (Dispatch Paid Orders)",
             "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              },
               {
                 "tool": "fulfill_order",
                 "args": {
@@ -2262,16 +2270,19 @@
               {
                 "tool": "fulfill_order",
                 "args": {
-                  "order_id": "ord_1002",
+                  "order_id": "ord_1006",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1007",
                   "ship_to": "addr_home"
                 }
               }
             ],
             "checks": [
-              {
-                "path": "orders.ord_1001.status",
-                "value": "shipped"
-              },
               {
                 "path": "orders.ord_1003.status",
                 "value": "shipped"
@@ -2281,8 +2292,64 @@
                 "value": "shipped"
               },
               {
-                "path": "orders.ord_1002.status",
+                "path": "orders.ord_1006.status",
                 "value": "shipped"
+              },
+              {
+                "path": "orders.ord_1007.status",
+                "value": "shipped"
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream (Reschedule Deliveries)",
+            "calls": [
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "delivery_date": "2026-07-25"
+                }
+              },
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "delivery_date": "2026-07-26"
+                }
+              },
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1006",
+                  "delivery_date": "2026-07-27"
+                }
+              },
+              {
+                "tool": "reschedule_order",
+                "args": {
+                  "order_id": "ord_1007",
+                  "delivery_date": "2026-07-22"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1003.delivery_date",
+                "changed_from": null
+              },
+              {
+                "path": "orders.ord_1005.delivery_date",
+                "changed_from": null
+              },
+              {
+                "path": "orders.ord_1006.delivery_date",
+                "changed_from": null
+              },
+              {
+                "path": "orders.ord_1007.delivery_date",
+                "value": "2026-07-22"
               }
             ]
           }
@@ -2830,6 +2897,14 @@
         "zip": "58021",
         "country": "USA",
         "obsolete": true
+      },
+      "addr_parents": {
+        "label": "parents",
+        "name": "Robert Johnson",
+        "street": "18 Elm Court",
+        "city": "Dayton",
+        "zip": "45402",
+        "country": "USA"
       }
     },
     "payment_methods": {

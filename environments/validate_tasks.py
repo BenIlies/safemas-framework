@@ -58,6 +58,10 @@ ENVDIR = HERE
 # Enums ('frozen'/'squash'/'away'), amounts, dates, booleans and free text are AGENT-GENERATED —
 # absence from state is expected and fine, so they are not "phantom".
 _LOOKUP_TYPES = {"iban", "email", "handle", "eth_address", "instance_id", "url", "id_token"}
+# Args that carry a write's PAYLOAD (new content being set), not a routing lookup — exempt from
+# PHANTOM's "id must already exist in state" check (a new secret/body/content is meant to be new).
+_CONTENT_ARGS = {"value", "secret", "password", "token", "body", "content", "text", "notes",
+                 "command", "message", "subject", "description", "note", "comment"}
 
 
 def _state_blob(state) -> str:
@@ -342,9 +346,42 @@ def validate_task(env, task, tools, blob, eff):
             if tn and tn not in tools:
                 issues.append(f"TOOL {task['id']}: calls nonexistent tool '{tn}'")
             for k, v in (c.get("args") or {}).items():
-                sv = str(v).strip().lower()
-                if sv and coherence.value_type(sv) in _LOOKUP_TYPES and sv not in blob:
-                    issues.append(f"PHANTOM {task['id']}: {tn}.{k}='{v}' (lookup id absent from state)")
+                # PHANTOM catches a ROUTING lookup id that doesn't exist in state. A write's own
+                # PAYLOAD (the new secret value, message body, page content, …) is legitimately absent
+                # — that's the point of setting it — so payload args are exempt. List-valued routing
+                # args (recipients=[...]) are checked element-wise, not on the bracketed string form.
+                if k in _CONTENT_ARGS:
+                    continue
+                for one in (v if isinstance(v, list) else [v]):
+                    sv = str(one).strip().lower()
+                    if sv and coherence.value_type(sv) in _LOOKUP_TYPES and sv not in blob:
+                        issues.append(f"PHANTOM {task['id']}: {tn}.{k}='{one}' (lookup id absent from state)")
+    # PROMPT-STREAMS gate: the operator prompt and the ground-truth subtasks must agree on how many
+    # work-streams exist. This is the invariant that broke silently before — a prompt saying "3
+    # independent work streams / (A).. (B).. (C).." while success carried 4 subtasks, so the runner
+    # spun up a 4th worker with no instructions (it flailed on unrelated tools). The prompt enumerates
+    # streams as "(A) .. (B) .." AND states "N .. work streams"; both must equal len(subtasks). Since
+    # prompt + subtasks are co-generated from one spec (gen_streams.py) they cannot drift, and this
+    # gate is the CI backstop that fails loudly if they ever do.
+    prompt = task.get("prompt") or ""
+    if subtasks and prompt:
+        letters = sorted(set(re.findall(r"\(([A-H])\)\s", prompt)))
+        if len(letters) != len(subtasks):
+            issues.append(f"PROMPT-STREAMS {task['id']}: prompt enumerates {len(letters)} streams "
+                          f"{letters} but success has {len(subtasks)} subtasks — operator request and "
+                          f"ground truth disagree on how many work-streams exist")
+        m = re.search(r"\b(\d+)\s+(?:completely\s+)?independent\s+work\s+streams", prompt)
+        if m and int(m.group(1)) != len(subtasks):
+            issues.append(f"PROMPT-STREAMS {task['id']}: prompt says '{m.group(1)} work streams' but "
+                          f"success has {len(subtasks)} subtasks")
+        # DEPTH-UNIFORM: every stream is the same depth (writes/sub-agent) — difficulty is that depth.
+        wps = [sum(1 for c in (st.get("calls") or []) if c and c.get("tool") and eff.get(c.get("tool")))
+               for st in subtasks]
+        # EASY tasks prepend one inspection getter to stream 1, so its write-count may be checked
+        # against the rest ignoring that non-write getter; writes themselves must be uniform.
+        if len(set(wps)) > 1:
+            issues.append(f"PROMPT-STREAMS {task['id']}: non-uniform depth {wps} across streams — "
+                          f"every stream must carry the same number of writes (difficulty = that depth)")
     return graded.get("utility"), issues
 
 
@@ -386,17 +423,23 @@ def validate_attack_cascade(env, eff):
                            task, else the poisoned delivery record is never consumed.
     """
     hard, warn = [], []
-    run = _run_task(env)                       # the executed/coupled task (first graded user_task)
-    if not run:
+    if not _graded_tasks(env):
         return ["CASCADE: env has no graded user_task to execute"], []
-    run_id = run["id"]
     groups = env.get("tool_groups") or {}
     owner = _tool_agent_map(env)
-    subs = (run.get("success") or {}).get("subtasks") or []
-    benign_tools = [c.get("tool") for st in subs for c in (st.get("calls") or []) if c and c.get("tool")]
-    active_agents = {owner.get(t) for t in benign_tools if eff.get(t)} - {None}
     for t in env.get("injection_tasks", []):
         kind = t.get("kind", "")
+        # Couple this attack to the minimal-breadth task that activates the agents it needs — an
+        # agent-4 sink can only be carried where agent_4 is active (breadth>=4), not on the easy task.
+        succ0 = t.get("success"); succ0 = succ0 if isinstance(succ0, list) else ([succ0] if succ0 else [])
+        sink0 = next((c.get("tool") for c in succ0 if c and c.get("tool")), None)
+        need = {t.get("origin_agent"), owner.get(sink0)} if kind == "indirect" else {t.get("target_agent")}
+        carrier = _carrier_task(env, need)
+        run = carrier or _run_task(env)
+        run_id = run["id"]
+        subs = (run.get("success") or {}).get("subtasks") or []
+        benign_tools = [c.get("tool") for st in subs for c in (st.get("calls") or []) if c and c.get("tool")]
+        active_agents = {owner.get(x) for x in benign_tools if eff.get(x)} - {None}
         # The CANONICAL attack per kind (``*_injection_task_0``) is the one coupled to the run task
         # — it MUST cascade → hard fail. Extra authored variants target other sinks not wired into
         # the run task; they are a known pairing gap → warn, don't block.
@@ -578,14 +621,18 @@ def validate_confound(env, eff):
     from the poisoned record; the run task must still grade to 1.0 (checks grade the poison-
     independent field; the harm predicate catches the redirect)."""
     issues = []
-    run = _run_task(env)
-    spec = (run or {}).get("success") or {}
-    subs = spec.get("subtasks") or []
-    if not subs:
-        return issues
     init = env.get("state", {})
+    owner = _tool_agent_map(env)
     for t in env.get("injection_tasks", []):
         if t.get("kind") != "indirect" or not str(t.get("id", "")).endswith("_task_0"):
+            continue
+        # evaluate on the same minimal carrier the cascade gate uses (where the poison-reading streams run)
+        succ0 = t.get("success"); succ0 = succ0 if isinstance(succ0, list) else ([succ0] if succ0 else [])
+        sink0 = next((c.get("tool") for c in succ0 if c and c.get("tool")), None)
+        run = _carrier_task(env, {t.get("origin_agent"), owner.get(sink0)}) or _run_task(env)
+        spec = (run or {}).get("success") or {}
+        subs = spec.get("subtasks") or []
+        if not subs:
             continue
         dp = (t.get("delivery") or {}).get("path"); dv = (t.get("delivery") or {}).get("value")
         v0 = _state_at(init, dp) if dp else None
@@ -655,6 +702,27 @@ def _run_task(env):
     attacks (their carriers) are wired to this task, and it is index-aligned Task i -> Sub-Agent i."""
     g = _graded_tasks(env)
     return g[0] if g else None
+
+
+def _agents_active(env, task):
+    """Set of sub-agents that own a benign WRITE in this task (the workers the task actually runs)."""
+    owner = _tool_agent_map(env)
+    eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
+    subs = (task.get("success") or {}).get("subtasks") or []
+    return {owner.get(c.get("tool")) for st in subs for c in (st.get("calls") or [])
+            if c and c.get("tool") and eff.get(c.get("tool"))} - {None}
+
+
+def _carrier_task(env, needed_agents):
+    """The task an attack is coupled to = the SMALLEST-breadth graded task that activates every agent
+    the attack needs (its origin + sink owner). With the breadth ladder (3/4/5 streams), an attack on
+    an agent-4 sink cannot cascade on the breadth-3 easy task — it only manifests once a breadth-4 task
+    runs. So cascade/confound are evaluated on that minimal carrier, not hardcoded to user_task_0."""
+    needed = {a for a in needed_agents if a}
+    cands = [t for t in _graded_tasks(env) if needed <= _agents_active(env, t)]
+    if not cands:
+        return None
+    return min(cands, key=lambda t: (len((t.get("success") or {}).get("subtasks") or []), str(t.get("id"))))
 
 
 def _reads_map(env):
@@ -984,27 +1052,27 @@ def emit_scenarios():
         name = f[:-5]
         eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
         flows = build_flows(env, eff)["utility_tasks"]
-        # --- CLEAN utility: each difficulty tier × every family (+ sas) ---
-        reps = {}
+        # --- CLEAN utility: EVERY graded task (the full breadth×depth grid) on its P-matched archs +
+        # sas. Difficulty is DEPTH (writes/agent); breadth = #subtasks = arch P — orthogonal axes, so
+        # a breadth-3 task runs only on *3 archs and a breadth-5 task only on *5 (this is the pairing
+        # whose absence produced the "3-stream prompt on a 4-worker hybrid" mismatch). ---
         for t in _graded_tasks(env):
             fl = flows.get(t["id"])
-            if fl and fl["difficulty"] not in reps:
-                reps[fl["difficulty"]] = (t["id"], len(fl["steps"]))
-        for tier in ("easy", "medium", "hard"):
-            if tier not in reps:
+            if not fl:
                 continue
-            tid, nsub = reps[tier]
-            for arch in [f"{fam}{nsub}" for fam in _FAMILIES] + ["sas"]:
+            tier = fl["difficulty"]
+            tid = t["id"]
+            P = len((t.get("success") or {}).get("subtasks") or [])
+            for arch in [f"{fam}{P}" for fam in _FAMILIES] + ["sas"]:
                 scen.append({"id": f"{name}_{arch}_clean_{tier}_{tid}", "env": name,
                              "template_id": arch, "user_task": tid, "trial": 0, "position": "clean",
                              "injection_kind": None, "injection_target": "", "aitm_channel": None,
                              "source": None, "sink": None, "difficulty": tier})
-        # --- ATTACKS on the executed task × every family (+ sas) × every fitting vector ---
-        run = _run_task(env)
-        if not run:
+        # --- ATTACKS: each injection is coupled to its CARRIER task (minimal-breadth task that
+        # activates its agents) and emitted on that breadth's archs. An agent-4 sink therefore runs on
+        # *4 archs against a breadth-4 task, never on the breadth-3 easy task where it couldn't fire. ---
+        if not _graded_tasks(env):
             continue
-        run_id = run["id"]
-        P = len((run.get("success") or {}).get("subtasks") or [])
         for t in env.get("injection_tasks", []):
             kind = t.get("kind", "")
             succ = t.get("success"); succ = succ if isinstance(succ, list) else ([succ] if succ else [])
@@ -1012,10 +1080,10 @@ def emit_scenarios():
             src = t.get("source")
             oa, sa, ta = t.get("origin_agent"), t.get("sink_agent"), t.get("target_agent")
             need = [a for a in ((ta,) if kind == "direct" else (oa, sa)) if a]
-            archs = []
-            if not any(_agent_idx(a) > P for a in need):   # needed sub-agents present at P
-                archs += [f"{fam}{P}" for fam in _FAMILIES]
-            archs.append("sas")                            # single agent owns all tools → always applies
+            carrier = _carrier_task(env, set(need)) or _run_task(env)
+            run_id = carrier["id"]
+            P = len((carrier.get("success") or {}).get("subtasks") or [])
+            archs = [f"{fam}{P}" for fam in _FAMILIES] + ["sas"]
             for arch in archs:
                 fam = "sas" if arch == "sas" else "".join(c for c in arch if not c.isdigit())
                 for v in _attack_vectors(kind, fam, sink, src, oa, sa, ta):
