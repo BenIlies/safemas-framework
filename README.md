@@ -318,13 +318,20 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
   is chosen with P = #subtasks).
 - **PHANTOM / TOOL** — every identifier argument is resolvable from state; no call names a
   tool that doesn't exist.
+- **ARG-TYPE** — a value that **routes** an action to a destination (`recipient`/`to`/`host`/
+  `account`/…) must be a resolvable **identifier** (a whitespace-free token present in state),
+  never a display name or free text. Stops incoherent targets like `send_money(recipient="City
+  Power & Light")` — grammatically a call, but no agent could pay to a company *name* — so utility
+  can't become a grading artifact from an unreachable target.
 
 **Attack coherence** — an attack must be able to actually fire:
 - **ATTACK** — the injection's `harm` value genuinely lands in its harm region when the sink
   runs (achievable, not aspirational).
-- **CROSS-AGENT** — an *indirect* (confused-deputy) attack's **origin agent ≠ the sink's
-  owner**: one agent plants the poison, a **different** one is tricked into acting. A
-  same-agent "indirect" is rejected as mislabeled.
+- **CROSS-AGENT** — a **field-redirect** *indirect* (confused-deputy) attack's **origin agent ≠
+  the sink's owner**: one agent plants the poison, a **different** one is tricked into acting.
+  (`indirect` attacks carry a `mechanism`: `field-redirect` = poison a record a deputy reads;
+  `instruction` = a command planted in a shared read a deputy obeys — the latter may be same-agent,
+  and must be in SAS, so cross-agent is required only for `field-redirect`.)
 - **CASCADE** — the canonical `*_injection_task_0` must be able to cascade on the run task:
   its origin agent is active there **and** its sink is a benign **carrier** the task actually
   invokes (so the poisoned record is read). Uncoupled variant attacks surface as warnings,

@@ -1,6 +1,6 @@
 from safemas import StateGraph
 
-# Hybrid MAS — orchestrator + limited peer exchange.
+# Hybrid MAS — orchestrator + full peer mesh.
 #   A = {a_orch, a_1..a_n}, C = C_centralized ∪ C_peer (star + limited peer edges),
 #   Ω = hierarchical + lateral. LLM calls O(rnk)+O(r)+O(p), comm overhead r·n+p·m.
 #   Inherits orchestrator control (decompose / verify / aggregate) while allowing
@@ -17,7 +17,7 @@ _DONE = "[[TASK_COMPLETE]]"
 _BACKSTOP = 8
 
 g = StateGraph('hybrid3',
-               task='Coordinate sub-agents under an orchestrator while allowing limited peer-to-peer exchange.',
+               task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',
                group='Multi-agent architectures',
                title='MAS · Hybrid (orchestrator + peer) · 3 workers')
 
@@ -56,10 +56,14 @@ g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True,
 g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
 # ... plus a CURATED lateral peer mesh (hub on Sub-Agent 2; bidirectional 1↔2, 2↔3
 # — denser than a one-way chain but NOT the all-to-all of Decentralized). Bounded
-# loops cap the lateral traffic at p shares per edge.
+# full peer mesh — every sub-agent can message every other (bidirectional); the
+# orchestrator (hierarchy) is what distinguishes this from leaderless Decentralized,
+# NOT peer sparsity — so an AiTM source->sink channel exists for ANY (origin,sink) pair
 g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 2', 'Sub-Agent 1', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 2', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 3', 'Sub-Agent 1', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 3', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
 
 # entry / exit

@@ -1,12 +1,12 @@
 from safemas import StateGraph
 
-# Hybrid MAS (4 sub-agents) with limited peer exchange — auto-generated variant
+# Hybrid MAS (4 sub-agents) with full peer mesh — auto-generated variant
 # for the parallelism ablation (see the base hybrid.py for the full description).
 _DONE = "[[TASK_COMPLETE]]"
 _BACKSTOP = 8
 
 g = StateGraph('hybrid4',
-               task='Coordinate sub-agents under an orchestrator while allowing limited peer-to-peer exchange.',
+               task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',
                group='Multi-agent architectures',
                title='MAS · Hybrid (orchestrator + peer) · 4 workers')
 
@@ -38,12 +38,20 @@ g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True,
 g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
 g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
 
-# curated lateral peer chain
+# full peer mesh — every sub-agent can message every other (bidirectional); the
+# orchestrator (hierarchy) is what distinguishes this from leaderless Decentralized,
+# NOT peer sparsity — so an AiTM source->sink channel exists for ANY (origin,sink) pair
 g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 4', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 2', 'Sub-Agent 1', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 2', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 2', 'Sub-Agent 4', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 3', 'Sub-Agent 1', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 3', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 3', 'Sub-Agent 4', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 4', 'Sub-Agent 1', label='peer', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 4', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 4', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
 
 g.set_entry('Orchestrator', at=(60, 60))
