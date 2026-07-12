@@ -16,7 +16,7 @@ from safemas import StateGraph
 #   confused orchestrator that never declares done still terminates (the global
 #   SAFEMAS_STEP_BUDGET / SAFEMAS_PER_AGENT_CAP are the ultimate runaway guards).
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 8                        # safety cap on rounds; real stop is the sentinel
+_BACKSTOP = 2                        # safety cap on rounds; real stop is the sentinel
 
 g = StateGraph('centralized3',
                task='Coordinate sub-agents through a central orchestrator that decomposes, verifies and aggregates.',

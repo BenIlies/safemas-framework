@@ -14,7 +14,7 @@ from safemas import StateGraph
 #   all-to-all of Decentralized). Because orchestration is multi-round, a peer message
 #   shared in one round is folded into that sub-agent's report in the NEXT round.
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 8
+_BACKSTOP = 2
 
 g = StateGraph('hybrid3',
                task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',

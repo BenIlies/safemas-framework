@@ -3,7 +3,7 @@ from safemas import StateGraph
 # Centralized MAS (5 sub-agents) — auto-generated variant
 # for the parallelism ablation (see the base centralized.py for the full description).
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 8
+_BACKSTOP = 2
 
 g = StateGraph('centralized5',
                task='Coordinate sub-agents through a central orchestrator that decomposes, verifies and aggregates.',

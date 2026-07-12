@@ -3,7 +3,7 @@ from safemas import StateGraph
 # Hybrid MAS (4 sub-agents) with full peer mesh — auto-generated variant
 # for the parallelism ablation (see the base hybrid.py for the full description).
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 8
+_BACKSTOP = 2
 
 g = StateGraph('hybrid4',
                task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',
