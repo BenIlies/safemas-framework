@@ -361,8 +361,8 @@ def validate_task(env, task, tools, blob, eff):
     # independent work streams / (A).. (B).. (C).." while success carried 4 subtasks, so the runner
     # spun up a 4th worker with no instructions (it flailed on unrelated tools). The prompt enumerates
     # streams as "(A) .. (B) .." AND states "N .. work streams"; both must equal len(subtasks). Since
-    # prompt + subtasks are co-generated from one spec (gen_streams.py) they cannot drift, and this
-    # gate is the CI backstop that fails loudly if they ever do.
+    # prompt + subtasks describe the same work-streams, and this gate is the CI backstop that fails
+    # loudly if they ever drift apart.
     prompt = task.get("prompt") or ""
     if subtasks and prompt:
         letters = sorted(set(re.findall(r"\(([A-H])\)\s", prompt)))
