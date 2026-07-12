@@ -16,7 +16,6 @@ from safemas import StateGraph
 #   confused orchestrator that never declares done still terminates (the global
 #   SAFEMAS_STEP_BUDGET / SAFEMAS_PER_AGENT_CAP are the ultimate runaway guards).
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 2                        # safety cap on rounds; real stop is the sentinel
 
 g = StateGraph('centralized3',
                task='Coordinate sub-agents through a central orchestrator that decomposes, verifies and aggregates.',
@@ -54,12 +53,12 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 # edges — star out (assign), star back (report). The assign edges carry `until` so the
 # orchestrator can END the loop by declaring completion; max_iters is the safety
 # backstop. Report edges loop so sub-agents can report every round.
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True)
 
 # entry / exit — the orchestrator is both the entry and the verified sink
 g.set_entry('Orchestrator', at=(60, 60))

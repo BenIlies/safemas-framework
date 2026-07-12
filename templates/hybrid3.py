@@ -14,7 +14,6 @@ from safemas import StateGraph
 #   all-to-all of Decentralized). Because orchestration is multi-round, a peer message
 #   shared in one round is folded into that sub-agent's report in the NEXT round.
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 2
 
 g = StateGraph('hybrid3',
                task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',
@@ -48,12 +47,12 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 
 # edges — star control (assign / report). Assign edges carry `until` so the orchestrator
 # ends the loop on completion; max_iters is the safety backstop ...
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True)
 # ... plus a CURATED lateral peer mesh (hub on Sub-Agent 2; bidirectional 1↔2, 2↔3
 # — denser than a one-way chain but NOT the all-to-all of Decentralized). Bounded
 # full peer mesh — every sub-agent can message every other (bidirectional); the

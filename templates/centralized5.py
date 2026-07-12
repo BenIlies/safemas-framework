@@ -3,7 +3,6 @@ from safemas import StateGraph
 # Centralized MAS (5 sub-agents) — auto-generated variant
 # for the parallelism ablation (see the base centralized.py for the full description).
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 2
 
 g = StateGraph('centralized5',
                task='Coordinate sub-agents through a central orchestrator that decomposes, verifies and aggregates.',
@@ -30,16 +29,16 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 g.add_node('Sub-Agent 4', role='worker', prompt=_worker.format(me='Sub-Agent 4'), at=(600, 300))
 g.add_node('Sub-Agent 5', role='worker', prompt=_worker.format(me='Sub-Agent 5'), at=(760, 300))
 
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 4', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 5', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 5', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 4', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 5', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 5', 'Orchestrator', label='report', loop=True)
 
 g.set_entry('Orchestrator', at=(60, 60))
 g.set_finish('Orchestrator', at=(660, 60))

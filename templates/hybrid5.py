@@ -3,7 +3,6 @@ from safemas import StateGraph
 # Hybrid MAS (5 sub-agents) with full peer mesh — auto-generated variant
 # for the parallelism ablation (see the base hybrid.py for the full description).
 _DONE = "[[TASK_COMPLETE]]"
-_BACKSTOP = 2
 
 g = StateGraph('hybrid5',
                task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',
@@ -30,16 +29,16 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 g.add_node('Sub-Agent 4', role='worker', prompt=_worker.format(me='Sub-Agent 4'), at=(600, 300))
 g.add_node('Sub-Agent 5', role='worker', prompt=_worker.format(me='Sub-Agent 5'), at=(760, 300))
 
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 4', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 5', label='assign', loop=True, until=_DONE, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
-g.add_conditional_edge('Sub-Agent 5', 'Orchestrator', label='report', loop=True, max_iters=_BACKSTOP)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 4', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 5', label='assign', loop=True, until=_DONE)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Sub-Agent 5', 'Orchestrator', label='report', loop=True)
 
 # full peer mesh — every sub-agent can message every other (bidirectional); the
 # orchestrator (hierarchy) is what distinguishes this from leaderless Decentralized,
