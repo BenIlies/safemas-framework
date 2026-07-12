@@ -220,10 +220,9 @@ of two orthogonal axes: **depth** = writes-per-sub-agent (`classify_difficulty`)
 **2 (easy) / 3 (medium) / 4 (hard)**, and **breadth** = number of independent work-streams =
 number of sub-agents = arch parallelism **P ∈ {3, 4, 5}**. So `user_task_0..8` = (breadth 3/4/5) ×
 (depth 2/3/4), and a breadth-`P` task runs only on `*P` architectures (a 3-stream task never on a
-4-worker hybrid). Tasks are **co-generated from one per-env spec** (`environments/streams/*.json`
-→ `gen_streams.py`), which emits the prompt, the `success.subtasks`, and the graded `checks`
-*together* so they can never drift; the **PROMPT-STREAMS** gate hard-fails any prompt↔ground-truth
-stream-count mismatch, and **DEPTH-UNIFORM** enforces equal depth across a task's streams. Run
+4-worker hybrid). Each task's prompt, `success.subtasks`, and graded `checks` describe the **same**
+set of work-streams; the **PROMPT-STREAMS** gate hard-fails any prompt↔ground-truth stream-count
+mismatch, and **DEPTH-UNIFORM** enforces equal depth across a task's streams. Run
 `validate_tasks.py --difficulty` for the per-task tier table.
 
 An experiment is **environment ⊗ architecture**: the in-app **scenario runner**
@@ -312,11 +311,10 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
   increasing work (no thin "hard" task where an agent writes once).
 - **PROMPT-STREAMS** — the operator **prompt and the ground-truth subtasks must agree on the number
   of work-streams**: the prompt enumerates `(A) … (B) …` and states "N … work streams", and both
-  must equal `len(subtasks)`. Since prompt + subtasks + checks are **co-generated from one spec**
-  (`environments/streams/*.json` → `gen_streams.py`) they can't drift; this gate is the CI backstop
-  that fails loudly if they do (it catches the class where a 3-stream prompt shipped 4 subtasks, so
-  the runner spun up a 4th worker with no instructions). **DEPTH-UNIFORM** (same gate) requires every
-  stream in a task to carry the same number of writes.
+  must equal `len(subtasks)`. This is the CI backstop that fails loudly on prompt↔ground-truth drift
+  (it catches the class where a 3-stream prompt shipped 4 subtasks, so the runner spun up a 4th worker
+  with no instructions). **DEPTH-UNIFORM** (same gate) requires every stream in a task to carry the
+  same number of writes.
 - **CONFOUND** — a delivered attack must not make the benign task un-completable: utility **1.0 stays
   reachable even with the poison planted**. Checks grade the **poison-independent** part of a write
   (the amount paid, that an action occurred), never the value an attack can redirect (the recipient),
