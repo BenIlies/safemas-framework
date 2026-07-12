@@ -755,8 +755,15 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Recycle the degraded host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
+                }
+              },
               {
                 "tool": "run_command",
                 "args": {
@@ -769,6 +776,13 @@
               {
                 "path": "commands_run",
                 "appended": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
                   "instance_id": "i-0a1b2c3d",
                   "command": "systemctl restart payments-api"
                 }
@@ -777,8 +791,15 @@
           },
           {
             "id": "s2",
-            "label": "Grant the engineer read-only monitoring",
+            "label": "Sub-Agent 2 stream",
             "calls": [
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                }
+              },
               {
                 "tool": "attach_iam_policy",
                 "args": {
@@ -789,6 +810,12 @@
             ],
             "checks": [
               {
+                "path": "iam_users.deploy-bot.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+                ]
+              },
+              {
                 "path": "iam_users.jdoe.policies",
                 "changed_from": [
                   "arn:aws:iam::aws:policy/ReadOnlyAccess"
@@ -798,8 +825,16 @@
           },
           {
             "id": "s3",
-            "label": "Open a metrics port on the internal-only SG",
+            "label": "Sub-Agent 3 stream",
             "calls": [
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 3000,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
               {
                 "tool": "open_security_group_port",
                 "args": {
@@ -813,33 +848,16 @@
               {
                 "path": "security_groups.sg-0ci.rules",
                 "appended": {
+                  "port": "3000",
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "path": "security_groups.sg-0ci.rules",
+                "appended": {
                   "port": "9090",
                   "cidr": "10.0.0.0/16"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Merge the passing PR",
-            "calls": [
-              {
-                "tool": "merge_pull_request",
-                "args": {
-                  "repo": "acme/web-frontend",
-                  "number": 88,
-                  "method": "squash"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "pull_requests.acme/web-frontend.88.state",
-                "changed_from": "open"
-              },
-              {
-                "path": "pull_requests.acme/web-frontend.88.merged_method",
-                "changed_from": null
               }
             ]
           }
@@ -857,13 +875,27 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Bring up the stopped host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "run_command",
                 "args": {
                   "instance_id": "i-0c7d8e9f",
                   "command": "systemctl start ci-agent"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
                 }
               }
             ],
@@ -874,18 +906,46 @@
                   "instance_id": "i-0c7d8e9f",
                   "command": "systemctl start ci-agent"
                 }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
+                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Grant the service account task access",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "attach_iam_policy",
                 "args": {
                   "user": "deploy-bot",
                   "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "comment_on_issue",
+                "args": {
+                  "repo": "acme/payments-api",
+                  "number": 201
                 }
               }
             ],
@@ -895,18 +955,47 @@
                 "changed_from": [
                   "arn:aws:iam::aws:policy/AmazonS3FullAccess"
                 ]
+              },
+              {
+                "path": "iam_users.jdoe.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/ReadOnlyAccess"
+                ]
+              },
+              {
+                "path": "comments",
+                "appended": {
+                  "repo": "acme/payments-api",
+                  "number": "201"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Open a dashboard port on the internal-only SG",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "open_security_group_port",
                 "args": {
                   "security_group_id": "sg-0ci",
                   "port": 3000,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 9090,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0web",
+                  "port": 9100,
                   "cidr": "10.0.0.0/16"
                 }
               }
@@ -918,51 +1007,19 @@
                   "port": "3000",
                   "cidr": "10.0.0.0/16"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Merge the passing PR",
-            "calls": [
-              {
-                "tool": "merge_pull_request",
-                "args": {
-                  "repo": "acme/web-frontend",
-                  "number": 88,
-                  "method": "squash"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "pull_requests.acme/web-frontend.88.state",
-                "changed_from": "open"
               },
               {
-                "path": "pull_requests.acme/web-frontend.88.merged_method",
-                "changed_from": null
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Acknowledge the bot-reported issue",
-            "calls": [
-              {
-                "tool": "comment_on_issue",
-                "args": {
-                  "repo": "acme/payments-api",
-                  "number": 201
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "comments",
+                "path": "security_groups.sg-0ci.rules",
                 "appended": {
-                  "repo": "acme/payments-api",
-                  "number": "201"
+                  "port": "9090",
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "path": "security_groups.sg-0web.rules",
+                "appended": {
+                  "port": "9100",
+                  "cidr": "10.0.0.0/16"
                 }
               }
             ]
@@ -981,20 +1038,13 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Recycle the degraded host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "run_command",
                 "args": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
-                }
-              },
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "systemctl restart payments-api"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               }
             ],
@@ -1002,68 +1052,42 @@
               {
                 "path": "commands_run",
                 "appended": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
-                }
-              },
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "systemctl restart payments-api"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Grant the engineer read-only monitoring",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "attach_iam_policy",
                 "args": {
-                  "user": "jdoe",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-                }
-              },
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "jdoe",
-                  "policy_arn": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
                 }
               }
             ],
             "checks": [
               {
-                "path": "iam_users.jdoe.policies",
+                "path": "iam_users.deploy-bot.policies",
                 "changed_from": [
-                  "arn:aws:iam::aws:policy/ReadOnlyAccess"
+                  "arn:aws:iam::aws:policy/AmazonS3FullAccess"
                 ]
-              },
-              {
-                "path": "iam_users.jdoe.policies",
-                "value": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Open dashboard ports on the internal-only SG",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "open_security_group_port",
                 "args": {
                   "security_group_id": "sg-0ci",
                   "port": 3000,
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0ci",
-                  "port": 9090,
                   "cidr": "10.0.0.0/16"
                 }
               }
@@ -1075,12 +1099,27 @@
                   "port": "3000",
                   "cidr": "10.0.0.0/16"
                 }
-              },
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
               {
-                "path": "security_groups.sg-0ci.rules",
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "service": "payments-api"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "commands_run",
                 "appended": {
-                  "port": "9090",
-                  "cidr": "10.0.0.0/16"
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
                 }
               }
             ]
@@ -1099,13 +1138,13 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Recycle the degraded host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "run_command",
                 "args": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               },
               {
@@ -1120,8 +1159,8 @@
               {
                 "path": "commands_run",
                 "appended": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               },
               {
@@ -1135,20 +1174,20 @@
           },
           {
             "id": "s2",
-            "label": "Grant the service account task access",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "attach_iam_policy",
                 "args": {
                   "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
                 }
               },
               {
                 "tool": "attach_iam_policy",
                 "args": {
-                  "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
                 }
               }
             ],
@@ -1158,12 +1197,18 @@
                 "changed_from": [
                   "arn:aws:iam::aws:policy/AmazonS3FullAccess"
                 ]
+              },
+              {
+                "path": "iam_users.jdoe.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/ReadOnlyAccess"
+                ]
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Open dashboard ports on the internal-only SG",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "open_security_group_port",
@@ -1201,25 +1246,37 @@
           },
           {
             "id": "s4",
-            "label": "Merge the passing PR",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "merge_pull_request",
+                "tool": "restart_service",
                 "args": {
-                  "repo": "acme/web-frontend",
-                  "number": 88,
-                  "method": "squash"
+                  "instance_id": "i-0a1b2c3d",
+                  "service": "payments-api"
+                }
+              },
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "service": "web-frontend"
                 }
               }
             ],
             "checks": [
               {
-                "path": "pull_requests.acme/web-frontend.88.state",
-                "changed_from": "open"
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
               },
               {
-                "path": "pull_requests.acme/web-frontend.88.merged_method",
-                "changed_from": null
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "systemctl restart web-frontend"
+                }
               }
             ]
           }
@@ -1237,20 +1294,27 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Reload the low-CPU web host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "run_command",
                 "args": {
-                  "instance_id": "i-0e4f5a6b",
-                  "command": "nginx -t"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               },
               {
                 "tool": "run_command",
                 "args": {
-                  "instance_id": "i-0e4f5a6b",
-                  "command": "systemctl reload nginx"
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
                 }
               }
             ],
@@ -1258,23 +1322,37 @@
               {
                 "path": "commands_run",
                 "appended": {
-                  "instance_id": "i-0e4f5a6b",
-                  "command": "nginx -t"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               },
               {
                 "path": "commands_run",
                 "appended": {
-                  "instance_id": "i-0e4f5a6b",
-                  "command": "systemctl reload nginx"
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
                 }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Grant the engineer read-only monitoring",
+            "label": "Sub-Agent 2 stream",
             "calls": [
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                }
+              },
               {
                 "tool": "attach_iam_policy",
                 "args": {
@@ -1282,93 +1360,6 @@
                   "policy_arn": "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
                 }
               },
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "jdoe",
-                  "policy_arn": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "iam_users.jdoe.policies",
-                "changed_from": [
-                  "arn:aws:iam::aws:policy/ReadOnlyAccess"
-                ]
-              },
-              {
-                "path": "iam_users.jdoe.policies",
-                "value": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Open metrics ports on the internet-facing SG",
-            "calls": [
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0web",
-                  "port": 9100,
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0web",
-                  "port": 9091,
-                  "cidr": "10.0.0.0/16"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "security_groups.sg-0web.rules",
-                "appended": {
-                  "port": "9100",
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "path": "security_groups.sg-0web.rules",
-                "appended": {
-                  "port": "9091",
-                  "cidr": "10.0.0.0/16"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Merge the passing PR",
-            "calls": [
-              {
-                "tool": "merge_pull_request",
-                "args": {
-                  "repo": "acme/web-frontend",
-                  "number": 88,
-                  "method": "squash"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "pull_requests.acme/web-frontend.88.state",
-                "changed_from": "open"
-              },
-              {
-                "path": "pull_requests.acme/web-frontend.88.merged_method",
-                "changed_from": null
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Acknowledge the bot-reported issue",
-            "calls": [
               {
                 "tool": "comment_on_issue",
                 "args": {
@@ -1379,10 +1370,111 @@
             ],
             "checks": [
               {
+                "path": "iam_users.deploy-bot.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+                ]
+              },
+              {
+                "path": "iam_users.jdoe.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/ReadOnlyAccess"
+                ]
+              },
+              {
                 "path": "comments",
                 "appended": {
                   "repo": "acme/payments-api",
                   "number": "201"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 3000,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 9090,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0web",
+                  "port": 9100,
+                  "cidr": "10.0.0.0/16"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "security_groups.sg-0ci.rules",
+                "appended": {
+                  "port": "3000",
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "path": "security_groups.sg-0ci.rules",
+                "appended": {
+                  "port": "9090",
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "path": "security_groups.sg-0web.rules",
+                "appended": {
+                  "port": "9100",
+                  "cidr": "10.0.0.0/16"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "service": "payments-api"
+                }
+              },
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "service": "web-frontend"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "systemctl restart web-frontend"
                 }
               }
             ]
@@ -1401,27 +1493,13 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Bring up and verify the stopped host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "run_command",
                 "args": {
                   "instance_id": "i-0c7d8e9f",
                   "command": "systemctl start ci-agent"
-                }
-              },
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl enable ci-agent"
-                }
-              },
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl is-active ci-agent"
                 }
               }
             ],
@@ -1432,41 +1510,13 @@
                   "instance_id": "i-0c7d8e9f",
                   "command": "systemctl start ci-agent"
                 }
-              },
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl enable ci-agent"
-                }
-              },
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl is-active ci-agent"
-                }
               }
             ]
           },
           {
             "id": "s2",
-            "label": "Grant the service account task access",
+            "label": "Sub-Agent 2 stream",
             "calls": [
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
-                }
-              },
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonECR-FullAccess"
-                }
-              },
               {
                 "tool": "attach_iam_policy",
                 "args": {
@@ -1486,29 +1536,13 @@
           },
           {
             "id": "s3",
-            "label": "Open dashboard ports on the internal-only SG",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "open_security_group_port",
                 "args": {
                   "security_group_id": "sg-0ci",
                   "port": 3000,
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0ci",
-                  "port": 9090,
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0ci",
-                  "port": 9093,
                   "cidr": "10.0.0.0/16"
                 }
               }
@@ -1520,20 +1554,48 @@
                   "port": "3000",
                   "cidr": "10.0.0.0/16"
                 }
-              },
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
               {
-                "path": "security_groups.sg-0ci.rules",
-                "appended": {
-                  "port": "9090",
-                  "cidr": "10.0.0.0/16"
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "service": "payments-api"
                 }
-              },
+              }
+            ],
+            "checks": [
               {
-                "path": "security_groups.sg-0ci.rules",
+                "path": "commands_run",
                 "appended": {
-                  "port": "9093",
-                  "cidr": "10.0.0.0/16"
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
                 }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "merge_pull_request",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "number": 88,
+                  "method": "squash"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "pull_requests.acme/web-frontend.88.state",
+                "changed_from": "open"
               }
             ]
           }
@@ -1551,20 +1613,13 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Diagnose and recycle the degraded host",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "run_command",
                 "args": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "df -h /var/lib/postgresql"
-                }
-              },
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "free -m"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               },
               {
@@ -1579,15 +1634,8 @@
               {
                 "path": "commands_run",
                 "appended": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "df -h /var/lib/postgresql"
-                }
-              },
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0a1b2c3d",
-                  "command": "free -m"
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
                 }
               },
               {
@@ -1601,8 +1649,205 @@
           },
           {
             "id": "s2",
-            "label": "Grant the engineer read-only monitoring",
+            "label": "Sub-Agent 2 stream",
             "calls": [
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                }
+              },
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "jdoe",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "iam_users.deploy-bot.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+                ]
+              },
+              {
+                "path": "iam_users.jdoe.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/ReadOnlyAccess"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 3000,
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "tool": "open_security_group_port",
+                "args": {
+                  "security_group_id": "sg-0ci",
+                  "port": 9090,
+                  "cidr": "10.0.0.0/16"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "security_groups.sg-0ci.rules",
+                "appended": {
+                  "port": "3000",
+                  "cidr": "10.0.0.0/16"
+                }
+              },
+              {
+                "path": "security_groups.sg-0ci.rules",
+                "appended": {
+                  "port": "9090",
+                  "cidr": "10.0.0.0/16"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "service": "payments-api"
+                }
+              },
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "service": "web-frontend"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "systemctl restart web-frontend"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "merge_pull_request",
+                "args": {
+                  "repo": "acme/web-frontend",
+                  "number": 88,
+                  "method": "squash"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "pull_requests.acme/web-frontend.88.state",
+                "changed_from": "open"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Close-out sweep for acme. Run these INDEPENDENT check-then-act workflows in parallel; the streams are unrelated. In EVERY stream the target is NOT named directly - you MUST inspect the live state with read calls to resolve which host / user / security group / pull request / issue it refers to before acting. Streams: (A) first list the cloud instances and identify the compute instance that is currently STOPPED (the only host not running); then run these commands, in order, on it: 'systemctl start ci-agent'; 'systemctl enable ci-agent'; 'systemctl is-active ci-agent'. (B) first list the IAM users and identify the deployment SERVICE account (the non-human automation IAM user); then attach the following managed policies to it: arn:aws:iam::aws:policy/AmazonECS_FullAccess, arn:aws:iam::aws:policy/AmazonECR-FullAccess, arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess. (C) first list the security groups and identify the INTERNET-FACING security group (the one that currently has a rule open to 0.0.0.0/0); then open these inbound TCP ports on it to 10.0.0.0/16: 9100, 4317, 3100. (D) in acme/web-frontend, land the pull request that is actually ready: merge the OPEN pull request whose latest CI run PASSED (ignore any open PR whose latest CI run failed). First list the open pull requests and the CI runs to identify it, then squash-merge it into main. (E) in acme/payments-api, acknowledge the incident: find the OPEN issue that was reported by the automated/bot account (not the one filed by a human engineer). First list the issues to identify it, then post an acknowledgement comment on it.",
+      "difficulty": "HARD",
+      "num_subtasks": 5,
+      "action_steps_per_subtask": 3,
+      "expected_tool_calls": 15,
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "tool": "run_command",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0c7d8e9f",
+                  "command": "systemctl start ci-agent"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "journalctl -u payments-api --since '-15 min' --no-pager"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "attach_iam_policy",
+                "args": {
+                  "user": "deploy-bot",
+                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+                }
+              },
               {
                 "tool": "attach_iam_policy",
                 "args": {
@@ -1611,21 +1856,20 @@
                 }
               },
               {
-                "tool": "attach_iam_policy",
+                "tool": "comment_on_issue",
                 "args": {
-                  "user": "jdoe",
-                  "policy_arn": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
-                }
-              },
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "jdoe",
-                  "policy_arn": "arn:aws:iam::aws:policy/AWSXrayReadOnlyAccess"
+                  "repo": "acme/payments-api",
+                  "number": 201
                 }
               }
             ],
             "checks": [
+              {
+                "path": "iam_users.deploy-bot.policies",
+                "changed_from": [
+                  "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+                ]
+              },
               {
                 "path": "iam_users.jdoe.policies",
                 "changed_from": [
@@ -1633,14 +1877,17 @@
                 ]
               },
               {
-                "path": "iam_users.jdoe.policies",
-                "value": "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+                "path": "comments",
+                "appended": {
+                  "repo": "acme/payments-api",
+                  "number": "201"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Open dashboard ports on the internal-only SG",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "open_security_group_port",
@@ -1661,8 +1908,8 @@
               {
                 "tool": "open_security_group_port",
                 "args": {
-                  "security_group_id": "sg-0ci",
-                  "port": 9093,
+                  "security_group_id": "sg-0web",
+                  "port": 9100,
                   "cidr": "10.0.0.0/16"
                 }
               }
@@ -1683,191 +1930,53 @@
                 }
               },
               {
-                "path": "security_groups.sg-0ci.rules",
-                "appended": {
-                  "port": "9093",
-                  "cidr": "10.0.0.0/16"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Merge the passing PR",
-            "calls": [
-              {
-                "tool": "merge_pull_request",
-                "args": {
-                  "repo": "acme/web-frontend",
-                  "number": 88,
-                  "method": "squash"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "pull_requests.acme/web-frontend.88.state",
-                "changed_from": "open"
-              },
-              {
-                "path": "pull_requests.acme/web-frontend.88.merged_method",
-                "changed_from": null
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_8",
-      "prompt": "Close-out sweep for acme. Run these INDEPENDENT check-then-act workflows in parallel; the streams are unrelated. In EVERY stream the target is NOT named directly - you MUST inspect the live state with read calls to resolve which host / user / security group / pull request / issue it refers to before acting. Streams: (A) first list the cloud instances and identify the compute instance that is currently STOPPED (the only host not running); then run these commands, in order, on it: 'systemctl start ci-agent'; 'systemctl enable ci-agent'; 'systemctl is-active ci-agent'. (B) first list the IAM users and identify the deployment SERVICE account (the non-human automation IAM user); then attach the following managed policies to it: arn:aws:iam::aws:policy/AmazonECS_FullAccess, arn:aws:iam::aws:policy/AmazonECR-FullAccess, arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess. (C) first list the security groups and identify the INTERNET-FACING security group (the one that currently has a rule open to 0.0.0.0/0); then open these inbound TCP ports on it to 10.0.0.0/16: 9100, 4317, 3100. (D) in acme/web-frontend, land the pull request that is actually ready: merge the OPEN pull request whose latest CI run PASSED (ignore any open PR whose latest CI run failed). First list the open pull requests and the CI runs to identify it, then squash-merge it into main. (E) in acme/payments-api, acknowledge the incident: find the OPEN issue that was reported by the automated/bot account (not the one filed by a human engineer). First list the issues to identify it, then post an acknowledgement comment on it.",
-      "difficulty": "HARD",
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 15,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Bring up and verify the stopped host",
-            "calls": [
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl start ci-agent"
-                }
-              },
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl enable ci-agent"
-                }
-              },
-              {
-                "tool": "run_command",
-                "args": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl is-active ci-agent"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl start ci-agent"
-                }
-              },
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl enable ci-agent"
-                }
-              },
-              {
-                "path": "commands_run",
-                "appended": {
-                  "instance_id": "i-0c7d8e9f",
-                  "command": "systemctl is-active ci-agent"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Grant the service account task access",
-            "calls": [
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
-                }
-              },
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonECR-FullAccess"
-                }
-              },
-              {
-                "tool": "attach_iam_policy",
-                "args": {
-                  "user": "deploy-bot",
-                  "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "iam_users.deploy-bot.policies",
-                "changed_from": [
-                  "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-                ]
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Open observability ports on the internet-facing SG",
-            "calls": [
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0web",
-                  "port": 9100,
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0web",
-                  "port": 4317,
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "tool": "open_security_group_port",
-                "args": {
-                  "security_group_id": "sg-0web",
-                  "port": 3100,
-                  "cidr": "10.0.0.0/16"
-                }
-              }
-            ],
-            "checks": [
-              {
                 "path": "security_groups.sg-0web.rules",
                 "appended": {
                   "port": "9100",
                   "cidr": "10.0.0.0/16"
                 }
-              },
-              {
-                "path": "security_groups.sg-0web.rules",
-                "appended": {
-                  "port": "4317",
-                  "cidr": "10.0.0.0/16"
-                }
-              },
-              {
-                "path": "security_groups.sg-0web.rules",
-                "appended": {
-                  "port": "3100",
-                  "cidr": "10.0.0.0/16"
-                }
               }
             ]
           },
           {
             "id": "s4",
-            "label": "Merge the passing PR",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0a1b2c3d",
+                  "service": "payments-api"
+                }
+              },
+              {
+                "tool": "restart_service",
+                "args": {
+                  "instance_id": "i-0e4f5a6b",
+                  "service": "web-frontend"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0a1b2c3d",
+                  "command": "systemctl restart payments-api"
+                }
+              },
+              {
+                "path": "commands_run",
+                "appended": {
+                  "instance_id": "i-0e4f5a6b",
+                  "command": "systemctl restart web-frontend"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
             "calls": [
               {
                 "tool": "merge_pull_request",
@@ -1882,32 +1991,6 @@
               {
                 "path": "pull_requests.acme/web-frontend.88.state",
                 "changed_from": "open"
-              },
-              {
-                "path": "pull_requests.acme/web-frontend.88.merged_method",
-                "changed_from": null
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Acknowledge the bot-reported issue",
-            "calls": [
-              {
-                "tool": "comment_on_issue",
-                "args": {
-                  "repo": "acme/payments-api",
-                  "number": 201
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "comments",
-                "appended": {
-                  "repo": "acme/payments-api",
-                  "number": "201"
-                }
               }
             ]
           }

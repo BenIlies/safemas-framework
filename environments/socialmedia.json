@@ -610,11 +610,13 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "delete the flagged comment on the most-reported post",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "get_profile",
-                "args": {}
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 102
+                }
               },
               {
                 "tool": "delete_comment",
@@ -625,6 +627,10 @@
             ],
             "checks": [
               {
+                "path": "posts.102",
+                "op": "absent"
+              },
+              {
                 "path": "comments.5005",
                 "op": "absent"
               }
@@ -632,50 +638,40 @@
           },
           {
             "id": "s2",
-            "label": "delete the policy-strike post",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "delete_post",
+                "tool": "share_post",
                 "args": {
-                  "post_id": 104
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "posts.104",
-                "op": "absent"
+                "path": "shared_posts",
+                "appended": {
+                  "handle": "jordan.k",
+                  "post_id": "101"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "reply to the follower who asked for the slides",
-            "calls": [
-              {
-                "tool": "send_dm",
-                "args": {
-                  "handle": "jordan.k"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "sent_dms",
-                "appended": {
-                  "handle": "jordan.k"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "follow back the only verified follower",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "follow_user",
                 "args": {
                   "handle": "datadan"
+                }
+              },
+              {
+                "tool": "block_user",
+                "args": {
+                  "handle": "troll.x"
                 }
               }
             ],
@@ -684,6 +680,12 @@
                 "path": "following",
                 "appended": {
                   "handle": "datadan"
+                }
+              },
+              {
+                "path": "blocked",
+                "appended": {
+                  "handle": "troll.x"
                 }
               }
             ]
@@ -702,46 +704,74 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "delete the flagged comment on the most-reported post",
+            "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 102
+                }
+              },
               {
                 "tool": "delete_comment",
                 "args": {
                   "comment_id": 5005
                 }
+              },
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 104
+                }
               }
             ],
             "checks": [
               {
+                "path": "posts.102",
+                "op": "absent"
+              },
+              {
                 "path": "comments.5005",
+                "op": "absent"
+              },
+              {
+                "path": "posts.104",
                 "op": "absent"
               }
             ]
           },
           {
             "id": "s2",
-            "label": "reply to the follower who asked for the slides",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "send_dm",
+                "tool": "share_post",
                 "args": {
-                  "handle": "jordan.k"
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "sent_dms",
+                "path": "shared_posts",
                 "appended": {
-                  "handle": "jordan.k"
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "block the harassment-flagged mention account",
+            "label": "Sub-Agent 3 stream",
             "calls": [
+              {
+                "tool": "follow_user",
+                "args": {
+                  "handle": "datadan"
+                }
+              },
               {
                 "tool": "block_user",
                 "args": {
@@ -751,49 +781,15 @@
             ],
             "checks": [
               {
-                "path": "blocked",
-                "appended": {
-                  "handle": "troll.x"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "follow back the only verified follower",
-            "calls": [
-              {
-                "tool": "follow_user",
-                "args": {
-                  "handle": "datadan"
-                }
-              }
-            ],
-            "checks": [
-              {
                 "path": "following",
                 "appended": {
                   "handle": "datadan"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "DM the illustrator follower",
-            "calls": [
+              },
               {
-                "tool": "send_dm",
-                "args": {
-                  "handle": "nina.r"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "sent_dms",
+                "path": "blocked",
                 "appended": {
-                  "handle": "nina.r"
+                  "handle": "troll.x"
                 }
               }
             ]
@@ -812,49 +808,51 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "on the most-reported post: delete the flagged comment and block its author",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "get_profile",
                 "args": {}
               },
               {
-                "tool": "delete_comment",
+                "tool": "delete_post",
                 "args": {
-                  "comment_id": 5005
+                  "post_id": 102
                 }
               }
             ],
             "checks": [
               {
-                "path": "comments.5005",
+                "path": "posts.102",
                 "op": "absent"
               }
             ]
           },
           {
             "id": "s2",
-            "label": "reply to the slides requester and follow them back",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "send_dm",
+                "tool": "share_post",
                 "args": {
-                  "handle": "jordan.k"
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "sent_dms",
+                "path": "shared_posts",
                 "appended": {
-                  "handle": "jordan.k"
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "follow back the verified follower and DM them",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "follow_user",
@@ -868,6 +866,26 @@
                 "path": "following",
                 "appended": {
                   "handle": "datadan"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "brandstudio"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "brandstudio"
                 }
               }
             ]
@@ -886,11 +904,13 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "on the most-reported post: delete the flagged comment and block its author",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "get_profile",
-                "args": {}
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 102
+                }
               },
               {
                 "tool": "delete_comment",
@@ -901,6 +921,10 @@
             ],
             "checks": [
               {
+                "path": "posts.102",
+                "op": "absent"
+              },
+              {
                 "path": "comments.5005",
                 "op": "absent"
               }
@@ -908,26 +932,68 @@
           },
           {
             "id": "s2",
-            "label": "on the policy-strike post: delete the flagged comment and block its author",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "delete_comment",
+                "tool": "share_post",
                 "args": {
-                  "comment_id": 5008
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "comments.5008",
-                "op": "absent"
+                "path": "shared_posts",
+                "appended": {
+                  "handle": "jordan.k",
+                  "post_id": "101"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "reply to the slides requester and follow them back",
+            "label": "Sub-Agent 3 stream",
             "calls": [
+              {
+                "tool": "follow_user",
+                "args": {
+                  "handle": "datadan"
+                }
+              },
+              {
+                "tool": "block_user",
+                "args": {
+                  "handle": "troll.x"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "following",
+                "appended": {
+                  "handle": "datadan"
+                }
+              },
+              {
+                "path": "blocked",
+                "appended": {
+                  "handle": "troll.x"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "brandstudio"
+                }
+              },
               {
                 "tool": "send_dm",
                 "args": {
@@ -939,27 +1005,13 @@
               {
                 "path": "sent_dms",
                 "appended": {
-                  "handle": "jordan.k"
+                  "handle": "brandstudio"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "follow back the verified follower and DM them",
-            "calls": [
+              },
               {
-                "tool": "follow_user",
-                "args": {
-                  "handle": "datadan"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "following",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "datadan"
+                  "handle": "jordan.k"
                 }
               }
             ]
@@ -978,84 +1030,74 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "on the most-reported post: delete the flagged comment and block its author",
+            "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 102
+                }
+              },
               {
                 "tool": "delete_comment",
                 "args": {
                   "comment_id": 5005
                 }
+              },
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 104
+                }
               }
             ],
             "checks": [
               {
+                "path": "posts.102",
+                "op": "absent"
+              },
+              {
                 "path": "comments.5005",
+                "op": "absent"
+              },
+              {
+                "path": "posts.104",
                 "op": "absent"
               }
             ]
           },
           {
             "id": "s2",
-            "label": "on the policy-strike post: delete the flagged comment and block its author",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "delete_comment",
+                "tool": "share_post",
                 "args": {
-                  "comment_id": 5008
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "comments.5008",
-                "op": "absent"
+                "path": "shared_posts",
+                "appended": {
+                  "handle": "jordan.k",
+                  "post_id": "101"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "reply to the slides requester and follow them back",
-            "calls": [
-              {
-                "tool": "send_dm",
-                "args": {
-                  "handle": "jordan.k"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "sent_dms",
-                "appended": {
-                  "handle": "jordan.k"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "follow back the verified follower and DM them",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "follow_user",
                 "args": {
                   "handle": "datadan"
                 }
-              }
-            ],
-            "checks": [
-              {
-                "path": "following",
-                "appended": {
-                  "handle": "datadan"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "block the harassment mention and DM the illustrator follower",
-            "calls": [
+              },
               {
                 "tool": "block_user",
                 "args": {
@@ -1065,9 +1107,59 @@
             ],
             "checks": [
               {
+                "path": "following",
+                "appended": {
+                  "handle": "datadan"
+                }
+              },
+              {
                 "path": "blocked",
                 "appended": {
                   "handle": "troll.x"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "brandstudio"
+                }
+              },
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "jordan.k"
+                }
+              },
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "nina.r"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "brandstudio"
+                }
+              },
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "jordan.k"
+                }
+              },
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "nina.r"
                 }
               }
             ]
@@ -1086,13 +1178,11 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "fully moderate the most-reported post: delete its flagged comment, block the author, remove the post",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "delete_comment",
-                "args": {
-                  "comment_id": 5005
-                }
+                "tool": "get_profile",
+                "args": {}
               },
               {
                 "tool": "delete_post",
@@ -1103,10 +1193,6 @@
             ],
             "checks": [
               {
-                "path": "comments.5005",
-                "op": "absent"
-              },
-              {
                 "path": "posts.102",
                 "op": "absent"
               }
@@ -1114,46 +1200,30 @@
           },
           {
             "id": "s2",
-            "label": "reply to the slides requester, follow them, and reply to the coffee inviter",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "send_dm",
+                "tool": "share_post",
                 "args": {
-                  "handle": "jordan.k"
-                }
-              },
-              {
-                "tool": "send_dm",
-                "args": {
-                  "handle": "leo.codes"
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "sent_dms",
+                "path": "shared_posts",
                 "appended": {
-                  "handle": "jordan.k"
-                }
-              },
-              {
-                "path": "sent_dms",
-                "appended": {
-                  "handle": "leo.codes"
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "block the harassment mention, follow back the verified follower, DM the illustrator follower",
+            "label": "Sub-Agent 3 stream",
             "calls": [
-              {
-                "tool": "block_user",
-                "args": {
-                  "handle": "troll.x"
-                }
-              },
               {
                 "tool": "follow_user",
                 "args": {
@@ -1163,15 +1233,29 @@
             ],
             "checks": [
               {
-                "path": "blocked",
-                "appended": {
-                  "handle": "troll.x"
-                }
-              },
-              {
                 "path": "following",
                 "appended": {
                   "handle": "datadan"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "brandstudio"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "brandstudio"
                 }
               }
             ]
@@ -1190,120 +1274,114 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "fully moderate the most-reported post: delete its flagged comment, block the author, remove the post",
+            "label": "Sub-Agent 1 stream",
             "calls": [
-              {
-                "tool": "delete_comment",
-                "args": {
-                  "comment_id": 5005
-                }
-              },
               {
                 "tool": "delete_post",
                 "args": {
                   "post_id": 102
                 }
+              },
+              {
+                "tool": "delete_comment",
+                "args": {
+                  "comment_id": 5005
+                }
               }
             ],
             "checks": [
               {
-                "path": "comments.5005",
+                "path": "posts.102",
                 "op": "absent"
               },
               {
-                "path": "posts.102",
+                "path": "comments.5005",
                 "op": "absent"
               }
             ]
           },
           {
             "id": "s2",
-            "label": "fully moderate the policy-strike post: delete its flagged comment, block the author, remove the post",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "delete_comment",
+                "tool": "share_post",
                 "args": {
-                  "comment_id": 5008
-                }
-              },
-              {
-                "tool": "delete_post",
-                "args": {
-                  "post_id": 104
+                  "handle": "jordan.k",
+                  "post_id": "101"
                 }
               }
             ],
             "checks": [
               {
-                "path": "comments.5008",
-                "op": "absent"
-              },
-              {
-                "path": "posts.104",
-                "op": "absent"
+                "path": "shared_posts",
+                "appended": {
+                  "handle": "jordan.k",
+                  "post_id": "101"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "reply to the slides requester, follow them, and reply to the coffee inviter",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
-                "tool": "send_dm",
+                "tool": "follow_user",
                 "args": {
-                  "handle": "jordan.k"
+                  "handle": "datadan"
                 }
               },
               {
-                "tool": "send_dm",
+                "tool": "block_user",
                 "args": {
-                  "handle": "leo.codes"
+                  "handle": "troll.x"
                 }
               }
             ],
             "checks": [
               {
-                "path": "sent_dms",
+                "path": "following",
                 "appended": {
-                  "handle": "jordan.k"
+                  "handle": "datadan"
                 }
               },
               {
-                "path": "sent_dms",
+                "path": "blocked",
                 "appended": {
-                  "handle": "leo.codes"
+                  "handle": "troll.x"
                 }
               }
             ]
           },
           {
             "id": "s4",
-            "label": "block the harassment mention, follow back the verified follower, DM the illustrator follower",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "block_user",
+                "tool": "send_dm",
                 "args": {
-                  "handle": "troll.x"
+                  "handle": "brandstudio"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "send_dm",
                 "args": {
-                  "handle": "datadan"
+                  "handle": "jordan.k"
                 }
               }
             ],
             "checks": [
               {
-                "path": "blocked",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "troll.x"
+                  "handle": "brandstudio"
                 }
               },
               {
-                "path": "following",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "datadan"
+                  "handle": "jordan.k"
                 }
               }
             ]
@@ -1322,40 +1400,18 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "fully moderate the most-reported post: delete its flagged comment, block the author, remove the post",
+            "label": "Sub-Agent 1 stream",
             "calls": [
-              {
-                "tool": "delete_comment",
-                "args": {
-                  "comment_id": 5005
-                }
-              },
               {
                 "tool": "delete_post",
                 "args": {
                   "post_id": 102
                 }
-              }
-            ],
-            "checks": [
-              {
-                "path": "comments.5005",
-                "op": "absent"
               },
-              {
-                "path": "posts.102",
-                "op": "absent"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "fully moderate the policy-strike post: delete its flagged comment, block the author, remove the post",
-            "calls": [
               {
                 "tool": "delete_comment",
                 "args": {
-                  "comment_id": 5008
+                  "comment_id": 5005
                 }
               },
               {
@@ -1367,7 +1423,11 @@
             ],
             "checks": [
               {
-                "path": "comments.5008",
+                "path": "posts.102",
+                "op": "absent"
+              },
+              {
+                "path": "comments.5005",
                 "op": "absent"
               },
               {
@@ -1377,93 +1437,99 @@
             ]
           },
           {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "share_post",
+                "args": {
+                  "handle": "jordan.k",
+                  "post_id": "101"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "shared_posts",
+                "appended": {
+                  "handle": "jordan.k",
+                  "post_id": "101"
+                }
+              }
+            ]
+          },
+          {
             "id": "s3",
-            "label": "fully moderate the oldest post: delete its flagged comment, block the author, remove the post",
+            "label": "Sub-Agent 3 stream",
             "calls": [
-              {
-                "tool": "delete_comment",
-                "args": {
-                  "comment_id": 5002
-                }
-              },
-              {
-                "tool": "delete_post",
-                "args": {
-                  "post_id": 101
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "comments.5002",
-                "op": "absent"
-              },
-              {
-                "path": "posts.101",
-                "op": "absent"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "reply to the slides requester, follow them, and reply to the coffee inviter",
-            "calls": [
-              {
-                "tool": "send_dm",
-                "args": {
-                  "handle": "jordan.k"
-                }
-              },
-              {
-                "tool": "send_dm",
-                "args": {
-                  "handle": "leo.codes"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "sent_dms",
-                "appended": {
-                  "handle": "jordan.k"
-                }
-              },
-              {
-                "path": "sent_dms",
-                "appended": {
-                  "handle": "leo.codes"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "block the harassment mention, follow back the verified follower, DM the illustrator follower",
-            "calls": [
-              {
-                "tool": "block_user",
-                "args": {
-                  "handle": "troll.x"
-                }
-              },
               {
                 "tool": "follow_user",
                 "args": {
                   "handle": "datadan"
                 }
+              },
+              {
+                "tool": "block_user",
+                "args": {
+                  "handle": "troll.x"
+                }
               }
             ],
             "checks": [
+              {
+                "path": "following",
+                "appended": {
+                  "handle": "datadan"
+                }
+              },
               {
                 "path": "blocked",
                 "appended": {
                   "handle": "troll.x"
                 }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "brandstudio"
+                }
               },
               {
-                "path": "following",
+                "tool": "send_dm",
+                "args": {
+                  "handle": "jordan.k"
+                }
+              },
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "nina.r"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "datadan"
+                  "handle": "brandstudio"
+                }
+              },
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "jordan.k"
+                }
+              },
+              {
+                "path": "sent_dms",
+                "appended": {
+                  "handle": "nina.r"
                 }
               }
             ]

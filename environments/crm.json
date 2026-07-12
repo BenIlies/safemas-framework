@@ -772,12 +772,19 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Cascade Negotiation deal",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
                 "args": {
                   "id": "104",
+                  "stage": "Closed Won"
+                }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
                   "stage": "Closed Won"
                 }
               }
@@ -786,60 +793,64 @@
               {
                 "path": "deals.104.stage",
                 "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.stage",
+                "changed_from": "Negotiation"
               }
             ]
           },
           {
             "id": "s2",
-            "label": "overdue deal two updates",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "create_task",
                 "args": {
-                  "id": "102",
-                  "stage": "Closed Won"
-                }
-              },
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "102",
-                  "owner": "Dana Cole"
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.102.stage",
-                "changed_from": "Negotiation"
-              },
-              {
-                "path": "deals.102.owner",
-                "changed_from": "Jordan Ames"
-              },
-              {
-                "path": "deals.102.owner",
-                "value": "Dana Cole"
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "earliest lead onboard",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
-                "tool": "create_contact",
+                "tool": "send_email",
                 "args": {
-                  "email": "hello@quanta-supply.com"
+                  "to": "owen.frost@lumenworks.com"
+                }
+              },
+              {
+                "tool": "delete_task",
+                "args": {
+                  "id": "201"
                 }
               }
             ],
             "checks": [
               {
-                "path": "new_contacts",
+                "path": "sent_emails",
                 "appended": {
-                  "email": "hello@quanta-supply.com"
+                  "to": "owen.frost@lumenworks.com"
                 }
+              },
+              {
+                "path": "tasks.201",
+                "op": "absent"
               }
             ]
           }
@@ -857,7 +868,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Cascade close+invoice+email",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
@@ -865,69 +876,88 @@
                   "id": "104",
                   "stage": "Closed Won"
                 }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.104.stage",
-                "changed_from": "Negotiation"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "overdue close+sendinvoice+email",
-            "calls": [
+              },
               {
                 "tool": "update_deal",
                 "args": {
                   "id": "102",
                   "stage": "Closed Won"
                 }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.102.stage",
-                "changed_from": "Negotiation"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "top-value deal",
-            "calls": [
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "101",
-                  "stage": "Negotiation"
-                }
               },
               {
                 "tool": "update_deal",
                 "args": {
-                  "id": "101",
+                  "id": "102",
                   "owner": "Dana Cole"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.101.stage",
-                "value": "Negotiation"
+                "path": "deals.104.stage",
+                "changed_from": "Negotiation"
               },
               {
-                "path": "deals.101.owner",
-                "changed_from": "Jordan Ames"
+                "path": "deals.102.stage",
+                "changed_from": "Negotiation"
               },
               {
-                "path": "deals.101.stage",
-                "changed_from": "Proposal"
-              },
-              {
-                "path": "deals.101.owner",
+                "path": "deals.102.owner",
                 "value": "Dana Cole"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "create_task",
+                "args": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "send_email",
+                "args": {
+                  "to": "owen.frost@lumenworks.com"
+                }
+              },
+              {
+                "tool": "delete_task",
+                "args": {
+                  "id": "201"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_emails",
+                "appended": {
+                  "to": "owen.frost@lumenworks.com"
+                }
+              },
+              {
+                "path": "tasks.201",
+                "op": "absent"
               }
             ]
           }
@@ -945,7 +975,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "neg deal -> won",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "list_contacts",
@@ -968,26 +998,31 @@
           },
           {
             "id": "s2",
-            "label": "overdue -> owner",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "create_task",
                 "args": {
-                  "id": "102",
-                  "owner": "Dana Cole"
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.102.owner",
-                "value": "Dana Cole"
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "stale contact email",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "send_email",
@@ -1007,19 +1042,23 @@
           },
           {
             "id": "s4",
-            "label": "earliest-due task delete",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "delete_task",
+                "tool": "send_invoice",
                 "args": {
-                  "id": "201"
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
                 }
               }
             ],
             "checks": [
               {
-                "path": "tasks.201",
-                "op": "absent"
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
               }
             ]
           }
@@ -1037,97 +1076,121 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "top deal",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
                 "args": {
-                  "id": "101",
-                  "stage": "Negotiation"
+                  "id": "104",
+                  "stage": "Closed Won"
+                }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
+                  "stage": "Closed Won"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.101.stage",
-                "value": "Negotiation"
+                "path": "deals.104.stage",
+                "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.stage",
+                "changed_from": "Negotiation"
               }
             ]
           },
           {
             "id": "s2",
-            "label": "largest discount deal",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "create_task",
                 "args": {
-                  "id": "105",
-                  "stage": "Negotiation"
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.105.stage",
-                "value": "Negotiation"
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "earliest lead onboard",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
-                "tool": "create_contact",
+                "tool": "send_email",
                 "args": {
-                  "email": "hello@quanta-supply.com"
+                  "to": "owen.frost@lumenworks.com"
+                }
+              },
+              {
+                "tool": "delete_task",
+                "args": {
+                  "id": "201"
                 }
               }
             ],
             "checks": [
               {
-                "path": "new_contacts",
+                "path": "sent_emails",
                 "appended": {
-                  "email": "hello@quanta-supply.com"
+                  "to": "owen.frost@lumenworks.com"
                 }
+              },
+              {
+                "path": "tasks.201",
+                "op": "absent"
               }
             ]
           },
           {
             "id": "s4",
-            "label": "qualification deal",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "send_invoice",
                 "args": {
-                  "id": "103",
-                  "owner": "Jordan Ames"
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
                 }
               },
               {
-                "tool": "update_deal",
+                "tool": "send_invoice",
                 "args": {
-                  "id": "103",
-                  "stage": "Proposal"
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.103.stage",
-                "changed_from": "Qualification"
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
               },
               {
-                "path": "deals.103.owner",
-                "value": "Jordan Ames"
-              },
-              {
-                "path": "deals.103.stage",
-                "value": "Proposal"
-              },
-              {
-                "path": "deals.103.owner",
-                "changed_from": "Dana Cole"
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
+                }
               }
             ]
           }
@@ -1145,26 +1208,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "overdue full",
-            "calls": [
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "102",
-                  "stage": "Closed Won"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.102.stage",
-                "changed_from": "Negotiation"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "cascade full",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
@@ -1172,69 +1216,124 @@
                   "id": "104",
                   "stage": "Closed Won"
                 }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
+                  "stage": "Closed Won"
+                }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
+                  "owner": "Dana Cole"
+                }
               }
             ],
             "checks": [
               {
                 "path": "deals.104.stage",
                 "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.stage",
+                "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.owner",
+                "value": "Dana Cole"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "create_task",
+                "args": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "top deal",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "send_email",
                 "args": {
-                  "id": "101",
-                  "owner": "Dana Cole"
+                  "to": "owen.frost@lumenworks.com"
                 }
               },
               {
-                "tool": "update_deal",
+                "tool": "delete_task",
                 "args": {
-                  "id": "101",
-                  "stage": "Negotiation"
+                  "id": "201"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.101.stage",
-                "changed_from": "Proposal"
+                "path": "sent_emails",
+                "appended": {
+                  "to": "owen.frost@lumenworks.com"
+                }
               },
               {
-                "path": "deals.101.owner",
-                "value": "Dana Cole"
-              },
-              {
-                "path": "deals.101.stage",
-                "value": "Negotiation"
-              },
-              {
-                "path": "deals.101.owner",
-                "changed_from": "Jordan Ames"
+                "path": "tasks.201",
+                "op": "absent"
               }
             ]
           },
           {
             "id": "s4",
-            "label": "largest discount full",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "send_invoice",
                 "args": {
-                  "id": "105",
-                  "stage": "Negotiation"
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
+              },
+              {
+                "tool": "send_invoice",
+                "args": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.105.stage",
-                "value": "Negotiation"
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
+              },
+              {
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
+                }
               }
             ]
           }
@@ -1252,7 +1351,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "neg deal",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
@@ -1271,26 +1370,31 @@
           },
           {
             "id": "s2",
-            "label": "overdue deal",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "create_task",
                 "args": {
-                  "id": "102",
-                  "owner": "Dana Cole"
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.102.owner",
-                "value": "Dana Cole"
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "stale contact",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "send_email",
@@ -1310,38 +1414,43 @@
           },
           {
             "id": "s4",
-            "label": "qualification deal",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "send_invoice",
                 "args": {
-                  "id": "103",
-                  "owner": "Jordan Ames"
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.103.owner",
-                "value": "Jordan Ames"
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
               }
             ]
           },
           {
             "id": "s5",
-            "label": "earliest task",
+            "label": "Sub-Agent 5 stream",
             "calls": [
               {
-                "tool": "delete_task",
+                "tool": "create_contact",
                 "args": {
-                  "id": "201"
+                  "email": "hello@quanta-supply.com"
                 }
               }
             ],
             "checks": [
               {
-                "path": "tasks.201",
-                "op": "absent"
+                "path": "new_contacts",
+                "appended": {
+                  "email": "hello@quanta-supply.com"
+                }
               }
             ]
           }
@@ -1359,31 +1468,19 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "top deal",
-            "calls": [
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "101",
-                  "owner": "Dana Cole"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.101.owner",
-                "value": "Dana Cole"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "neg deal",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
                 "args": {
                   "id": "104",
+                  "stage": "Closed Won"
+                }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
                   "stage": "Closed Won"
                 }
               }
@@ -1392,36 +1489,117 @@
               {
                 "path": "deals.104.stage",
                 "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.stage",
+                "changed_from": "Negotiation"
               }
             ]
           },
           {
-            "id": "s3",
-            "label": "largest discount deal",
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "create_task",
                 "args": {
-                  "id": "105",
-                  "stage": "Negotiation"
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.105.stage",
-                "value": "Negotiation"
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "send_email",
+                "args": {
+                  "to": "owen.frost@lumenworks.com"
+                }
+              },
+              {
+                "tool": "delete_task",
+                "args": {
+                  "id": "201"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_emails",
+                "appended": {
+                  "to": "owen.frost@lumenworks.com"
+                }
+              },
+              {
+                "path": "tasks.201",
+                "op": "absent"
               }
             ]
           },
           {
             "id": "s4",
-            "label": "earliest lead",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "send_invoice",
+                "args": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
+              },
+              {
+                "tool": "send_invoice",
+                "args": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
+              },
+              {
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
             "calls": [
               {
                 "tool": "create_contact",
                 "args": {
                   "email": "hello@quanta-supply.com"
+                }
+              },
+              {
+                "tool": "create_contact",
+                "args": {
+                  "email": "rfp@meridian-health.org"
                 }
               }
             ],
@@ -1431,44 +1609,12 @@
                 "appended": {
                   "email": "hello@quanta-supply.com"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "qualification deal",
-            "calls": [
+              },
               {
-                "tool": "update_deal",
-                "args": {
-                  "id": "103",
-                  "owner": "Jordan Ames"
+                "path": "new_contacts",
+                "appended": {
+                  "email": "rfp@meridian-health.org"
                 }
-              },
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "103",
-                  "stage": "Proposal"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.103.stage",
-                "changed_from": "Qualification"
-              },
-              {
-                "path": "deals.103.owner",
-                "value": "Jordan Ames"
-              },
-              {
-                "path": "deals.103.stage",
-                "value": "Proposal"
-              },
-              {
-                "path": "deals.103.owner",
-                "changed_from": "Dana Cole"
               }
             ]
           }
@@ -1486,26 +1632,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "overdue full",
-            "calls": [
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "102",
-                  "stage": "Closed Won"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.102.stage",
-                "changed_from": "Negotiation"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "cascade full",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "update_deal",
@@ -1513,57 +1640,137 @@
                   "id": "104",
                   "stage": "Closed Won"
                 }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
+                  "stage": "Closed Won"
+                }
+              },
+              {
+                "tool": "update_deal",
+                "args": {
+                  "id": "102",
+                  "owner": "Dana Cole"
+                }
               }
             ],
             "checks": [
               {
                 "path": "deals.104.stage",
                 "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.stage",
+                "changed_from": "Negotiation"
+              },
+              {
+                "path": "deals.102.owner",
+                "value": "Dana Cole"
               }
             ]
           },
           {
-            "id": "s3",
-            "label": "top deal",
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
-                "tool": "update_deal",
+                "tool": "create_task",
                 "args": {
-                  "id": "101",
-                  "owner": "Dana Cole"
-                }
-              },
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "101",
-                  "stage": "Negotiation"
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
                 }
               }
             ],
             "checks": [
               {
-                "path": "deals.101.stage",
-                "changed_from": "Proposal"
+                "path": "new_tasks",
+                "appended": {
+                  "title": "Reassign overdue deal 102 to Dana Cole",
+                  "due_date": "2026-07-25",
+                  "contact_id": "2"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "send_email",
+                "args": {
+                  "to": "owen.frost@lumenworks.com"
+                }
               },
               {
-                "path": "deals.101.owner",
-                "value": "Dana Cole"
+                "tool": "delete_task",
+                "args": {
+                  "id": "201"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_emails",
+                "appended": {
+                  "to": "owen.frost@lumenworks.com"
+                }
               },
               {
-                "path": "deals.101.stage",
-                "value": "Negotiation"
-              },
-              {
-                "path": "deals.101.owner",
-                "changed_from": "Jordan Ames"
+                "path": "tasks.201",
+                "op": "absent"
               }
             ]
           },
           {
             "id": "s4",
-            "label": "newest lead",
+            "label": "Sub-Agent 4 stream",
             "calls": [
+              {
+                "tool": "send_invoice",
+                "args": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
+              },
+              {
+                "tool": "send_invoice",
+                "args": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "301",
+                  "to": "m.reed@brightpath.io"
+                }
+              },
+              {
+                "path": "sent_invoices",
+                "appended": {
+                  "invoice_id": "302",
+                  "to": "elena.voss@cascaderetail.com"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "create_contact",
+                "args": {
+                  "email": "hello@quanta-supply.com"
+                }
+              },
               {
                 "tool": "create_contact",
                 "args": {
@@ -1575,27 +1782,14 @@
               {
                 "path": "new_contacts",
                 "appended": {
+                  "email": "hello@quanta-supply.com"
+                }
+              },
+              {
+                "path": "new_contacts",
+                "appended": {
                   "email": "rfp@meridian-health.org"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "largest discount full",
-            "calls": [
-              {
-                "tool": "update_deal",
-                "args": {
-                  "id": "105",
-                  "stage": "Negotiation"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "deals.105.stage",
-                "value": "Negotiation"
               }
             ]
           }

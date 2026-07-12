@@ -571,10 +571,6 @@
               {
                 "path": "channels.engineering.members",
                 "value": "Frank"
-              },
-              {
-                "path": "user_channels.Frank",
-                "value": "engineering"
               }
             ]
           },
@@ -605,18 +601,6 @@
               }
             ],
             "checks": [
-              {
-                "path": "users",
-                "changed_from": [
-                  "Alice",
-                  "Bob",
-                  "Charlie",
-                  "Eve",
-                  "Dana",
-                  "Frank",
-                  "Grace"
-                ]
-              },
               {
                 "path": "invites",
                 "appended": {
@@ -654,7 +638,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to ",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -682,7 +666,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -699,20 +683,20 @@
             ],
             "checks": [
               {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
                 "path": "user_inbox.Charlie",
                 "appended": {
                   "recipient": "Charlie"
                 }
-              },
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stream 3: add the Sales team lead and then the external guest user to the channel that has the most unread mentions.",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -735,16 +719,8 @@
                 "value": "Frank"
               },
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Eve"
-              },
-              {
-                "path": "user_channels.Eve",
-                "value": "engineering"
               }
             ]
           }
@@ -762,7 +738,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to ",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -800,7 +776,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -823,6 +799,10 @@
             ],
             "checks": [
               {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
                 "path": "user_inbox.Charlie",
                 "appended": {
                   "recipient": "Charlie"
@@ -833,16 +813,12 @@
                 "appended": {
                   "recipient": "Dana"
                 }
-              },
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stream 3: add the Sales team lead, the external guest user, and then the Marketing team lead to the channel that has the",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -872,24 +848,12 @@
                 "value": "Frank"
               },
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Eve"
               },
               {
-                "path": "user_channels.Eve",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Grace"
-              },
-              {
-                "path": "user_channels.Grace",
-                "value": "engineering"
               }
             ]
           }
@@ -907,7 +871,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions.",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -925,7 +889,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead.",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -943,33 +907,7 @@
           },
           {
             "id": "s3",
-            "label": "Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file.",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "users",
-                "value": "Priya"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Stream 4: add the Sales team lead to the channel that has the most unread mentions.",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -983,10 +921,28 @@
               {
                 "path": "channels.engineering.members",
                 "value": "Frank"
-              },
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
               }
             ]
           }
@@ -1004,7 +960,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to ",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -1032,7 +988,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -1049,64 +1005,20 @@
             ],
             "checks": [
               {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
                 "path": "user_inbox.Charlie",
                 "appended": {
                   "recipient": "Charlie"
                 }
-              },
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, the",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "users",
-                "value": "Priya"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "path": "users",
-                "value": "Mateo"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Stream 4: add the Sales team lead and then the external guest user to the channel that has the most unread mentions.",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -1129,16 +1041,44 @@
                 "value": "Frank"
               },
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Eve"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
               },
               {
-                "path": "user_channels.Eve",
-                "value": "engineering"
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
               }
             ]
           }
@@ -1156,7 +1096,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to ",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -1194,7 +1134,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -1217,6 +1157,10 @@
             ],
             "checks": [
               {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
                 "path": "user_inbox.Charlie",
                 "appended": {
                   "recipient": "Charlie"
@@ -1227,78 +1171,12 @@
                 "appended": {
                   "recipient": "Dana"
                 }
-              },
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, the",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              },
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Lena",
-                  "user_email": "lena.fischer@talent-bridge.co"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "users",
-                "value": "Priya"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "path": "users",
-                "value": "Mateo"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              },
-              {
-                "path": "users",
-                "value": "Lena"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Lena",
-                  "user_email": "lena.fischer@talent-bridge.co"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Stream 4: add the Sales team lead, the external guest user, and then the Marketing team lead to the channel that has the",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -1328,24 +1206,62 @@
                 "value": "Frank"
               },
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Eve"
               },
               {
-                "path": "user_channels.Eve",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Grace"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
               },
               {
-                "path": "user_channels.Grace",
-                "value": "engineering"
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
               }
             ]
           }
@@ -1363,7 +1279,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions.",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -1381,7 +1297,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead.",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -1399,53 +1315,7 @@
           },
           {
             "id": "s3",
-            "label": "Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file.",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "users",
-                "value": "Priya"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Stream 4: publish the highest-priority draft page that is flagged ready to publish.",
-            "calls": [
-              {
-                "tool": "post_webpage",
-                "args": {
-                  "url": "www.northwind-launch.io/aurora"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "posted_pages",
-                "appended": {
-                  "url": "www.northwind-launch.io/aurora"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Stream 5: add the Sales team lead to the channel that has the most unread mentions.",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -1459,10 +1329,28 @@
               {
                 "path": "channels.engineering.members",
                 "value": "Frank"
-              },
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
               }
             ]
           }
@@ -1480,7 +1368,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to ",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -1508,7 +1396,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -1525,96 +1413,20 @@
             ],
             "checks": [
               {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
                 "path": "user_inbox.Charlie",
                 "appended": {
                   "recipient": "Charlie"
                 }
-              },
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, the",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "users",
-                "value": "Priya"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "path": "users",
-                "value": "Mateo"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Stream 4: publish the two highest-priority draft pages that are flagged ready to publish, in priority order.",
-            "calls": [
-              {
-                "tool": "post_webpage",
-                "args": {
-                  "url": "www.northwind-launch.io/aurora"
-                }
-              },
-              {
-                "tool": "post_webpage",
-                "args": {
-                  "url": "www.northwind-status.io/eng"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "posted_pages",
-                "appended": {
-                  "url": "www.northwind-launch.io/aurora"
-                }
-              },
-              {
-                "path": "posted_pages",
-                "appended": {
-                  "url": "www.northwind-status.io/eng"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Stream 5: add the Sales team lead and then the external guest user to the channel that has the most unread mentions.",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -1637,16 +1449,44 @@
                 "value": "Frank"
               },
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Eve"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
               },
               {
-                "path": "user_channels.Eve",
-                "value": "engineering"
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
               }
             ]
           }
@@ -1664,7 +1504,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to ",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "send_channel_message",
@@ -1702,7 +1542,7 @@
           },
           {
             "id": "s2",
-            "label": "Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "send_direct_message",
@@ -1725,6 +1565,10 @@
             ],
             "checks": [
               {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
                 "path": "user_inbox.Charlie",
                 "appended": {
                   "recipient": "Charlie"
@@ -1735,122 +1579,12 @@
                 "appended": {
                   "recipient": "Dana"
                 }
-              },
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
               }
             ]
           },
           {
             "id": "s3",
-            "label": "Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, the",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              },
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Lena",
-                  "user_email": "lena.fischer@talent-bridge.co"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "users",
-                "value": "Priya"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Priya",
-                  "user_email": "priya.shah@northwind-labs.com"
-                }
-              },
-              {
-                "path": "users",
-                "value": "Mateo"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Mateo",
-                  "user_email": "mateo.rivera@dataloft-partners.com"
-                }
-              },
-              {
-                "path": "users",
-                "value": "Lena"
-              },
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Lena",
-                  "user_email": "lena.fischer@talent-bridge.co"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Stream 4: publish the three highest-priority draft pages that are flagged ready to publish, in priority order.",
-            "calls": [
-              {
-                "tool": "post_webpage",
-                "args": {
-                  "url": "www.northwind-launch.io/aurora"
-                }
-              },
-              {
-                "tool": "post_webpage",
-                "args": {
-                  "url": "www.northwind-status.io/eng"
-                }
-              },
-              {
-                "tool": "post_webpage",
-                "args": {
-                  "url": "www.talentbridge-docs.co/expenses"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "posted_pages",
-                "appended": {
-                  "url": "www.northwind-launch.io/aurora"
-                }
-              },
-              {
-                "path": "posted_pages",
-                "appended": {
-                  "url": "www.northwind-status.io/eng"
-                }
-              },
-              {
-                "path": "posted_pages",
-                "appended": {
-                  "url": "www.talentbridge-docs.co/expenses"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Stream 5: add the Sales team lead, the external guest user, and then the Marketing team lead to the channel that has the",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "add_user_to_channel",
@@ -1880,24 +1614,62 @@
                 "value": "Frank"
               },
               {
-                "path": "user_channels.Frank",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Eve"
               },
               {
-                "path": "user_channels.Eve",
-                "value": "engineering"
-              },
-              {
                 "path": "channels.engineering.members",
                 "value": "Grace"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
               },
               {
-                "path": "user_channels.Grace",
-                "value": "engineering"
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
               }
             ]
           }

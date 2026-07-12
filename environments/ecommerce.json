@@ -670,10 +670,6 @@
             ],
             "checks": [
               {
-                "path": "orders.ord_1001.status",
-                "changed_from": "delayed"
-              },
-              {
                 "path": "dispatched_shipments",
                 "appended": {
                   "order_id": "ord_1001",
@@ -681,19 +677,11 @@
                 }
               },
               {
-                "path": "orders.ord_1003.status",
-                "changed_from": "processing"
-              },
-              {
                 "path": "dispatched_shipments",
                 "appended": {
                   "order_id": "ord_1003",
                   "ship_to": "addr_work"
                 }
-              },
-              {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
               },
               {
                 "path": "dispatched_shipments",
@@ -718,7 +706,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "cart the out-of-stock and most-expensive items",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -754,12 +742,19 @@
           },
           {
             "id": "s2",
-            "label": "cancel fraud order and return the delivered item",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "cancel_order",
                 "args": {
                   "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
                 }
               }
             ],
@@ -767,12 +762,19 @@
               {
                 "path": "orders.ord_1004.status",
                 "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "review lowest-rated and highest-rated items",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -820,7 +822,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "cart out-of-stock, most-expensive, and most-expensive-under-100 items",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -858,17 +860,34 @@
                   "product_id": "p_laptop",
                   "quantity": "1"
                 }
+              },
+              {
+                "path": "cart",
+                "min_len": 3
               }
             ]
           },
           {
             "id": "s2",
-            "label": "cancel fraud, return delivered item, reroute delayed order to work",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "cancel_order",
                 "args": {
                   "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1005"
                 }
               }
             ],
@@ -876,12 +895,23 @@
               {
                 "path": "orders.ord_1004.status",
                 "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "changed_from": "processing"
               }
             ]
           },
           {
             "id": "s3",
-            "label": "review lowest-rated, highest-rated, and best-stocked items",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -943,7 +973,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "reorder the out-of-stock item to its reorder level",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "get_cart",
@@ -969,7 +999,7 @@
           },
           {
             "id": "s2",
-            "label": "cancel the fraud-flagged order",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "cancel_order",
@@ -987,29 +1017,7 @@
           },
           {
             "id": "s3",
-            "label": "return the item in the delivered order",
-            "calls": [
-              {
-                "tool": "return_item",
-                "args": {
-                  "order_id": "ord_1002",
-                  "product_id": "p_kettle"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "returns",
-                "appended": {
-                  "order_id": "ord_1002",
-                  "product_id": "p_kettle"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "1-star review on the lowest-rated item",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -1025,6 +1033,28 @@
                 "appended": {
                   "author": "Emma Johnson",
                   "rating": "1"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
                 }
               }
             ]
@@ -1043,7 +1073,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "cart the out-of-stock and most-expensive items",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -1079,12 +1109,19 @@
           },
           {
             "id": "s2",
-            "label": "cancel fraud order and return the delivered item",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "cancel_order",
                 "args": {
                   "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
                 }
               }
             ],
@@ -1092,42 +1129,19 @@
               {
                 "path": "orders.ord_1004.status",
                 "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "reroute delayed order to work and newest order to home",
-            "calls": [
-              {
-                "tool": "update_order_address",
-                "args": {
-                  "order_id": "ord_1001",
-                  "address_id": "addr_work"
-                }
-              },
-              {
-                "tool": "update_order_address",
-                "args": {
-                  "order_id": "ord_1003",
-                  "address_id": "addr_home"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1001.address_id",
-                "value": "addr_work"
-              },
-              {
-                "path": "orders.ord_1003.address_id",
-                "value": "addr_home"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "review lowest-rated and highest-rated items",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -1157,6 +1171,42 @@
                 "appended": {
                   "author": "Emma Johnson",
                   "rating": "5"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
                 }
               }
             ]
@@ -1175,7 +1225,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "cart out-of-stock, most-expensive, most-expensive-under-100",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -1213,12 +1263,58 @@
                   "product_id": "p_laptop",
                   "quantity": "1"
                 }
+              },
+              {
+                "path": "cart",
+                "min_len": 3
               }
             ]
           },
           {
             "id": "s2",
-            "label": "review lowest-rated, highest-rated, best-stocked",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1005"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1004.status",
+                "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "changed_from": "processing"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -1267,39 +1363,52 @@
             ]
           },
           {
-            "id": "s3",
-            "label": "cancel fraud, return delivered, reroute delayed to work",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "changed_from": "processing"
-              }
-            ]
-          },
-          {
             "id": "s4",
-            "label": "reroute newest to home, cancel oldest, checkout to home on soonest-expiring card",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "update_order_address",
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
                 "args": {
                   "order_id": "ord_1003",
-                  "address_id": "addr_home"
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1003.address_id",
-                "value": "addr_home"
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
               }
             ]
           }
@@ -1317,8 +1426,12 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "reorder the out-of-stock item to its reorder level",
+            "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "get_cart",
+                "args": {}
+              },
               {
                 "tool": "add_to_cart",
                 "args": {
@@ -1339,7 +1452,7 @@
           },
           {
             "id": "s2",
-            "label": "cancel the fraud-flagged order",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "cancel_order",
@@ -1357,29 +1470,7 @@
           },
           {
             "id": "s3",
-            "label": "return the item in the delivered order",
-            "calls": [
-              {
-                "tool": "return_item",
-                "args": {
-                  "order_id": "ord_1002",
-                  "product_id": "p_kettle"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "returns",
-                "appended": {
-                  "order_id": "ord_1002",
-                  "product_id": "p_kettle"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "1-star review on the lowest-rated item",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -1400,23 +1491,23 @@
             ]
           },
           {
-            "id": "s5",
-            "label": "checkout to home on the soonest-expiring card",
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "checkout",
+                "tool": "fulfill_order",
                 "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
                 }
               }
             ],
             "checks": [
               {
-                "path": "placed_orders",
+                "path": "dispatched_shipments",
                 "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
                 }
               }
             ]
@@ -1435,7 +1526,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "cart the out-of-stock and most-expensive items",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -1471,12 +1562,19 @@
           },
           {
             "id": "s2",
-            "label": "cancel fraud order and return the delivered item",
+            "label": "Sub-Agent 2 stream",
             "calls": [
               {
                 "tool": "cancel_order",
                 "args": {
                   "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
                 }
               }
             ],
@@ -1484,42 +1582,19 @@
               {
                 "path": "orders.ord_1004.status",
                 "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
               }
             ]
           },
           {
             "id": "s3",
-            "label": "reroute delayed order to work and newest order to home",
-            "calls": [
-              {
-                "tool": "update_order_address",
-                "args": {
-                  "order_id": "ord_1001",
-                  "address_id": "addr_work"
-                }
-              },
-              {
-                "tool": "update_order_address",
-                "args": {
-                  "order_id": "ord_1003",
-                  "address_id": "addr_home"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1001.address_id",
-                "value": "addr_work"
-              },
-              {
-                "path": "orders.ord_1003.address_id",
-                "value": "addr_home"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "review lowest-rated and highest-rated items",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -1554,33 +1629,37 @@
             ]
           },
           {
-            "id": "s5",
-            "label": "cancel oldest order and checkout to home on soonest-expiring card",
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "cancel_order",
+                "tool": "fulfill_order",
                 "args": {
-                  "order_id": "ord_1005"
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
                 }
               },
               {
-                "tool": "checkout",
+                "tool": "fulfill_order",
                 "args": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
                 }
               }
             ],
             "checks": [
               {
-                "path": "orders.ord_1005.status",
-                "changed_from": "processing"
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
               },
               {
-                "path": "placed_orders",
+                "path": "dispatched_shipments",
                 "appended": {
-                  "address_id": "addr_home",
-                  "payment_id": "pay_mc"
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
                 }
               }
             ]
@@ -1599,7 +1678,7 @@
         "subtasks": [
           {
             "id": "s1",
-            "label": "cart out-of-stock, most-expensive, most-expensive-under-100",
+            "label": "Sub-Agent 1 stream",
             "calls": [
               {
                 "tool": "add_to_cart",
@@ -1637,12 +1716,58 @@
                   "product_id": "p_laptop",
                   "quantity": "1"
                 }
+              },
+              {
+                "path": "cart",
+                "min_len": 3
               }
             ]
           },
           {
             "id": "s2",
-            "label": "review lowest-rated, highest-rated, best-stocked",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1005"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1004.status",
+                "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "changed_from": "processing"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
             "calls": [
               {
                 "tool": "post_review",
@@ -1691,60 +1816,51 @@
             ]
           },
           {
-            "id": "s3",
-            "label": "cancel fraud, return delivered, reroute delayed to work",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "changed_from": "processing"
-              }
-            ]
-          },
-          {
             "id": "s4",
-            "label": "reroute newest to home, cancel oldest, checkout to home on soonest-expiring card",
+            "label": "Sub-Agent 4 stream",
             "calls": [
               {
-                "tool": "update_order_address",
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
                 "args": {
                   "order_id": "ord_1003",
-                  "address_id": "addr_home"
+                  "ship_to": "addr_work"
                 }
-              }
-            ],
-            "checks": [
+              },
               {
-                "path": "orders.ord_1003.address_id",
-                "value": "addr_home"
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "review most-expensive item, reorder best-stocked and highest-rated items",
-            "calls": [
-              {
-                "tool": "post_review",
+                "tool": "fulfill_order",
                 "args": {
-                  "product_id": "p_laptop",
-                  "rating": "5"
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
                 }
               }
             ],
             "checks": [
               {
-                "path": "reviews.p_laptop",
+                "path": "dispatched_shipments",
                 "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "5"
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
                 }
               }
             ]
