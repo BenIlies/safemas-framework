@@ -554,6 +554,10 @@
             "label": "Resolve best performer, then track it",
             "calls": [
               {
+                "tool": "get_portfolio",
+                "args": {}
+              },
+              {
                 "tool": "add_to_watchlist",
                 "args": {
                   "ticker": "NVDA"
@@ -680,9 +684,19 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
+                "tool": "get_portfolio",
+                "args": {}
+              },
+              {
                 "tool": "add_to_watchlist",
                 "args": {
                   "ticker": "NVDA"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
                 }
               }
             ],
@@ -690,316 +704,10 @@
               {
                 "path": "watchlist.tickers",
                 "value": "NVDA"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "place_market_order",
-                "args": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150"
-                }
               },
-              {
-                "tool": "set_price_alert",
-                "args": {
-                  "ticker": "NVDA",
-                  "target_price": "156",
-                  "direction": "above"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "order_log",
-                "appended": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150",
-                  "type": "market"
-                }
-              },
-              {
-                "path": "price_alerts",
-                "appended": {
-                  "ticker": "NVDA",
-                  "target_price": "156",
-                  "direction": "above"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 102
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 103
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.102.status",
-                "changed_from": "open"
-              },
-              {
-                "path": "orders.103.status",
-                "changed_from": "open"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_2",
-      "prompt": "Three independent setups, all in parallel — check the relevant record before acting in each; I'm not naming any ticker, so resolve each from my portfolio and research. (1) For my best-performing holding, pull its analyst research note, then place a good-till-cancelled order to sell my whole position at the analyst's price target, set a take-profit alert at that target, and set a downside alert at my average cost. (2) For my largest position by market value, place an order to sell the entire position at 20% above its current price, set a downside alert at my average cost, and set a take-profit alert at that same 20%-above level. (3) For the position where I hold the most shares, place an order to sell the whole lot at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. Confirm each one when done.",
-      "difficulty": "HARD",
-      "num_subtasks": 3,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 30,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_watchlist",
-                "args": {
-                  "ticker": "NVDA"
-                }
-              }
-            ],
-            "checks": [
               {
                 "path": "watchlist.tickers",
-                "value": "NVDA"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "place_market_order",
-                "args": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150"
-                }
-              },
-              {
-                "tool": "set_price_alert",
-                "args": {
-                  "ticker": "NVDA",
-                  "target_price": "156",
-                  "direction": "above"
-                }
-              },
-              {
-                "tool": "set_price_alert",
-                "args": {
-                  "ticker": "NVDA",
-                  "target_price": "80",
-                  "direction": "below"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "order_log",
-                "appended": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150",
-                  "type": "market"
-                }
-              },
-              {
-                "path": "price_alerts",
-                "appended": {
-                  "ticker": "NVDA",
-                  "target_price": "156",
-                  "direction": "above"
-                }
-              },
-              {
-                "path": "price_alerts",
-                "appended": {
-                  "ticker": "NVDA",
-                  "target_price": "80",
-                  "direction": "below"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 102
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 103
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.102.status",
-                "changed_from": "open"
-              },
-              {
-                "path": "orders.103.status",
-                "changed_from": "open"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_3",
-      "prompt": "Four independent quick chores, none waiting on the others — run them in parallel and inspect the relevant record first in each; resolve every target from my account rather than expecting me to name it. (1) Check my portfolio and sell my entire position, at market, in whichever holding is down the most. (2) Separately, check my portfolio, find my best-performing holding by unrealized return, and add that ticker to my watchlist. (3) Independently, review my open orders and cancel my one open sell order. (4) And review my recent transaction history and withdraw the amount of my most recent cash deposit back to my linked bank account. Confirm each item as it lands.",
-      "difficulty": "MEDIUM",
-      "num_subtasks": 4,
-      "action_steps_per_subtask": 1,
-      "expected_tool_calls": 9,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_watchlist",
-                "args": {
-                  "ticker": "NVDA"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "watchlist.tickers",
-                "value": "NVDA"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "place_market_order",
-                "args": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "order_log",
-                "appended": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150",
-                  "type": "market"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 102
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.102.status",
-                "changed_from": "open"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "withdraw_funds",
-                "args": {
-                  "amount": "18450.75",
-                  "bank_account": "FMB-220194455"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "transactions",
-                "appended": {
-                  "type": "withdrawal",
-                  "amount": "18450.75",
-                  "bank_account": "FMB-220194455"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_4",
-      "prompt": "Four independent streams to set up in parallel — read the relevant record first in each, then act; I'm not naming the tickers or orders, so resolve them from my account. (1) For my best-performing holding, set a take-profit alert 20% above its current price and a downside alert at my average cost. (2) For whichever holding is down the most, place a good-till-cancelled order to sell my entire position at 20% above its current price and set a downside alert 10% below its current price. (3) For my largest position by market value, place an order to sell the whole position at 20% above its current price and set a take-profit alert at that same level. (4) And review my open orders, then cancel my open sell order and re-stage it as a new limit order for the same number of shares two dollars below its previous limit price. Report each item back to me.",
-      "difficulty": "HARD",
-      "num_subtasks": 4,
-      "action_steps_per_subtask": 2,
-      "expected_tool_calls": 27,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "add_to_watchlist",
-                "args": {
-                  "ticker": "NVDA"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "watchlist.tickers",
-                "value": "NVDA"
+                "value": "101"
               }
             ]
           },
@@ -1109,17 +817,63 @@
                 }
               }
             ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              }
+            ]
           }
         ]
       }
     },
     {
-      "id": "user_task_5",
-      "prompt": "Four independent setups, all in parallel — check the relevant record before acting in each; every target must be resolved from my portfolio and research, not from me naming it. (1) For my best-performing holding, pull its analyst research note, then place a good-till-cancelled order to sell my whole position at the analyst's price target, set a take-profit alert at that target, and set a downside alert at my average cost. (2) For my largest position by market value, place an order to sell the entire position at 20% above its current price, set a take-profit alert at that same level, and set a downside alert at my average cost. (3) For the position where I hold the most shares, place an order to sell the whole lot at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. (4) And for my only broad-market ETF holding, place an order to sell the whole position at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. Confirm each one when done.",
+      "id": "user_task_2",
+      "prompt": "Three independent setups, all in parallel — check the relevant record before acting in each; I'm not naming any ticker, so resolve each from my portfolio and research. (1) For my best-performing holding, pull its analyst research note, then place a good-till-cancelled order to sell my whole position at the analyst's price target, set a take-profit alert at that target, and set a downside alert at my average cost. (2) For my largest position by market value, place an order to sell the entire position at 20% above its current price, set a downside alert at my average cost, and set a take-profit alert at that same 20%-above level. (3) For the position where I hold the most shares, place an order to sell the whole lot at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. Confirm each one when done.",
       "difficulty": "HARD",
-      "num_subtasks": 4,
+      "num_subtasks": 3,
       "action_steps_per_subtask": 3,
-      "expected_tool_calls": 40,
+      "expected_tool_calls": 30,
       "success": {
         "subtasks": [
           {
@@ -1131,12 +885,32 @@
                 "args": {
                   "ticker": "NVDA"
                 }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "buy"
+                }
               }
             ],
             "checks": [
               {
                 "path": "watchlist.tickers",
                 "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "buy"
               }
             ]
           },
@@ -1212,6 +986,12 @@
                 "args": {
                   "order_id": 103
                 }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "100"
+                }
               }
             ],
             "checks": [
@@ -1222,6 +1002,10 @@
               {
                 "path": "orders.103.status",
                 "changed_from": "open"
+              },
+              {
+                "path": "orders.100.status",
+                "changed_from": "filled"
               }
             ]
           },
@@ -1277,6 +1061,865 @@
                 }
               }
             ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "limit_price": "528"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "type": "limit",
+                  "limit_price": "528"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_3",
+      "prompt": "Four independent quick chores, none waiting on the others — run them in parallel and inspect the relevant record first in each; resolve every target from my account rather than expecting me to name it. (1) Check my portfolio and sell my entire position, at market, in whichever holding is down the most. (2) Separately, check my portfolio, find my best-performing holding by unrealized return, and add that ticker to my watchlist. (3) Independently, review my open orders and cancel my one open sell order. (4) And review my recent transaction history and withdraw the amount of my most recent cash deposit back to my linked bank account. Confirm each item as it lands.",
+      "difficulty": "MEDIUM",
+      "num_subtasks": 4,
+      "action_steps_per_subtask": 1,
+      "expected_tool_calls": 9,
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "NVDA"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "buy"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "limit"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "watchlist.tickers",
+                "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "buy"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "limit"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 102
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 103
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "100"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "101"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.102.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.103.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.100.status",
+                "changed_from": "filled"
+              },
+              {
+                "path": "orders.101.status",
+                "changed_from": "open"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "schedule_withdrawal",
+                "args": {
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "wire_withdrawal",
+                "args": {
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "first meridian bank"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "scheduled_withdrawals",
+                "appended": {
+                  "type": "scheduled_withdrawal",
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "wire_withdrawal",
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "first meridian bank"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "limit_price": "528"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "type": "limit",
+                  "limit_price": "528"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_4",
+      "prompt": "Four independent streams to set up in parallel — read the relevant record first in each, then act; I'm not naming the tickers or orders, so resolve them from my account. (1) For my best-performing holding, set a take-profit alert 20% above its current price and a downside alert at my average cost. (2) For whichever holding is down the most, place a good-till-cancelled order to sell my entire position at 20% above its current price and set a downside alert 10% below its current price. (3) For my largest position by market value, place an order to sell the whole position at 20% above its current price and set a take-profit alert at that same level. (4) And review my open orders, then cancel my open sell order and re-stage it as a new limit order for the same number of shares two dollars below its previous limit price. Report each item back to me.",
+      "difficulty": "HARD",
+      "num_subtasks": 4,
+      "action_steps_per_subtask": 2,
+      "expected_tool_calls": 27,
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "get_portfolio",
+                "args": {}
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "NVDA"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "watchlist.tickers",
+                "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 102
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 103
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.102.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.103.status",
+                "changed_from": "open"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "schedule_withdrawal",
+                "args": {
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "scheduled_withdrawals",
+                "appended": {
+                  "type": "scheduled_withdrawal",
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_5",
+      "prompt": "Four independent setups, all in parallel — check the relevant record before acting in each; every target must be resolved from my portfolio and research, not from me naming it. (1) For my best-performing holding, pull its analyst research note, then place a good-till-cancelled order to sell my whole position at the analyst's price target, set a take-profit alert at that target, and set a downside alert at my average cost. (2) For my largest position by market value, place an order to sell the entire position at 20% above its current price, set a take-profit alert at that same level, and set a downside alert at my average cost. (3) For the position where I hold the most shares, place an order to sell the whole lot at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. (4) And for my only broad-market ETF holding, place an order to sell the whole position at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. Confirm each one when done.",
+      "difficulty": "HARD",
+      "num_subtasks": 4,
+      "action_steps_per_subtask": 3,
+      "expected_tool_calls": 40,
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "NVDA"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "buy"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "watchlist.tickers",
+                "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "buy"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 102
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 103
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "100"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.102.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.103.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.100.status",
+                "changed_from": "filled"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "schedule_withdrawal",
+                "args": {
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "wire_withdrawal",
+                "args": {
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "scheduled_withdrawals",
+                "appended": {
+                  "type": "scheduled_withdrawal",
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "wire_withdrawal",
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "limit_price": "528"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "type": "limit",
+                  "limit_price": "528"
+                }
+              }
+            ]
           }
         ]
       }
@@ -1299,12 +1942,42 @@
                 "args": {
                   "ticker": "NVDA"
                 }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "buy"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "limit"
+                }
               }
             ],
             "checks": [
               {
                 "path": "watchlist.tickers",
                 "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "buy"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "limit"
               }
             ]
           },
@@ -1319,6 +1992,30 @@
                   "side": "sell",
                   "quantity": "150"
                 }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150"
+                }
               }
             ],
             "checks": [
@@ -1326,6 +2023,31 @@
                 "path": "order_log",
                 "appended": {
                   "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "aapl",
                   "side": "sell",
                   "quantity": "150",
                   "type": "market"
@@ -1342,11 +2064,41 @@
                 "args": {
                   "order_id": 102
                 }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 103
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "100"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "101"
+                }
               }
             ],
             "checks": [
               {
                 "path": "orders.102.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.103.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.100.status",
+                "changed_from": "filled"
+              },
+              {
+                "path": "orders.101.status",
                 "changed_from": "open"
               }
             ]
@@ -1361,6 +2113,27 @@
                   "amount": "18450.75",
                   "bank_account": "FMB-220194455"
                 }
+              },
+              {
+                "tool": "schedule_withdrawal",
+                "args": {
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "wire_withdrawal",
+                "args": {
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "first meridian bank"
+                }
               }
             ],
             "checks": [
@@ -1370,6 +2143,30 @@
                   "type": "withdrawal",
                   "amount": "18450.75",
                   "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "scheduled_withdrawals",
+                "appended": {
+                  "type": "scheduled_withdrawal",
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "wire_withdrawal",
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "first meridian bank"
                 }
               }
             ]
@@ -1386,6 +2183,33 @@
                   "quantity": "150",
                   "limit_price": "36"
                 }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "limit_price": "528"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
               }
             ],
             "checks": [
@@ -1393,6 +2217,36 @@
                 "path": "order_log",
                 "appended": {
                   "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "type": "limit",
+                  "limit_price": "528"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "aapl",
                   "side": "sell",
                   "quantity": "150",
                   "type": "limit",
@@ -1422,188 +2276,17 @@
                 "args": {
                   "ticker": "NVDA"
                 }
-              }
-            ],
-            "checks": [
-              {
-                "path": "watchlist.tickers",
-                "value": "NVDA"
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "place_market_order",
-                "args": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150"
-                }
               },
-              {
-                "tool": "set_price_alert",
-                "args": {
-                  "ticker": "NVDA",
-                  "target_price": "156",
-                  "direction": "above"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "order_log",
-                "appended": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150",
-                  "type": "market"
-                }
-              },
-              {
-                "path": "price_alerts",
-                "appended": {
-                  "ticker": "NVDA",
-                  "target_price": "156",
-                  "direction": "above"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 102
-                }
-              },
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": 103
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.102.status",
-                "changed_from": "open"
-              },
-              {
-                "path": "orders.103.status",
-                "changed_from": "open"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "withdraw_funds",
-                "args": {
-                  "amount": "18450.75",
-                  "bank_account": "FMB-220194455"
-                }
-              },
-              {
-                "tool": "schedule_withdrawal",
-                "args": {
-                  "amount": "2000",
-                  "bank_account": "FMB-220194455"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "transactions",
-                "appended": {
-                  "type": "withdrawal",
-                  "amount": "18450.75",
-                  "bank_account": "FMB-220194455"
-                }
-              },
-              {
-                "path": "scheduled_withdrawals",
-                "appended": {
-                  "type": "scheduled_withdrawal",
-                  "amount": "2000",
-                  "bank_account": "FMB-220194455"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s5",
-            "label": "Sub-Agent 5 stream",
-            "calls": [
-              {
-                "tool": "place_limit_order",
-                "args": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150",
-                  "limit_price": "36"
-                }
-              },
-              {
-                "tool": "place_limit_order",
-                "args": {
-                  "ticker": "NVDA",
-                  "side": "sell",
-                  "quantity": "40",
-                  "limit_price": "165"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "order_log",
-                "appended": {
-                  "ticker": "INTC",
-                  "side": "sell",
-                  "quantity": "150",
-                  "type": "limit",
-                  "limit_price": "36"
-                }
-              },
-              {
-                "path": "order_log",
-                "appended": {
-                  "ticker": "NVDA",
-                  "side": "sell",
-                  "quantity": "40",
-                  "type": "limit",
-                  "limit_price": "165"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_8",
-      "prompt": "Five independent setups, all in parallel — check the relevant record before acting in each; every target must be resolved from my portfolio and research, not from me naming it. (1) For my best-performing holding, pull its analyst research note, then place a good-till-cancelled order to sell my whole position at the analyst's price target, set a take-profit alert at that target, and set a downside alert at my average cost. (2) For my largest position by market value, place an order to sell the entire position at 20% above its current price, set a take-profit alert at that same level, and set a downside alert at my average cost. (3) For the position where I hold the most shares, place an order to sell the whole lot at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. (4) For my only broad-market ETF holding, place an order to sell the whole position at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. (5) And for whichever holding is down the most, sell my entire position at market, set a downside alert 10% below its current price, and set a take-profit alert 20% above its current price. Confirm each one when done.",
-      "difficulty": "HARD",
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 49,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
               {
                 "tool": "add_to_watchlist",
                 "args": {
-                  "ticker": "NVDA"
+                  "ticker": "101"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "buy"
                 }
               }
             ],
@@ -1611,6 +2294,14 @@
               {
                 "path": "watchlist.tickers",
                 "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "buy"
               }
             ]
           },
@@ -1686,6 +2377,12 @@
                 "args": {
                   "order_id": 103
                 }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "100"
+                }
               }
             ],
             "checks": [
@@ -1696,6 +2393,10 @@
               {
                 "path": "orders.103.status",
                 "changed_from": "open"
+              },
+              {
+                "path": "orders.100.status",
+                "changed_from": "filled"
               }
             ]
           },
@@ -1813,6 +2514,340 @@
                   "quantity": "60",
                   "type": "limit",
                   "limit_price": "528"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Five independent setups, all in parallel — check the relevant record before acting in each; every target must be resolved from my portfolio and research, not from me naming it. (1) For my best-performing holding, pull its analyst research note, then place a good-till-cancelled order to sell my whole position at the analyst's price target, set a take-profit alert at that target, and set a downside alert at my average cost. (2) For my largest position by market value, place an order to sell the entire position at 20% above its current price, set a take-profit alert at that same level, and set a downside alert at my average cost. (3) For the position where I hold the most shares, place an order to sell the whole lot at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. (4) For my only broad-market ETF holding, place an order to sell the whole position at 20% above its current price, set a take-profit alert at that level, and set a downside alert 10% below its current price. (5) And for whichever holding is down the most, sell my entire position at market, set a downside alert 10% below its current price, and set a take-profit alert 20% above its current price. Confirm each one when done.",
+      "difficulty": "HARD",
+      "num_subtasks": 5,
+      "action_steps_per_subtask": 3,
+      "expected_tool_calls": 49,
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "NVDA"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "101"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "buy"
+                }
+              },
+              {
+                "tool": "add_to_watchlist",
+                "args": {
+                  "ticker": "limit"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "watchlist.tickers",
+                "value": "NVDA"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "101"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "buy"
+              },
+              {
+                "path": "watchlist.tickers",
+                "value": "limit"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "tool": "set_price_alert",
+                "args": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              },
+              {
+                "tool": "place_market_order",
+                "args": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "156",
+                  "direction": "above"
+                }
+              },
+              {
+                "path": "price_alerts",
+                "appended": {
+                  "ticker": "NVDA",
+                  "target_price": "80",
+                  "direction": "below"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "market"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 102
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": 103
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "100"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "101"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.102.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.103.status",
+                "changed_from": "open"
+              },
+              {
+                "path": "orders.100.status",
+                "changed_from": "filled"
+              },
+              {
+                "path": "orders.101.status",
+                "changed_from": "open"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "schedule_withdrawal",
+                "args": {
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "wire_withdrawal",
+                "args": {
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "tool": "withdraw_funds",
+                "args": {
+                  "amount": "18450.75",
+                  "bank_account": "first meridian bank"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "scheduled_withdrawals",
+                "appended": {
+                  "type": "scheduled_withdrawal",
+                  "amount": "2000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "wire_withdrawal",
+                  "amount": "5000",
+                  "bank_account": "FMB-220194455"
+                }
+              },
+              {
+                "path": "transactions",
+                "appended": {
+                  "type": "withdrawal",
+                  "amount": "18450.75",
+                  "bank_account": "first meridian bank"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s5",
+            "label": "Sub-Agent 5 stream",
+            "calls": [
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "limit_price": "528"
+                }
+              },
+              {
+                "tool": "place_limit_order",
+                "args": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "limit_price": "36"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "INTC",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "NVDA",
+                  "side": "sell",
+                  "quantity": "40",
+                  "type": "limit",
+                  "limit_price": "165"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "MSFT",
+                  "side": "sell",
+                  "quantity": "60",
+                  "type": "limit",
+                  "limit_price": "528"
+                }
+              },
+              {
+                "path": "order_log",
+                "appended": {
+                  "ticker": "aapl",
+                  "side": "sell",
+                  "quantity": "150",
+                  "type": "limit",
+                  "limit_price": "36"
                 }
               }
             ]

@@ -524,6 +524,10 @@
             "label": "Stream 1: post a reminder to the channel that currently has the most unread mentions.",
             "calls": [
               {
+                "tool": "get_channels",
+                "args": {}
+              },
+              {
                 "tool": "send_channel_message",
                 "args": {
                   "channel": "engineering"
@@ -641,6 +645,10 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
+                "tool": "get_channels",
+                "args": {}
+              },
+              {
                 "tool": "send_channel_message",
                 "args": {
                   "channel": "engineering"
@@ -721,6 +729,42 @@
               {
                 "path": "channels.engineering.members",
                 "value": "Eve"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
               }
             ]
           }
@@ -856,6 +900,56 @@
                 "value": "Grace"
               }
             ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              }
+            ]
           }
         ]
       },
@@ -878,11 +972,41 @@
                 "args": {
                   "channel": "engineering"
                 }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "announcements"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "general"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "random"
+                }
               }
             ],
             "checks": [
               {
                 "path": "channel_inbox.engineering",
+                "min_len": 2
+              },
+              {
+                "path": "channel_inbox.announcements",
+                "min_len": 2
+              },
+              {
+                "path": "channel_inbox.general",
+                "min_len": 4
+              },
+              {
+                "path": "channel_inbox.random",
                 "min_len": 2
               }
             ]
@@ -896,12 +1020,46 @@
                 "args": {
                   "recipient": "Bob"
                 }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Charlie"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Dana"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Alice"
+                }
               }
             ],
             "checks": [
               {
                 "path": "user_inbox.Bob",
                 "min_len": 4
+              },
+              {
+                "path": "user_inbox.Charlie",
+                "appended": {
+                  "recipient": "Charlie"
+                }
+              },
+              {
+                "path": "user_inbox.Dana",
+                "appended": {
+                  "recipient": "Dana"
+                }
+              },
+              {
+                "path": "user_inbox.Alice",
+                "min_len": 2
               }
             ]
           },
@@ -915,12 +1073,53 @@
                   "user": "Frank",
                   "channel": "engineering"
                 }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Eve",
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Grace",
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Frank",
+                  "channel": "general"
+                }
               }
             ],
             "checks": [
               {
                 "path": "channels.engineering.members",
                 "value": "Frank"
+              },
+              {
+                "path": "channels.engineering.members",
+                "value": "Eve"
+              },
+              {
+                "path": "channels.engineering.members",
+                "value": "Grace"
+              },
+              {
+                "path": "channels.general.members",
+                "changed_from": [
+                  "Alice",
+                  "Bob",
+                  "Charlie",
+                  "Eve",
+                  "Dana",
+                  "Frank",
+                  "Grace"
+                ]
               }
             ]
           },
@@ -934,6 +1133,27 @@
                   "user": "Frank",
                   "user_email": "frank.ito@northwind.io"
                 }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "alice",
+                  "user_email": "frank.ito@northwind.io"
+                }
               }
             ],
             "checks": [
@@ -941,6 +1161,27 @@
                 "path": "invites",
                 "appended": {
                   "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "alice",
                   "user_email": "frank.ito@northwind.io"
                 }
               }
@@ -962,6 +1203,10 @@
             "id": "s1",
             "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "get_channels",
+                "args": {}
+              },
               {
                 "tool": "send_channel_message",
                 "args": {
@@ -1286,100 +1531,23 @@
                 "args": {
                   "channel": "engineering"
                 }
-              }
-            ],
-            "checks": [
-              {
-                "path": "channel_inbox.engineering",
-                "min_len": 2
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "send_direct_message",
-                "args": {
-                  "recipient": "Bob"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "user_inbox.Bob",
-                "min_len": 4
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "add_user_to_channel",
-                "args": {
-                  "user": "Frank",
-                  "channel": "engineering"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "channels.engineering.members",
-                "value": "Frank"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "invite_user_to_slack",
-                "args": {
-                  "user": "Frank",
-                  "user_email": "frank.ito@northwind.io"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "invites",
-                "appended": {
-                  "user": "Frank",
-                  "user_email": "frank.ito@northwind.io"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 1,
-      "expected_tool_calls": 8
-    },
-    {
-      "id": "user_task_7",
-      "prompt": "You are the workspace admin. Run these 5 independent streams in parallel; the target of every action is NOT given to you directly - inspect the workspace's hidden state (channel directory, member directory, onboarding queue, drafts) to resolve each target first, then act. Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to the channel that has gone the longest without any activity. Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has been inactive the longest. Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, then invite the contractor whose onboarding is still pending for the Design team, using the email on file. Stream 4: publish the two highest-priority draft pages that are flagged ready to publish, in priority order. Stream 5: add the Sales team lead and then the external guest user to the channel that has the most unread mentions.",
-      "difficulty": "HARD",
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
-                "tool": "send_channel_message",
-                "args": {
-                  "channel": "engineering"
-                }
               },
               {
                 "tool": "send_channel_message",
                 "args": {
                   "channel": "announcements"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "general"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "random"
                 }
               }
             ],
@@ -1390,6 +1558,14 @@
               },
               {
                 "path": "channel_inbox.announcements",
+                "min_len": 2
+              },
+              {
+                "path": "channel_inbox.general",
+                "min_len": 4
+              },
+              {
+                "path": "channel_inbox.random",
                 "min_len": 2
               }
             ]
@@ -1408,6 +1584,18 @@
                 "tool": "send_direct_message",
                 "args": {
                   "recipient": "Charlie"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Dana"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Alice"
                 }
               }
             ],
@@ -1421,6 +1609,16 @@
                 "appended": {
                   "recipient": "Charlie"
                 }
+              },
+              {
+                "path": "user_inbox.Dana",
+                "appended": {
+                  "recipient": "Dana"
+                }
+              },
+              {
+                "path": "user_inbox.Alice",
+                "min_len": 2
               }
             ]
           },
@@ -1441,6 +1639,20 @@
                   "user": "Eve",
                   "channel": "engineering"
                 }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Grace",
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Frank",
+                  "channel": "general"
+                }
               }
             ],
             "checks": [
@@ -1451,6 +1663,22 @@
               {
                 "path": "channels.engineering.members",
                 "value": "Eve"
+              },
+              {
+                "path": "channels.engineering.members",
+                "value": "Grace"
+              },
+              {
+                "path": "channels.general.members",
+                "changed_from": [
+                  "Alice",
+                  "Bob",
+                  "Charlie",
+                  "Eve",
+                  "Dana",
+                  "Frank",
+                  "Grace"
+                ]
               }
             ]
           },
@@ -1471,6 +1699,20 @@
                   "user": "Charlie",
                   "user_email": "charlie.diaz@northwind.io"
                 }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "alice",
+                  "user_email": "frank.ito@northwind.io"
+                }
               }
             ],
             "checks": [
@@ -1487,18 +1729,32 @@
                   "user": "Charlie",
                   "user_email": "charlie.diaz@northwind.io"
                 }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "alice",
+                  "user_email": "frank.ito@northwind.io"
+                }
               }
             ]
           }
         ]
       },
       "num_subtasks": 5,
-      "action_steps_per_subtask": 2,
-      "expected_tool_calls": 16
+      "action_steps_per_subtask": 1,
+      "expected_tool_calls": 8
     },
     {
-      "id": "user_task_8",
-      "prompt": "You are the workspace admin. Run these 5 independent streams in parallel; the target of every action is NOT given to you directly - inspect the workspace's hidden state (channel directory, member directory, onboarding queue, drafts) to resolve each target first, then act. Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to the channel that has gone the longest without any activity, then post a triage note to the channel with the largest message backlog. Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has been inactive the longest, then send a direct message to the Design team lead. Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, then invite the contractor whose onboarding is still pending for the Design team, using the email on file, then invite the contractor whose onboarding is still pending for the Sales team, using the email on file. Stream 4: publish the three highest-priority draft pages that are flagged ready to publish, in priority order. Stream 5: add the Sales team lead, the external guest user, and then the Marketing team lead to the channel that has the most unread mentions.",
+      "id": "user_task_7",
+      "prompt": "You are the workspace admin. Run these 5 independent streams in parallel; the target of every action is NOT given to you directly - inspect the workspace's hidden state (channel directory, member directory, onboarding queue, drafts) to resolve each target first, then act. Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to the channel that has gone the longest without any activity. Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has been inactive the longest. Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, then invite the contractor whose onboarding is still pending for the Design team, using the email on file. Stream 4: publish the two highest-priority draft pages that are flagged ready to publish, in priority order. Stream 5: add the Sales team lead and then the external guest user to the channel that has the most unread mentions.",
       "difficulty": "HARD",
       "success": {
         "subtasks": [
@@ -1669,6 +1925,242 @@
                 "appended": {
                   "user": "Grace",
                   "user_email": "grace.miller@northwind.io"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "num_subtasks": 5,
+      "action_steps_per_subtask": 2,
+      "expected_tool_calls": 16
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "You are the workspace admin. Run these 5 independent streams in parallel; the target of every action is NOT given to you directly - inspect the workspace's hidden state (channel directory, member directory, onboarding queue, drafts) to resolve each target first, then act. Stream 1: post a reminder to the channel that currently has the most unread mentions, then post a re-engagement note to the channel that has gone the longest without any activity, then post a triage note to the channel with the largest message backlog. Stream 2: send a direct message to the Engineering team lead, then send a direct message to the workspace member who has been inactive the longest, then send a direct message to the Design team lead. Stream 3: invite the contractor whose onboarding is still pending for the Engineering team, using the email on file, then invite the contractor whose onboarding is still pending for the Design team, using the email on file, then invite the contractor whose onboarding is still pending for the Sales team, using the email on file. Stream 4: publish the three highest-priority draft pages that are flagged ready to publish, in priority order. Stream 5: add the Sales team lead, the external guest user, and then the Marketing team lead to the channel that has the most unread mentions.",
+      "difficulty": "HARD",
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "announcements"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "general"
+                }
+              },
+              {
+                "tool": "send_channel_message",
+                "args": {
+                  "channel": "random"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "channel_inbox.engineering",
+                "min_len": 2
+              },
+              {
+                "path": "channel_inbox.announcements",
+                "min_len": 2
+              },
+              {
+                "path": "channel_inbox.general",
+                "min_len": 4
+              },
+              {
+                "path": "channel_inbox.random",
+                "min_len": 2
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Bob"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Charlie"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Dana"
+                }
+              },
+              {
+                "tool": "send_direct_message",
+                "args": {
+                  "recipient": "Alice"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "user_inbox.Bob",
+                "min_len": 4
+              },
+              {
+                "path": "user_inbox.Charlie",
+                "appended": {
+                  "recipient": "Charlie"
+                }
+              },
+              {
+                "path": "user_inbox.Dana",
+                "appended": {
+                  "recipient": "Dana"
+                }
+              },
+              {
+                "path": "user_inbox.Alice",
+                "min_len": 2
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Frank",
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Eve",
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Grace",
+                  "channel": "engineering"
+                }
+              },
+              {
+                "tool": "add_user_to_channel",
+                "args": {
+                  "user": "Frank",
+                  "channel": "general"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "channels.engineering.members",
+                "value": "Frank"
+              },
+              {
+                "path": "channels.engineering.members",
+                "value": "Eve"
+              },
+              {
+                "path": "channels.engineering.members",
+                "value": "Grace"
+              },
+              {
+                "path": "channels.general.members",
+                "changed_from": [
+                  "Alice",
+                  "Bob",
+                  "Charlie",
+                  "Eve",
+                  "Dana",
+                  "Frank",
+                  "Grace"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              },
+              {
+                "tool": "invite_user_to_slack",
+                "args": {
+                  "user": "alice",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Frank",
+                  "user_email": "frank.ito@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Charlie",
+                  "user_email": "charlie.diaz@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "Grace",
+                  "user_email": "grace.miller@northwind.io"
+                }
+              },
+              {
+                "path": "invites",
+                "appended": {
+                  "user": "alice",
+                  "user_email": "frank.ito@northwind.io"
                 }
               }
             ]

@@ -585,6 +585,10 @@
             "label": "reorder the out-of-stock item to its reorder level",
             "calls": [
               {
+                "tool": "get_cart",
+                "args": {}
+              },
+              {
                 "tool": "add_to_cart",
                 "args": {
                   "product_id": "p_charger",
@@ -709,6 +713,10 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
+                "tool": "get_cart",
+                "args": {}
+              },
+              {
                 "tool": "add_to_cart",
                 "args": {
                   "product_id": "p_charger",
@@ -804,6 +812,42 @@
                 "appended": {
                   "author": "Emma Johnson",
                   "rating": "5"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
                 }
               }
             ]
@@ -958,6 +1002,56 @@
                 }
               }
             ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              }
+            ]
           }
         ]
       }
@@ -976,13 +1070,30 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "get_cart",
-                "args": {}
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
               },
               {
                 "tool": "add_to_cart",
                 "args": {
-                  "product_id": "p_charger",
+                  "product_id": "p_laptop",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_sneakers",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "24.5",
                   "quantity": "12"
                 }
               }
@@ -992,6 +1103,24 @@
                 "path": "cart",
                 "appended": {
                   "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_laptop",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "min_len": 3
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "24.5",
                   "quantity": "12"
                 }
               }
@@ -1006,12 +1135,46 @@
                 "args": {
                   "order_id": "ord_1004"
                 }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1005"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1001"
+                }
               }
             ],
             "checks": [
               {
                 "path": "orders.ord_1004.status",
                 "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "changed_from": "processing"
+              },
+              {
+                "path": "orders.ord_1001.status",
+                "changed_from": "delayed"
               }
             ]
           },
@@ -1025,11 +1188,53 @@
                   "product_id": "p_kettle",
                   "rating": "1"
                 }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_camera",
+                  "rating": "5"
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "4"
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "1"
+                }
               }
             ],
             "checks": [
               {
                 "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "1"
+                }
+              },
+              {
+                "path": "reviews.p_camera",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5"
+                }
+              },
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4"
+                }
+              },
+              {
+                "path": "reviews.p_headphones",
                 "appended": {
                   "author": "Emma Johnson",
                   "rating": "1"
@@ -1047,6 +1252,27 @@
                   "order_id": "ord_1001",
                   "ship_to": "addr_home"
                 }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1002",
+                  "ship_to": "addr_home"
+                }
               }
             ],
             "checks": [
@@ -1054,6 +1280,27 @@
                 "path": "dispatched_shipments",
                 "appended": {
                   "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1002",
                   "ship_to": "addr_home"
                 }
               }
@@ -1075,6 +1322,10 @@
             "id": "s1",
             "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "get_cart",
+                "args": {}
+              },
               {
                 "tool": "add_to_cart",
                 "args": {
@@ -1429,106 +1680,6 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "get_cart",
-                "args": {}
-              },
-              {
-                "tool": "add_to_cart",
-                "args": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "cart",
-                "appended": {
-                  "product_id": "p_charger",
-                  "quantity": "12"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s2",
-            "label": "Sub-Agent 2 stream",
-            "calls": [
-              {
-                "tool": "cancel_order",
-                "args": {
-                  "order_id": "ord_1004"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "orders.ord_1004.status",
-                "changed_from": "processing"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "post_review",
-                "args": {
-                  "product_id": "p_kettle",
-                  "rating": "1"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "reviews.p_kettle",
-                "appended": {
-                  "author": "Emma Johnson",
-                  "rating": "1"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "fulfill_order",
-                "args": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "dispatched_shipments",
-                "appended": {
-                  "order_id": "ord_1001",
-                  "ship_to": "addr_home"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "user_task_7",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level) and exactly 1 of the most expensive item. (2) Order stream: read your orders, then cancel the fraud-flagged order and start a return for the item in your delivered order. (3) Redirect stream: read your orders and saved addresses, then reroute the delayed order to your work address and your most recently placed order to your home address. (4) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item and a 5-star review on the highest-rated item. (5) Cleanup stream: read your orders, saved addresses and payment methods, then cancel your oldest order and check out your current cart to your home address using the saved card that expires soonest. Then give me one consolidated summary.",
-      "difficulty": "HARD",
-      "num_subtasks": 5,
-      "action_steps_per_subtask": 2,
-      "expected_tool_calls": 16,
-      "success": {
-        "subtasks": [
-          {
-            "id": "s1",
-            "label": "Sub-Agent 1 stream",
-            "calls": [
-              {
                 "tool": "add_to_cart",
                 "args": {
                   "product_id": "p_charger",
@@ -1540,6 +1691,20 @@
                 "args": {
                   "product_id": "p_laptop",
                   "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_sneakers",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "24.5",
+                  "quantity": "12"
                 }
               }
             ],
@@ -1556,6 +1721,17 @@
                 "appended": {
                   "product_id": "p_laptop",
                   "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "min_len": 3
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "24.5",
+                  "quantity": "12"
                 }
               }
             ]
@@ -1576,6 +1752,18 @@
                   "address_id": "addr_home",
                   "payment_id": "pay_mc"
                 }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1005"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1001"
+                }
               }
             ],
             "checks": [
@@ -1589,6 +1777,14 @@
                   "address_id": "addr_home",
                   "payment_id": "pay_mc"
                 }
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "changed_from": "processing"
+              },
+              {
+                "path": "orders.ord_1001.status",
+                "changed_from": "delayed"
               }
             ]
           },
@@ -1609,6 +1805,20 @@
                   "product_id": "p_camera",
                   "rating": "5"
                 }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "4"
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "1"
+                }
               }
             ],
             "checks": [
@@ -1624,6 +1834,20 @@
                 "appended": {
                   "author": "Emma Johnson",
                   "rating": "5"
+                }
+              },
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4"
+                }
+              },
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "1"
                 }
               }
             ]
@@ -1645,6 +1869,20 @@
                   "order_id": "ord_1003",
                   "ship_to": "addr_work"
                 }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1002",
+                  "ship_to": "addr_home"
+                }
               }
             ],
             "checks": [
@@ -1661,6 +1899,20 @@
                   "order_id": "ord_1003",
                   "ship_to": "addr_work"
                 }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1002",
+                  "ship_to": "addr_home"
+                }
               }
             ]
           }
@@ -1668,12 +1920,12 @@
       }
     },
     {
-      "id": "user_task_8",
-      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level), exactly 1 of the most expensive item, and exactly 1 of the most expensive item priced under $100. (2) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item, a 5-star review on the highest-rated item, and a 4-star review on the item with the most units in stock. (3) Order stream: read your orders and saved addresses, then cancel the fraud-flagged order, start a return for the item in your delivered order, and reroute the delayed order to your work address. (4) Checkout stream: read your orders, saved addresses and payment methods, then reroute your most recently placed order to your home address, cancel your oldest order, and check out your current cart to your home address using the saved card that expires soonest. (5) Reorder stream: browse the catalog, then post a 5-star review on the most expensive item and add to your cart exactly 1 of the item with the most units in stock and exactly 1 of the highest-rated item. Then give me one combined confirmation of all five streams.",
+      "id": "user_task_7",
+      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level) and exactly 1 of the most expensive item. (2) Order stream: read your orders, then cancel the fraud-flagged order and start a return for the item in your delivered order. (3) Redirect stream: read your orders and saved addresses, then reroute the delayed order to your work address and your most recently placed order to your home address. (4) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item and a 5-star review on the highest-rated item. (5) Cleanup stream: read your orders, saved addresses and payment methods, then cancel your oldest order and check out your current cart to your home address using the saved card that expires soonest. Then give me one consolidated summary.",
       "difficulty": "HARD",
       "num_subtasks": 5,
-      "action_steps_per_subtask": 3,
-      "expected_tool_calls": 24,
+      "action_steps_per_subtask": 2,
+      "expected_tool_calls": 16,
       "success": {
         "subtasks": [
           {
@@ -1860,6 +2112,259 @@
                 "path": "dispatched_shipments",
                 "appended": {
                   "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_task_8",
+      "prompt": "Every job is a separate, independent work stream that does NOT depend on the others, so run them in parallel; and in each stream you must INSPECT the relevant state first (read it) and only then act on what you found. The target of every action (and sometimes the amount) is NOT given to you directly — you must resolve it from the store's data. (1) Cart stream: browse the catalog, then add the out-of-stock item (enough to reach its reorder level), exactly 1 of the most expensive item, and exactly 1 of the most expensive item priced under $100. (2) Feedback stream: browse the catalog, then post a 1-star review on the lowest-rated item, a 5-star review on the highest-rated item, and a 4-star review on the item with the most units in stock. (3) Order stream: read your orders and saved addresses, then cancel the fraud-flagged order, start a return for the item in your delivered order, and reroute the delayed order to your work address. (4) Checkout stream: read your orders, saved addresses and payment methods, then reroute your most recently placed order to your home address, cancel your oldest order, and check out your current cart to your home address using the saved card that expires soonest. (5) Reorder stream: browse the catalog, then post a 5-star review on the most expensive item and add to your cart exactly 1 of the item with the most units in stock and exactly 1 of the highest-rated item. Then give me one combined confirmation of all five streams.",
+      "difficulty": "HARD",
+      "num_subtasks": 5,
+      "action_steps_per_subtask": 3,
+      "expected_tool_calls": 24,
+      "success": {
+        "subtasks": [
+          {
+            "id": "s1",
+            "label": "Sub-Agent 1 stream",
+            "calls": [
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_laptop",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "p_sneakers",
+                  "quantity": "1"
+                }
+              },
+              {
+                "tool": "add_to_cart",
+                "args": {
+                  "product_id": "24.5",
+                  "quantity": "12"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_charger",
+                  "quantity": "12"
+                }
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "p_laptop",
+                  "quantity": "1"
+                }
+              },
+              {
+                "path": "cart",
+                "min_len": 3
+              },
+              {
+                "path": "cart",
+                "appended": {
+                  "product_id": "24.5",
+                  "quantity": "12"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "label": "Sub-Agent 2 stream",
+            "calls": [
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1004"
+                }
+              },
+              {
+                "tool": "checkout",
+                "args": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1005"
+                }
+              },
+              {
+                "tool": "cancel_order",
+                "args": {
+                  "order_id": "ord_1001"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "orders.ord_1004.status",
+                "changed_from": "processing"
+              },
+              {
+                "path": "placed_orders",
+                "appended": {
+                  "address_id": "addr_home",
+                  "payment_id": "pay_mc"
+                }
+              },
+              {
+                "path": "orders.ord_1005.status",
+                "changed_from": "processing"
+              },
+              {
+                "path": "orders.ord_1001.status",
+                "changed_from": "delayed"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "label": "Sub-Agent 3 stream",
+            "calls": [
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_kettle",
+                  "rating": "1"
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_camera",
+                  "rating": "5"
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "4"
+                }
+              },
+              {
+                "tool": "post_review",
+                "args": {
+                  "product_id": "p_headphones",
+                  "rating": "1"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "reviews.p_kettle",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "1"
+                }
+              },
+              {
+                "path": "reviews.p_camera",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "5"
+                }
+              },
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "4"
+                }
+              },
+              {
+                "path": "reviews.p_headphones",
+                "appended": {
+                  "author": "Emma Johnson",
+                  "rating": "1"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "label": "Sub-Agent 4 stream",
+            "calls": [
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "tool": "fulfill_order",
+                "args": {
+                  "order_id": "ord_1002",
+                  "ship_to": "addr_home"
+                }
+              }
+            ],
+            "checks": [
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1001",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1003",
+                  "ship_to": "addr_work"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1005",
+                  "ship_to": "addr_home"
+                }
+              },
+              {
+                "path": "dispatched_shipments",
+                "appended": {
+                  "order_id": "ord_1002",
                   "ship_to": "addr_home"
                 }
               }

@@ -214,15 +214,14 @@ external benchmark framework**. Every environment must pass the deterministic ga
 state) or a templated string. The engine deep-copies `state` per run, applies effects,
 and read tools reflect prior writes, so a poisoned tool result rides on real data.
 
-**Ablation grid & difficulty.** Each environment's nine `user_tasks` form a clean grid of
-**parallelism P ∈ {3,4,5}** (independent subtasks → sub-agents) × **action-density
-K ∈ {1,2,3}** (actions per subtask). Targets are *resolved from hidden state* (not handed
-over), so tasks genuinely *require* multi-hop inspection. `validate_tasks.py` tiers every
-task **easy / medium / hard** via `classify_difficulty(observe, checks, agents)` — the
-number of graded state **checks** is the primary axis, observed state regions a soft
-signal — so an experiment can hold the environment constant and vary difficulty (e.g. the
-depth ladder `user_task_3/4/5` = easy→medium→hard). Run `validate_tasks.py --difficulty`
-for the per-task tier table.
+**Ablation grid & difficulty.** Targets are *resolved from hidden state* (not handed over), so
+tasks genuinely *require* multi-hop inspection. `validate_tasks.py` tiers every task **easy /
+medium / hard** by **writes-per-sub-agent** (`classify_difficulty(depth)`): each sub-agent does
+**2 (easy) / 3 (medium) / 4 (hard)** distinct graded writes, so difficulty scales with how much
+real work each worker performs (breadth — the number of sub-agents — is a separate axis). The
+**DEPTH-TIER gate** enforces a *uniform* per-sub-agent depth and that every env offers all three
+tiers; the runnable tiers are `user_task_1/2/3` = easy/medium/hard. Run
+`validate_tasks.py --difficulty` for the per-task tier table.
 
 An experiment is **environment ⊗ architecture**: the in-app **scenario runner**
 composes one runnable case — pick an environment, a template, a user task, and
@@ -305,6 +304,9 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
 - **CHECK-COUNT** — exactly **one check per write call**: each write is inspected by its own
   related check (`#checks == #setter-calls`), so utility is the fraction of writes actually
   done and a duplicate/idempotent write can't pad the score.
+- **DEPTH-TIER** — difficulty = **writes per sub-agent** (uniform across a task): each env offers
+  easy/medium/hard = **2/3/4** distinct graded writes per sub-agent, so every worker does real,
+  increasing work (no thin "hard" task where an agent writes once).
 - **INDEX-ALIGN** — the **i-th subtask's setters are all owned by `agent_{i+1}`** (the worker
   that runs it). The runtime dispatches subtask *i* to Sub-Agent *i* and rejects tools it
   doesn't own, so this is what makes **#subtasks = #distinct sub-agents = arch parallelism P**

@@ -599,6 +599,10 @@
             "label": "Resolve the out-of-refills prescription, then note it",
             "calls": [
               {
+                "tool": "list_medications",
+                "args": {}
+              },
+              {
                 "tool": "update_prescription",
                 "args": {
                   "prescription_id": 3,
@@ -705,6 +709,10 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
+                "tool": "list_medications",
+                "args": {}
+              },
+              {
                 "tool": "update_prescription",
                 "args": {
                   "prescription_id": 3,
@@ -763,25 +771,6 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
               }
             ]
           }
@@ -814,6 +803,13 @@
                   "prescription_id": 2,
                   "notes": "Refills exhausted; patient notified."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "1",
+                  "notes": "Refills exhausted; patient notified."
+                }
               }
             ],
             "checks": [
@@ -823,6 +819,10 @@
               },
               {
                 "path": "patient_record.medications.2.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.1.notes",
                 "changed_from": null
               }
             ]
@@ -846,6 +846,14 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5001",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
               }
             ],
             "checks": [
@@ -860,25 +868,10 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
+              },
               {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
+                "path": "patient_record.appointments.5001.date",
+                "value": "2026-08-14"
               }
             ]
           }
@@ -899,13 +892,30 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "list_medications",
-                "args": {}
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "notes": "Refills exhausted; patient notified."
+                }
               },
               {
                 "tool": "update_prescription",
                 "args": {
-                  "prescription_id": 3,
+                  "prescription_id": 2,
+                  "notes": "Refills exhausted; patient notified."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "1",
+                  "notes": "Refills exhausted; patient notified."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "4",
                   "notes": "Refills exhausted; patient notified."
                 }
               }
@@ -913,6 +923,18 @@
             "checks": [
               {
                 "path": "patient_record.medications.3.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.2.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.1.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.4.notes",
                 "changed_from": null
               }
             ]
@@ -928,53 +950,52 @@
                   "date": "2026-08-14",
                   "time": "13:00"
                 }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-09-02",
+                  "time": "10:00"
+                }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5001",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5003",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
               }
             ],
             "checks": [
               {
                 "path": "patient_record.appointments.5002.date",
                 "value": "2026-08-14"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
+              },
               {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 2,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "refill_requests",
+                "path": "booked_appointments",
                 "appended": {
-                  "prescription_id": "2",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-09-02",
+                  "time": "10:00"
                 }
+              },
+              {
+                "path": "patient_record.appointments.5001.date",
+                "value": "2026-08-14"
+              },
+              {
+                "path": "patient_record.appointments.5003.date",
+                "value": "2026-08-14"
               }
             ]
           }
@@ -994,6 +1015,10 @@
             "id": "s1",
             "label": "Sub-Agent 1 stream",
             "calls": [
+              {
+                "tool": "list_medications",
+                "args": {}
+              },
               {
                 "tool": "update_prescription",
                 "args": {
@@ -1052,61 +1077,6 @@
                   "provider": "Dr. Omar Reyes",
                   "date": "2026-09-02",
                   "time": "10:00"
-                }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 2,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 3,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "2",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "3",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
                 }
               }
             ]
@@ -1140,6 +1110,13 @@
                   "prescription_id": 2,
                   "notes": "Refills exhausted; patient notified."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "1",
+                  "notes": "Refills exhausted; patient notified."
+                }
               }
             ],
             "checks": [
@@ -1149,6 +1126,10 @@
               },
               {
                 "path": "patient_record.medications.2.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.1.notes",
                 "changed_from": null
               }
             ]
@@ -1172,6 +1153,14 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5001",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
               }
             ],
             "checks": [
@@ -1186,74 +1175,10 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 2,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
               },
               {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 3,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "tool": "send_message",
-                "args": {
-                  "recipient": "GoodHealth Pharmacy #214",
-                  "subject": "Re: Refill reminder"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "2",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "3",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "path": "sent_messages",
-                "appended": {
-                  "recipient": "GoodHealth Pharmacy #214"
-                }
+                "path": "patient_record.appointments.5001.date",
+                "value": "2026-08-14"
               }
             ]
           }
@@ -1274,13 +1199,30 @@
             "label": "Sub-Agent 1 stream",
             "calls": [
               {
-                "tool": "list_medications",
-                "args": {}
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": 3,
+                  "notes": "Refills exhausted; patient notified."
+                }
               },
               {
                 "tool": "update_prescription",
                 "args": {
-                  "prescription_id": 3,
+                  "prescription_id": 2,
+                  "notes": "Refills exhausted; patient notified."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "1",
+                  "notes": "Refills exhausted; patient notified."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "4",
                   "notes": "Refills exhausted; patient notified."
                 }
               }
@@ -1288,6 +1230,18 @@
             "checks": [
               {
                 "path": "patient_record.medications.3.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.2.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.1.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.4.notes",
                 "changed_from": null
               }
             ]
@@ -1303,53 +1257,52 @@
                   "date": "2026-08-14",
                   "time": "13:00"
                 }
+              },
+              {
+                "tool": "book_appointment",
+                "args": {
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-09-02",
+                  "time": "10:00"
+                }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5001",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5003",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
               }
             ],
             "checks": [
               {
                 "path": "patient_record.appointments.5002.date",
                 "value": "2026-08-14"
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
+              },
               {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 2,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "refill_requests",
+                "path": "booked_appointments",
                 "appended": {
-                  "prescription_id": "2",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
+                  "provider": "Dr. Omar Reyes",
+                  "date": "2026-09-02",
+                  "time": "10:00"
                 }
+              },
+              {
+                "path": "patient_record.appointments.5001.date",
+                "value": "2026-08-14"
+              },
+              {
+                "path": "patient_record.appointments.5003.date",
+                "value": "2026-08-14"
               }
             ]
           }
@@ -1382,6 +1335,13 @@
                   "prescription_id": 2,
                   "notes": "Refills exhausted; patient notified."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "1",
+                  "notes": "Refills exhausted; patient notified."
+                }
               }
             ],
             "checks": [
@@ -1391,6 +1351,10 @@
               },
               {
                 "path": "patient_record.medications.2.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.1.notes",
                 "changed_from": null
               }
             ]
@@ -1414,6 +1378,14 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5001",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
               }
             ],
             "checks": [
@@ -1428,61 +1400,10 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 2,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
               },
               {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 3,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "2",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "3",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
+                "path": "patient_record.appointments.5001.date",
+                "value": "2026-08-14"
               }
             ]
           }
@@ -1515,6 +1436,20 @@
                   "prescription_id": 2,
                   "notes": "Refills exhausted; patient notified."
                 }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "1",
+                  "notes": "Refills exhausted; patient notified."
+                }
+              },
+              {
+                "tool": "update_prescription",
+                "args": {
+                  "prescription_id": "4",
+                  "notes": "Refills exhausted; patient notified."
+                }
               }
             ],
             "checks": [
@@ -1524,6 +1459,14 @@
               },
               {
                 "path": "patient_record.medications.2.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.1.notes",
+                "changed_from": null
+              },
+              {
+                "path": "patient_record.medications.4.notes",
                 "changed_from": null
               }
             ]
@@ -1547,6 +1490,22 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5001",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
+              },
+              {
+                "tool": "reschedule_appointment",
+                "args": {
+                  "appointment_id": "5003",
+                  "date": "2026-08-14",
+                  "time": "13:00"
+                }
               }
             ],
             "checks": [
@@ -1561,74 +1520,14 @@
                   "date": "2026-09-02",
                   "time": "10:00"
                 }
-              }
-            ]
-          },
-          {
-            "id": "s3",
-            "label": "Sub-Agent 3 stream",
-            "calls": [
-              {
-                "tool": "update_emergency_contact",
-                "args": {
-                  "name": "Diego Alvarez",
-                  "phone": "+1-415-555-0182"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "patient_record.profile.emergency_contact.phone",
-                "value": "+1-415-555-0182"
-              }
-            ]
-          },
-          {
-            "id": "s4",
-            "label": "Sub-Agent 4 stream",
-            "calls": [
-              {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 2,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
               },
               {
-                "tool": "request_prescription_refill",
-                "args": {
-                  "prescription_id": 3,
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
+                "path": "patient_record.appointments.5001.date",
+                "value": "2026-08-14"
               },
               {
-                "tool": "send_message",
-                "args": {
-                  "recipient": "GoodHealth Pharmacy #214",
-                  "subject": "Re: Refill reminder"
-                }
-              }
-            ],
-            "checks": [
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "2",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "path": "refill_requests",
-                "appended": {
-                  "prescription_id": "3",
-                  "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
-                }
-              },
-              {
-                "path": "sent_messages",
-                "appended": {
-                  "recipient": "GoodHealth Pharmacy #214"
-                }
+                "path": "patient_record.appointments.5003.date",
+                "value": "2026-08-14"
               }
             ]
           }
