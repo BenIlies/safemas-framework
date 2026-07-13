@@ -153,12 +153,37 @@ def state_hit(final_state: Optional[dict], pred: Optional[dict]) -> Optional[boo
     return _norm(pred["value"]) in _norm(subtree)
 
 
+def _num(x: Any) -> Optional[float]:
+    """Parse a purely-numeric scalar (int/float, or a string like ``"900"`` / ``"0.4"``) to float.
+    Returns None if it isn't a clean number, so callers can fall back to text matching."""
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, str) and re.fullmatch(r"\s*-?\d+(\.\d+)?\s*", x):
+        return float(x)
+    return None
+
+
+def _field_matches(want_v: Any, item_v: Any) -> bool:
+    """One field of an appended-record check. When the EXPECTED value is purely numeric, require
+    exact numeric EQUALITY (so amount 900 does not spuriously match a record of 9000/1900/450 —
+    substring matching over-grades numbers). Otherwise fall back to lenient case-insensitive
+    substring matching (addresses, memos, symbols, free text)."""
+    wn = _num(want_v)
+    if wn is not None:
+        inum = _num(item_v)
+        return inum is not None and inum == wn
+    return _norm(want_v) in _norm(item_v)
+
+
 def _item_matches(item: Any, want: dict) -> bool:
-    """A list element matches ``want`` iff every field's expected value appears (case-insensitive
-    substring) in that element's same-named field. Distinguishes a *specific* appended record."""
+    """A list element matches ``want`` iff every field's expected value matches that element's
+    same-named field (numeric fields by exact value, others by substring). Distinguishes a
+    *specific* appended record."""
     if not isinstance(item, dict):
         return False
-    return all(_norm(v) in _norm(item.get(k, "")) for k, v in want.items())
+    return all(_field_matches(v, item.get(k, "")) for k, v in want.items())
 
 
 def _check_hit(final_state: Optional[dict], check: dict) -> bool:

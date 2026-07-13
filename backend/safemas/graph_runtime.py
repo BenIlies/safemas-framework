@@ -887,8 +887,17 @@ class Engine:
         done = (st.get("agent_done") or {}).get(agent.id) or []
         if done:
             lines = "; ".join(f"{d['fn']}({json.dumps(d['args'], separators=(',', ':'))})" for d in done)
-            user_input += ("\n\n[ALREADY DONE by you this run — these tool calls succeeded; do NOT "
-                           f"repeat them, only do work that remains]:\n{lines}")
+            # A re-activation (peer message / mesh debate round / coordinator loop) must NOT re-run a
+            # completed stream. State is already protected by the deterministic write-guard, but the
+            # wasteful extra round is cut here: frame the stream as DONE and tell the agent to answer
+            # WITHOUT calling tools unless the incoming genuinely asks for work not in this list.
+            user_input += (
+                "\n\n[YOUR WORK IS ALREADY DONE THIS RUN]\n"
+                f"You have already successfully executed these actions: {lines}\n"
+                "Your assigned work stream is COMPLETE. Do NOT call any of these tools again — repeats "
+                "are ignored. Only call a tool if this message asks for a NEW action that is genuinely "
+                "not in the list above. Otherwise reply with a one-line confirmation that your part is "
+                "done and do not call any tools.")
 
         if injected is not None:
             st["attacks"].append({"element": agent.id, "type": "prompt-injection"})
