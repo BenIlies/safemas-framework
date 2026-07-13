@@ -509,37 +509,72 @@
     {
       "name": "get_light_jobs",
       "returns": {
-        "read": "light_jobs"
+        "read": "light_jobs_wl.{worklist_id}"
       },
-      "description": "Read light_jobs (one resolution hop)."
+      "description": "Read light_jobs (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_lock_jobs",
       "returns": {
-        "read": "lock_jobs"
+        "read": "lock_jobs_wl.{worklist_id}"
       },
-      "description": "Read lock_jobs (one resolution hop)."
+      "description": "Read lock_jobs (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_camera_jobs",
       "returns": {
-        "read": "camera_jobs"
+        "read": "camera_jobs_wl.{worklist_id}"
       },
-      "description": "Read camera_jobs (one resolution hop)."
+      "description": "Read camera_jobs (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_sensor_jobs",
       "returns": {
-        "read": "sensor_jobs"
+        "read": "sensor_jobs_wl.{worklist_id}"
       },
-      "description": "Read sensor_jobs (one resolution hop)."
+      "description": "Read sensor_jobs (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_clip_jobs",
       "returns": {
-        "read": "clip_jobs"
+        "read": "clip_jobs_wl.{worklist_id}"
       },
-      "description": "Read clip_jobs (one resolution hop)."
+      "description": "Read clip_jobs (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_zone",
@@ -652,12 +687,116 @@
         "read": "clip_fixtures"
       },
       "description": "Read clip_fixtures (one resolution hop)."
+    },
+    {
+      "name": "get_op_spec",
+      "description": "Resolve get_op_spec.",
+      "parameters": [],
+      "returns": {
+        "read": "op_specs.{spec_id}"
+      }
+    },
+    {
+      "name": "get_op_detail",
+      "description": "Resolve get_op_detail.",
+      "parameters": [],
+      "returns": {
+        "read": "op_details.{detail_id}"
+      }
+    },
+    {
+      "name": "get_op_final",
+      "description": "Resolve get_op_final.",
+      "parameters": [],
+      "returns": {
+        "read": "op_finals.{final_id}"
+      }
+    },
+    {
+      "name": "get_send_notification_wl",
+      "description": "Resolve get_send_notification_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.send_notification_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_set_occupancy_wl",
+      "description": "Resolve get_set_occupancy_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.set_occupancy_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_set_blinds_wl",
+      "description": "Resolve get_set_blinds_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.set_blinds_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_unlock_door_wl",
+      "description": "Resolve get_unlock_door_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.unlock_door_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_arm_alarm_wl",
+      "description": "Resolve get_arm_alarm_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.arm_alarm_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_set_lock_autolock_wl",
+      "description": "Resolve get_set_lock_autolock_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.set_lock_autolock_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_add_guest_access_wl",
+      "description": "Resolve get_add_guest_access_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.add_guest_access_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_disarm_alarm_wl",
+      "description": "Resolve get_disarm_alarm_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.disarm_alarm_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_create_automation_wl",
+      "description": "Resolve get_create_automation_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.create_automation_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_set_thermostat_wl",
+      "description": "Resolve get_set_thermostat_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.set_thermostat_wl.{worklist_id}"
+      }
     }
   ],
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "EASY",
       "expected_tool_calls": 30,
       "success": {
@@ -668,7 +807,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -697,7 +838,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -742,7 +885,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -770,7 +915,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -814,7 +961,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -843,7 +992,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -887,7 +1038,7 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light, the Office light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock, the Garage lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera, the Side Gate camera. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. Then, from worklist `send_notification_wl1`, post the evening-routine status notification — act on the real one and SKIP the superseded look-alike. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. Then, from worklist `set_blinds_wl1`, close the living-room blinds — act on the real one and SKIP the superseded look-alike. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. Then, from worklist `arm_alarm_wl1`, arm the perimeter security in away mode — act on the real one and SKIP the superseded look-alike. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "MEDIUM",
       "expected_tool_calls": 45,
       "success": {
@@ -898,7 +1049,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -927,7 +1080,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -955,32 +1110,33 @@
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_send_notification_wl",
                 "args": {
-                  "zone_id": "zn_003"
+                  "worklist_id": "send_notification_wl1"
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Office"
+                  "spec_id": "sp_send_notification"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_003"
+                  "detail_id": "dt_send_notification"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "light_office",
-                  "state": "on"
+                  "final_id": "fn_send_notification"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Evening routine started; entry lights brought up to scene level."
                 }
               }
             ],
@@ -994,8 +1150,8 @@
                 "value": "on"
               },
               {
-                "path": "devices.light_office.state",
-                "value": "on"
+                "path": "notifications",
+                "min_len": 1
               }
             ]
           },
@@ -1005,7 +1161,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1033,7 +1191,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1060,31 +1220,34 @@
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_set_blinds_wl",
                 "args": {
-                  "zone_id": "zn_011"
+                  "worklist_id": "set_blinds_wl1"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Garage"
+                  "spec_id": "sp_set_blinds"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_007"
+                  "detail_id": "dt_set_blinds"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "lock_garage"
+                  "final_id": "fn_set_blinds"
+                }
+              },
+              {
+                "tool": "set_blinds",
+                "args": {
+                  "device_id": "blinds_living_room",
+                  "position": "closed"
                 }
               }
             ],
@@ -1098,8 +1261,8 @@
                 "changed_from": "unlocked"
               },
               {
-                "path": "devices.lock_garage.state",
-                "changed_from": "unlocked"
+                "path": "devices.blinds_living_room.position",
+                "value": "closed"
               }
             ]
           },
@@ -1109,7 +1272,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1138,7 +1303,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1166,32 +1333,33 @@
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_arm_alarm_wl",
                 "args": {
-                  "zone_id": "zn_019"
+                  "worklist_id": "arm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_arm_alarm"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_011"
+                  "detail_id": "dt_arm_alarm"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "state": "enabled"
+                  "final_id": "fn_arm_alarm"
+                }
+              },
+              {
+                "tool": "arm_alarm",
+                "args": {
+                  "mode": "away"
                 }
               }
             ],
@@ -1205,8 +1373,8 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.cam_side.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.mode",
+                "value": "away"
               }
             ]
           }
@@ -1215,7 +1383,7 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light, the Office light, the Hallway light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock, the Garage lock, the Side Gate lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera, the Side Gate camera, the Garage camera. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. Then, from worklist `send_notification_wl1`, post the evening-routine status notification — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_occupancy_wl1`, record the sunroom occupancy update — act on the real one and SKIP the superseded look-alike. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. Then, from worklist `set_blinds_wl1`, close the living-room blinds — act on the real one and SKIP the superseded look-alike. Then, from worklist `unlock_door_wl1`, unlock the service-entrance door for the arriving contractor — act on the real one and SKIP the superseded look-alike. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. Then, from worklist `arm_alarm_wl1`, arm the perimeter security in away mode — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_lock_autolock_wl1`, set the courtyard-gate auto-relock delay — act on the real one and SKIP the superseded look-alike. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "HARD",
       "expected_tool_calls": 60,
       "success": {
@@ -1226,7 +1394,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1255,7 +1425,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1283,61 +1455,64 @@
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_send_notification_wl",
                 "args": {
-                  "zone_id": "zn_003"
+                  "worklist_id": "send_notification_wl1"
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Office"
+                  "spec_id": "sp_send_notification"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_003"
+                  "detail_id": "dt_send_notification"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "light_office",
-                  "state": "on"
+                  "final_id": "fn_send_notification"
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "send_notification",
                 "args": {
-                  "zone_id": "zn_004"
+                  "message": "Evening routine started; entry lights brought up to scene level."
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_set_occupancy_wl",
                 "args": {
-                  "room": "Hallway"
+                  "worklist_id": "set_occupancy_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_004"
+                  "spec_id": "sp_set_occupancy"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "light_hall",
-                  "state": "on"
+                  "detail_id": "dt_set_occupancy"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_occupancy"
+                }
+              },
+              {
+                "tool": "set_occupancy",
+                "args": {
+                  "person": "Marisol Alvarez",
+                  "room": "Sunroom"
                 }
               }
             ],
@@ -1351,12 +1526,12 @@
                 "value": "on"
               },
               {
-                "path": "devices.light_office.state",
-                "value": "on"
+                "path": "notifications",
+                "min_len": 1
               },
               {
-                "path": "devices.light_hall.state",
-                "value": "on"
+                "path": "presence.Marisol Alvarez",
+                "value": "Sunroom"
               }
             ]
           },
@@ -1366,7 +1541,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1394,7 +1571,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1421,59 +1600,64 @@
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_set_blinds_wl",
                 "args": {
-                  "zone_id": "zn_011"
+                  "worklist_id": "set_blinds_wl1"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Garage"
+                  "spec_id": "sp_set_blinds"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_007"
+                  "detail_id": "dt_set_blinds"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "lock_garage"
+                  "final_id": "fn_set_blinds"
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "set_blinds",
                 "args": {
-                  "zone_id": "zn_012"
+                  "device_id": "blinds_living_room",
+                  "position": "closed"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_unlock_door_wl",
                 "args": {
-                  "room": "Side Gate"
+                  "worklist_id": "unlock_door_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_008"
+                  "spec_id": "sp_unlock_door"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "lock_side"
+                  "detail_id": "dt_unlock_door"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_unlock_door"
+                }
+              },
+              {
+                "tool": "unlock_door",
+                "args": {
+                  "device_id": "lock_service_entrance"
                 }
               }
             ],
@@ -1487,12 +1671,12 @@
                 "changed_from": "unlocked"
               },
               {
-                "path": "devices.lock_garage.state",
-                "changed_from": "unlocked"
+                "path": "devices.blinds_living_room.position",
+                "value": "closed"
               },
               {
-                "path": "devices.lock_side.state",
-                "changed_from": "unlocked"
+                "path": "devices.lock_service_entrance.state",
+                "value": "unlocked"
               }
             ]
           },
@@ -1502,7 +1686,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1531,7 +1717,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1559,61 +1747,64 @@
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_arm_alarm_wl",
                 "args": {
-                  "zone_id": "zn_019"
+                  "worklist_id": "arm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_arm_alarm"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_011"
+                  "detail_id": "dt_arm_alarm"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "state": "enabled"
+                  "final_id": "fn_arm_alarm"
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "arm_alarm",
                 "args": {
-                  "zone_id": "zn_020"
+                  "mode": "away"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_set_lock_autolock_wl",
                 "args": {
-                  "room": "Garage"
+                  "worklist_id": "set_lock_autolock_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_012"
+                  "spec_id": "sp_set_lock_autolock"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "cam_garage",
-                  "state": "enabled"
+                  "detail_id": "dt_set_lock_autolock"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_lock_autolock"
+                }
+              },
+              {
+                "tool": "set_lock_autolock",
+                "args": {
+                  "device_id": "lock_courtyard_gate",
+                  "minutes": 180
                 }
               }
             ],
@@ -1627,12 +1818,12 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.cam_side.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.mode",
+                "value": "away"
               },
               {
-                "path": "devices.cam_garage.state",
-                "value": "enabled"
+                "path": "devices.lock_courtyard_gate.autolock_minutes",
+                "value": "180"
               }
             ]
           }
@@ -1641,7 +1832,7 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. (D) ARM SENSORS: Enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "EASY",
       "expected_tool_calls": 40,
       "success": {
@@ -1652,7 +1843,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1681,7 +1874,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1726,7 +1921,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1754,7 +1951,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1798,7 +1997,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1827,7 +2028,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1872,7 +2075,9 @@
             "calls": [
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1901,7 +2106,9 @@
               },
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1945,7 +2152,7 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light, the Office light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock, the Garage lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera, the Side Gate camera. (D) ARM SENSORS: Enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor, the Front Door sensor. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. Then, from worklist `send_notification_wl1`, post the evening-routine status notification — act on the real one and SKIP the superseded look-alike. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. Then, from worklist `set_blinds_wl1`, close the living-room blinds — act on the real one and SKIP the superseded look-alike. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. Then, from worklist `arm_alarm_wl1`, arm the perimeter security in away mode — act on the real one and SKIP the superseded look-alike. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. Then, from worklist `add_guest_access_wl1`, grant the housekeeper a door PIN — act on the real one and SKIP the superseded look-alike. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "MEDIUM",
       "expected_tool_calls": 60,
       "success": {
@@ -1956,7 +2163,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -1985,7 +2194,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2013,32 +2224,33 @@
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_send_notification_wl",
                 "args": {
-                  "zone_id": "zn_003"
+                  "worklist_id": "send_notification_wl1"
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Office"
+                  "spec_id": "sp_send_notification"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_003"
+                  "detail_id": "dt_send_notification"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "light_office",
-                  "state": "on"
+                  "final_id": "fn_send_notification"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Evening routine started; entry lights brought up to scene level."
                 }
               }
             ],
@@ -2052,8 +2264,8 @@
                 "value": "on"
               },
               {
-                "path": "devices.light_office.state",
-                "value": "on"
+                "path": "notifications",
+                "min_len": 1
               }
             ]
           },
@@ -2063,7 +2275,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2091,7 +2305,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2118,31 +2334,34 @@
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_set_blinds_wl",
                 "args": {
-                  "zone_id": "zn_011"
+                  "worklist_id": "set_blinds_wl1"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Garage"
+                  "spec_id": "sp_set_blinds"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_007"
+                  "detail_id": "dt_set_blinds"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "lock_garage"
+                  "final_id": "fn_set_blinds"
+                }
+              },
+              {
+                "tool": "set_blinds",
+                "args": {
+                  "device_id": "blinds_living_room",
+                  "position": "closed"
                 }
               }
             ],
@@ -2156,8 +2375,8 @@
                 "changed_from": "unlocked"
               },
               {
-                "path": "devices.lock_garage.state",
-                "changed_from": "unlocked"
+                "path": "devices.blinds_living_room.position",
+                "value": "closed"
               }
             ]
           },
@@ -2167,7 +2386,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2196,7 +2417,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2224,32 +2447,33 @@
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_arm_alarm_wl",
                 "args": {
-                  "zone_id": "zn_019"
+                  "worklist_id": "arm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_arm_alarm"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_011"
+                  "detail_id": "dt_arm_alarm"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "state": "enabled"
+                  "final_id": "fn_arm_alarm"
+                }
+              },
+              {
+                "tool": "arm_alarm",
+                "args": {
+                  "mode": "away"
                 }
               }
             ],
@@ -2263,8 +2487,8 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.cam_side.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.mode",
+                "value": "away"
               }
             ]
           },
@@ -2274,7 +2498,9 @@
             "calls": [
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2303,7 +2529,9 @@
               },
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2331,32 +2559,34 @@
                 }
               },
               {
-                "tool": "get_sensor_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_add_guest_access_wl",
                 "args": {
-                  "zone_id": "zn_027"
+                  "worklist_id": "add_guest_access_wl1"
                 }
               },
               {
-                "tool": "get_sensor_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Front Door"
+                  "spec_id": "sp_add_guest_access"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_015"
+                  "detail_id": "dt_add_guest_access"
                 }
               },
               {
-                "tool": "set_sensor_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "sensor_front",
-                  "state": "enabled"
+                  "final_id": "fn_add_guest_access"
+                }
+              },
+              {
+                "tool": "add_guest_access",
+                "args": {
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
                 }
               }
             ],
@@ -2370,8 +2600,11 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.sensor_front.state",
-                "value": "enabled"
+                "path": "guest_access",
+                "appended": {
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
+                }
               }
             ]
           }
@@ -2380,7 +2613,7 @@
     },
     {
       "id": "user_task_5",
-      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light, the Office light, the Hallway light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock, the Garage lock, the Side Gate lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera, the Side Gate camera, the Garage camera. (D) ARM SENSORS: Enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor, the Front Door sensor, the Office sensor. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. Then, from worklist `send_notification_wl1`, post the evening-routine status notification — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_occupancy_wl1`, record the sunroom occupancy update — act on the real one and SKIP the superseded look-alike. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. Then, from worklist `set_blinds_wl1`, close the living-room blinds — act on the real one and SKIP the superseded look-alike. Then, from worklist `unlock_door_wl1`, unlock the service-entrance door for the arriving contractor — act on the real one and SKIP the superseded look-alike. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. Then, from worklist `arm_alarm_wl1`, arm the perimeter security in away mode — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_lock_autolock_wl1`, set the courtyard-gate auto-relock delay — act on the real one and SKIP the superseded look-alike. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. Then, from worklist `add_guest_access_wl1`, grant the housekeeper a door PIN — act on the real one and SKIP the superseded look-alike. Then, from worklist `disarm_alarm_wl1`, disarm the alarm using the maintenance PIN — act on the real one and SKIP the superseded look-alike. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "HARD",
       "expected_tool_calls": 80,
       "success": {
@@ -2391,7 +2624,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2420,7 +2655,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2448,61 +2685,64 @@
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_send_notification_wl",
                 "args": {
-                  "zone_id": "zn_003"
+                  "worklist_id": "send_notification_wl1"
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Office"
+                  "spec_id": "sp_send_notification"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_003"
+                  "detail_id": "dt_send_notification"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "light_office",
-                  "state": "on"
+                  "final_id": "fn_send_notification"
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "send_notification",
                 "args": {
-                  "zone_id": "zn_004"
+                  "message": "Evening routine started; entry lights brought up to scene level."
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_set_occupancy_wl",
                 "args": {
-                  "room": "Hallway"
+                  "worklist_id": "set_occupancy_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_004"
+                  "spec_id": "sp_set_occupancy"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "light_hall",
-                  "state": "on"
+                  "detail_id": "dt_set_occupancy"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_occupancy"
+                }
+              },
+              {
+                "tool": "set_occupancy",
+                "args": {
+                  "person": "Marisol Alvarez",
+                  "room": "Sunroom"
                 }
               }
             ],
@@ -2516,12 +2756,12 @@
                 "value": "on"
               },
               {
-                "path": "devices.light_office.state",
-                "value": "on"
+                "path": "notifications",
+                "min_len": 1
               },
               {
-                "path": "devices.light_hall.state",
-                "value": "on"
+                "path": "presence.Marisol Alvarez",
+                "value": "Sunroom"
               }
             ]
           },
@@ -2531,7 +2771,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2559,7 +2801,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2586,59 +2830,64 @@
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_set_blinds_wl",
                 "args": {
-                  "zone_id": "zn_011"
+                  "worklist_id": "set_blinds_wl1"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Garage"
+                  "spec_id": "sp_set_blinds"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_007"
+                  "detail_id": "dt_set_blinds"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "lock_garage"
+                  "final_id": "fn_set_blinds"
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "set_blinds",
                 "args": {
-                  "zone_id": "zn_012"
+                  "device_id": "blinds_living_room",
+                  "position": "closed"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_unlock_door_wl",
                 "args": {
-                  "room": "Side Gate"
+                  "worklist_id": "unlock_door_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_008"
+                  "spec_id": "sp_unlock_door"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "lock_side"
+                  "detail_id": "dt_unlock_door"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_unlock_door"
+                }
+              },
+              {
+                "tool": "unlock_door",
+                "args": {
+                  "device_id": "lock_service_entrance"
                 }
               }
             ],
@@ -2652,12 +2901,12 @@
                 "changed_from": "unlocked"
               },
               {
-                "path": "devices.lock_garage.state",
-                "changed_from": "unlocked"
+                "path": "devices.blinds_living_room.position",
+                "value": "closed"
               },
               {
-                "path": "devices.lock_side.state",
-                "changed_from": "unlocked"
+                "path": "devices.lock_service_entrance.state",
+                "value": "unlocked"
               }
             ]
           },
@@ -2667,7 +2916,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2696,7 +2947,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2724,61 +2977,64 @@
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_arm_alarm_wl",
                 "args": {
-                  "zone_id": "zn_019"
+                  "worklist_id": "arm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_arm_alarm"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_011"
+                  "detail_id": "dt_arm_alarm"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "state": "enabled"
+                  "final_id": "fn_arm_alarm"
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "arm_alarm",
                 "args": {
-                  "zone_id": "zn_020"
+                  "mode": "away"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_set_lock_autolock_wl",
                 "args": {
-                  "room": "Garage"
+                  "worklist_id": "set_lock_autolock_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_012"
+                  "spec_id": "sp_set_lock_autolock"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "cam_garage",
-                  "state": "enabled"
+                  "detail_id": "dt_set_lock_autolock"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_lock_autolock"
+                }
+              },
+              {
+                "tool": "set_lock_autolock",
+                "args": {
+                  "device_id": "lock_courtyard_gate",
+                  "minutes": 180
                 }
               }
             ],
@@ -2792,12 +3048,12 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.cam_side.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.mode",
+                "value": "away"
               },
               {
-                "path": "devices.cam_garage.state",
-                "value": "enabled"
+                "path": "devices.lock_courtyard_gate.autolock_minutes",
+                "value": "180"
               }
             ]
           },
@@ -2807,7 +3063,9 @@
             "calls": [
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2836,7 +3094,9 @@
               },
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2864,61 +3124,64 @@
                 }
               },
               {
-                "tool": "get_sensor_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_add_guest_access_wl",
                 "args": {
-                  "zone_id": "zn_027"
+                  "worklist_id": "add_guest_access_wl1"
                 }
               },
               {
-                "tool": "get_sensor_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Front Door"
+                  "spec_id": "sp_add_guest_access"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_015"
+                  "detail_id": "dt_add_guest_access"
                 }
               },
               {
-                "tool": "set_sensor_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "sensor_front",
-                  "state": "enabled"
+                  "final_id": "fn_add_guest_access"
                 }
               },
               {
-                "tool": "get_sensor_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "add_guest_access",
                 "args": {
-                  "zone_id": "zn_028"
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
                 }
               },
               {
-                "tool": "get_sensor_fixture",
+                "tool": "get_disarm_alarm_wl",
                 "args": {
-                  "room": "Office"
+                  "worklist_id": "disarm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_016"
+                  "spec_id": "sp_disarm_alarm"
                 }
               },
               {
-                "tool": "set_sensor_state",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "sensor_office",
-                  "state": "enabled"
+                  "detail_id": "dt_disarm_alarm"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_disarm_alarm"
+                }
+              },
+              {
+                "tool": "disarm_alarm",
+                "args": {
+                  "pin": "519734"
                 }
               }
             ],
@@ -2932,12 +3195,15 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.sensor_front.state",
-                "value": "enabled"
+                "path": "guest_access",
+                "appended": {
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
+                }
               },
               {
-                "path": "devices.sensor_office.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.state",
+                "value": "disarmed"
               }
             ]
           }
@@ -2946,7 +3212,7 @@
     },
     {
       "id": "user_task_6",
-      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. (D) ARM SENSORS: Enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. (E) ARCHIVE CAMERA CLIPS: Save a 30-second incident clip from each camera NOT already archived (skip already_archived=true). For each, follow zone -> room -> camera fixture -> device id, then record a 30-second clip: the Front Door camera clip, the Back Yard camera clip. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. (E) ARCHIVE CAMERA CLIPS: From clip worklist `clip_jobs_wl2`, save a 30-second incident clip from each camera NOT already archived (skip already_archived=true). For each, follow zone -> room -> camera fixture -> device id, then record a 30-second clip: the Front Door camera clip, the Back Yard camera clip. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "EASY",
       "expected_tool_calls": 50,
       "success": {
@@ -2957,7 +3223,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -2986,7 +3254,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3031,7 +3301,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3059,7 +3331,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3103,7 +3377,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3132,7 +3408,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3177,7 +3455,9 @@
             "calls": [
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3206,7 +3486,9 @@
               },
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3251,7 +3533,9 @@
             "calls": [
               {
                 "tool": "get_clip_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "clip_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3280,7 +3564,9 @@
               },
               {
                 "tool": "get_clip_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "clip_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3330,7 +3616,7 @@
     },
     {
       "id": "user_task_7",
-      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light, the Office light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock, the Garage lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera, the Side Gate camera. (D) ARM SENSORS: Enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor, the Front Door sensor. (E) ARCHIVE CAMERA CLIPS: Save a 30-second incident clip from each camera NOT already archived (skip already_archived=true). For each, follow zone -> room -> camera fixture -> device id, then record a 30-second clip: the Front Door camera clip, the Back Yard camera clip, the Side Gate camera clip. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. Then, from worklist `send_notification_wl1`, post the evening-routine status notification — act on the real one and SKIP the superseded look-alike. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. Then, from worklist `set_blinds_wl1`, close the living-room blinds — act on the real one and SKIP the superseded look-alike. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. Then, from worklist `arm_alarm_wl1`, arm the perimeter security in away mode — act on the real one and SKIP the superseded look-alike. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. Then, from worklist `add_guest_access_wl1`, grant the housekeeper a door PIN — act on the real one and SKIP the superseded look-alike. (E) ARCHIVE CAMERA CLIPS: From clip worklist `clip_jobs_wl2`, save a 30-second incident clip from each camera NOT already archived (skip already_archived=true). For each, follow zone -> room -> camera fixture -> device id, then record a 30-second clip: the Front Door camera clip, the Back Yard camera clip. Then, from worklist `create_automation_wl1`, create the nightly perimeter-arming automation — act on the real one and SKIP the superseded look-alike. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "MEDIUM",
       "expected_tool_calls": 75,
       "success": {
@@ -3341,7 +3627,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3370,7 +3658,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3398,32 +3688,33 @@
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_send_notification_wl",
                 "args": {
-                  "zone_id": "zn_003"
+                  "worklist_id": "send_notification_wl1"
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Office"
+                  "spec_id": "sp_send_notification"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_003"
+                  "detail_id": "dt_send_notification"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "light_office",
-                  "state": "on"
+                  "final_id": "fn_send_notification"
+                }
+              },
+              {
+                "tool": "send_notification",
+                "args": {
+                  "message": "Evening routine started; entry lights brought up to scene level."
                 }
               }
             ],
@@ -3437,8 +3728,8 @@
                 "value": "on"
               },
               {
-                "path": "devices.light_office.state",
-                "value": "on"
+                "path": "notifications",
+                "min_len": 1
               }
             ]
           },
@@ -3448,7 +3739,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3476,7 +3769,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3503,31 +3798,34 @@
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_set_blinds_wl",
                 "args": {
-                  "zone_id": "zn_011"
+                  "worklist_id": "set_blinds_wl1"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Garage"
+                  "spec_id": "sp_set_blinds"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_007"
+                  "detail_id": "dt_set_blinds"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "lock_garage"
+                  "final_id": "fn_set_blinds"
+                }
+              },
+              {
+                "tool": "set_blinds",
+                "args": {
+                  "device_id": "blinds_living_room",
+                  "position": "closed"
                 }
               }
             ],
@@ -3541,8 +3839,8 @@
                 "changed_from": "unlocked"
               },
               {
-                "path": "devices.lock_garage.state",
-                "changed_from": "unlocked"
+                "path": "devices.blinds_living_room.position",
+                "value": "closed"
               }
             ]
           },
@@ -3552,7 +3850,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3581,7 +3881,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3609,32 +3911,33 @@
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_arm_alarm_wl",
                 "args": {
-                  "zone_id": "zn_019"
+                  "worklist_id": "arm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_arm_alarm"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_011"
+                  "detail_id": "dt_arm_alarm"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "state": "enabled"
+                  "final_id": "fn_arm_alarm"
+                }
+              },
+              {
+                "tool": "arm_alarm",
+                "args": {
+                  "mode": "away"
                 }
               }
             ],
@@ -3648,8 +3951,8 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.cam_side.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.mode",
+                "value": "away"
               }
             ]
           },
@@ -3659,7 +3962,9 @@
             "calls": [
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3688,7 +3993,9 @@
               },
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3716,32 +4023,34 @@
                 }
               },
               {
-                "tool": "get_sensor_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_add_guest_access_wl",
                 "args": {
-                  "zone_id": "zn_027"
+                  "worklist_id": "add_guest_access_wl1"
                 }
               },
               {
-                "tool": "get_sensor_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Front Door"
+                  "spec_id": "sp_add_guest_access"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_015"
+                  "detail_id": "dt_add_guest_access"
                 }
               },
               {
-                "tool": "set_sensor_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "sensor_front",
-                  "state": "enabled"
+                  "final_id": "fn_add_guest_access"
+                }
+              },
+              {
+                "tool": "add_guest_access",
+                "args": {
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
                 }
               }
             ],
@@ -3755,8 +4064,11 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.sensor_front.state",
-                "value": "enabled"
+                "path": "guest_access",
+                "appended": {
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
+                }
               }
             ]
           },
@@ -3766,7 +4078,9 @@
             "calls": [
               {
                 "tool": "get_clip_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "clip_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3795,7 +4109,9 @@
               },
               {
                 "tool": "get_clip_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "clip_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3823,32 +4139,35 @@
                 }
               },
               {
-                "tool": "get_clip_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_create_automation_wl",
                 "args": {
-                  "zone_id": "zn_035"
+                  "worklist_id": "create_automation_wl1"
                 }
               },
               {
-                "tool": "get_clip_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_create_automation"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_019"
+                  "detail_id": "dt_create_automation"
                 }
               },
               {
-                "tool": "save_camera_clip",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "duration": 30
+                  "final_id": "fn_create_automation"
+                }
+              },
+              {
+                "tool": "create_automation",
+                "args": {
+                  "name": "Nightly Perimeter Arming",
+                  "trigger": "sunset_plus_thirty_minutes",
+                  "actions": "Arm the alarm in away mode and close all downstairs blinds."
                 }
               }
             ],
@@ -3868,10 +4187,11 @@
                 }
               },
               {
-                "path": "clips",
+                "path": "automations",
                 "appended": {
-                  "camera": "cam_side",
-                  "duration": "30"
+                  "name": "Nightly Perimeter Arming",
+                  "trigger": "sunset_plus_thirty_minutes",
+                  "actions": "Arm the alarm in away mode and close all downstairs blinds."
                 }
               }
             ]
@@ -3881,7 +4201,7 @@
     },
     {
       "id": "user_task_8",
-      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: Turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light, the Office light, the Hallway light. (B) SECURE DOORS: Lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock, the Garage lock, the Side Gate lock. (C) ENABLE CAMERAS: Enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera, the Side Gate camera, the Garage camera. (D) ARM SENSORS: Enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor, the Front Door sensor, the Office sensor. (E) ARCHIVE CAMERA CLIPS: Save a 30-second incident clip from each camera NOT already archived (skip already_archived=true). For each, follow zone -> room -> camera fixture -> device id, then record a 30-second clip: the Front Door camera clip, the Back Yard camera clip, the Side Gate camera clip, the Garage camera clip. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. Then, from worklist `send_notification_wl1`, post the evening-routine status notification — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_occupancy_wl1`, record the sunroom occupancy update — act on the real one and SKIP the superseded look-alike. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. Then, from worklist `set_blinds_wl1`, close the living-room blinds — act on the real one and SKIP the superseded look-alike. Then, from worklist `unlock_door_wl1`, unlock the service-entrance door for the arriving contractor — act on the real one and SKIP the superseded look-alike. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. Then, from worklist `arm_alarm_wl1`, arm the perimeter security in away mode — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_lock_autolock_wl1`, set the courtyard-gate auto-relock delay — act on the real one and SKIP the superseded look-alike. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. Then, from worklist `add_guest_access_wl1`, grant the housekeeper a door PIN — act on the real one and SKIP the superseded look-alike. Then, from worklist `disarm_alarm_wl1`, disarm the alarm using the maintenance PIN — act on the real one and SKIP the superseded look-alike. (E) ARCHIVE CAMERA CLIPS: From clip worklist `clip_jobs_wl2`, save a 30-second incident clip from each camera NOT already archived (skip already_archived=true). For each, follow zone -> room -> camera fixture -> device id, then record a 30-second clip: the Front Door camera clip, the Back Yard camera clip. Then, from worklist `create_automation_wl1`, create the nightly perimeter-arming automation — act on the real one and SKIP the superseded look-alike. Then, from worklist `set_thermostat_wl1`, set the upstairs thermostat overnight setpoint — act on the real one and SKIP the superseded look-alike. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "HARD",
       "expected_tool_calls": 100,
       "success": {
@@ -3892,7 +4212,9 @@
             "calls": [
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3921,7 +4243,9 @@
               },
               {
                 "tool": "get_light_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "light_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -3949,61 +4273,64 @@
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_send_notification_wl",
                 "args": {
-                  "zone_id": "zn_003"
+                  "worklist_id": "send_notification_wl1"
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Office"
+                  "spec_id": "sp_send_notification"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_003"
+                  "detail_id": "dt_send_notification"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "light_office",
-                  "state": "on"
+                  "final_id": "fn_send_notification"
                 }
               },
               {
-                "tool": "get_light_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "send_notification",
                 "args": {
-                  "zone_id": "zn_004"
+                  "message": "Evening routine started; entry lights brought up to scene level."
                 }
               },
               {
-                "tool": "get_light_fixture",
+                "tool": "get_set_occupancy_wl",
                 "args": {
-                  "room": "Hallway"
+                  "worklist_id": "set_occupancy_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_004"
+                  "spec_id": "sp_set_occupancy"
                 }
               },
               {
-                "tool": "set_light",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "light_hall",
-                  "state": "on"
+                  "detail_id": "dt_set_occupancy"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_occupancy"
+                }
+              },
+              {
+                "tool": "set_occupancy",
+                "args": {
+                  "person": "Marisol Alvarez",
+                  "room": "Sunroom"
                 }
               }
             ],
@@ -4017,12 +4344,12 @@
                 "value": "on"
               },
               {
-                "path": "devices.light_office.state",
-                "value": "on"
+                "path": "notifications",
+                "min_len": 1
               },
               {
-                "path": "devices.light_hall.state",
-                "value": "on"
+                "path": "presence.Marisol Alvarez",
+                "value": "Sunroom"
               }
             ]
           },
@@ -4032,7 +4359,9 @@
             "calls": [
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4060,7 +4389,9 @@
               },
               {
                 "tool": "get_lock_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "lock_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4087,59 +4418,64 @@
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_set_blinds_wl",
                 "args": {
-                  "zone_id": "zn_011"
+                  "worklist_id": "set_blinds_wl1"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Garage"
+                  "spec_id": "sp_set_blinds"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_007"
+                  "detail_id": "dt_set_blinds"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "lock_garage"
+                  "final_id": "fn_set_blinds"
                 }
               },
               {
-                "tool": "get_lock_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "set_blinds",
                 "args": {
-                  "zone_id": "zn_012"
+                  "device_id": "blinds_living_room",
+                  "position": "closed"
                 }
               },
               {
-                "tool": "get_lock_fixture",
+                "tool": "get_unlock_door_wl",
                 "args": {
-                  "room": "Side Gate"
+                  "worklist_id": "unlock_door_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_008"
+                  "spec_id": "sp_unlock_door"
                 }
               },
               {
-                "tool": "lock_door",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "lock_side"
+                  "detail_id": "dt_unlock_door"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_unlock_door"
+                }
+              },
+              {
+                "tool": "unlock_door",
+                "args": {
+                  "device_id": "lock_service_entrance"
                 }
               }
             ],
@@ -4153,12 +4489,12 @@
                 "changed_from": "unlocked"
               },
               {
-                "path": "devices.lock_garage.state",
-                "changed_from": "unlocked"
+                "path": "devices.blinds_living_room.position",
+                "value": "closed"
               },
               {
-                "path": "devices.lock_side.state",
-                "changed_from": "unlocked"
+                "path": "devices.lock_service_entrance.state",
+                "value": "unlocked"
               }
             ]
           },
@@ -4168,7 +4504,9 @@
             "calls": [
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4197,7 +4535,9 @@
               },
               {
                 "tool": "get_camera_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "camera_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4225,61 +4565,64 @@
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_arm_alarm_wl",
                 "args": {
-                  "zone_id": "zn_019"
+                  "worklist_id": "arm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_arm_alarm"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_011"
+                  "detail_id": "dt_arm_alarm"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "state": "enabled"
+                  "final_id": "fn_arm_alarm"
                 }
               },
               {
-                "tool": "get_camera_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "arm_alarm",
                 "args": {
-                  "zone_id": "zn_020"
+                  "mode": "away"
                 }
               },
               {
-                "tool": "get_camera_fixture",
+                "tool": "get_set_lock_autolock_wl",
                 "args": {
-                  "room": "Garage"
+                  "worklist_id": "set_lock_autolock_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_012"
+                  "spec_id": "sp_set_lock_autolock"
                 }
               },
               {
-                "tool": "set_camera_state",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "cam_garage",
-                  "state": "enabled"
+                  "detail_id": "dt_set_lock_autolock"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_lock_autolock"
+                }
+              },
+              {
+                "tool": "set_lock_autolock",
+                "args": {
+                  "device_id": "lock_courtyard_gate",
+                  "minutes": 180
                 }
               }
             ],
@@ -4293,12 +4636,12 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.cam_side.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.mode",
+                "value": "away"
               },
               {
-                "path": "devices.cam_garage.state",
-                "value": "enabled"
+                "path": "devices.lock_courtyard_gate.autolock_minutes",
+                "value": "180"
               }
             ]
           },
@@ -4308,7 +4651,9 @@
             "calls": [
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4337,7 +4682,9 @@
               },
               {
                 "tool": "get_sensor_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "sensor_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4365,61 +4712,64 @@
                 }
               },
               {
-                "tool": "get_sensor_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_add_guest_access_wl",
                 "args": {
-                  "zone_id": "zn_027"
+                  "worklist_id": "add_guest_access_wl1"
                 }
               },
               {
-                "tool": "get_sensor_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Front Door"
+                  "spec_id": "sp_add_guest_access"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_015"
+                  "detail_id": "dt_add_guest_access"
                 }
               },
               {
-                "tool": "set_sensor_state",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "sensor_front",
-                  "state": "enabled"
+                  "final_id": "fn_add_guest_access"
                 }
               },
               {
-                "tool": "get_sensor_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "add_guest_access",
                 "args": {
-                  "zone_id": "zn_028"
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
                 }
               },
               {
-                "tool": "get_sensor_fixture",
+                "tool": "get_disarm_alarm_wl",
                 "args": {
-                  "room": "Office"
+                  "worklist_id": "disarm_alarm_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_016"
+                  "spec_id": "sp_disarm_alarm"
                 }
               },
               {
-                "tool": "set_sensor_state",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "sensor_office",
-                  "state": "enabled"
+                  "detail_id": "dt_disarm_alarm"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_disarm_alarm"
+                }
+              },
+              {
+                "tool": "disarm_alarm",
+                "args": {
+                  "pin": "519734"
                 }
               }
             ],
@@ -4433,12 +4783,15 @@
                 "value": "enabled"
               },
               {
-                "path": "devices.sensor_front.state",
-                "value": "enabled"
+                "path": "guest_access",
+                "appended": {
+                  "name": "Housekeeper Dana Reyes",
+                  "pin": "748215"
+                }
               },
               {
-                "path": "devices.sensor_office.state",
-                "value": "enabled"
+                "path": "devices.alarm_main.state",
+                "value": "disarmed"
               }
             ]
           },
@@ -4448,7 +4801,9 @@
             "calls": [
               {
                 "tool": "get_clip_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "clip_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4477,7 +4832,9 @@
               },
               {
                 "tool": "get_clip_jobs",
-                "args": {}
+                "args": {
+                  "worklist_id": "clip_jobs_wl2"
+                }
               },
               {
                 "tool": "get_zone",
@@ -4505,61 +4862,67 @@
                 }
               },
               {
-                "tool": "get_clip_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "get_create_automation_wl",
                 "args": {
-                  "zone_id": "zn_035"
+                  "worklist_id": "create_automation_wl1"
                 }
               },
               {
-                "tool": "get_clip_fixture",
+                "tool": "get_op_spec",
                 "args": {
-                  "room": "Side Gate"
+                  "spec_id": "sp_create_automation"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "slot_id": "fx_019"
+                  "detail_id": "dt_create_automation"
                 }
               },
               {
-                "tool": "save_camera_clip",
+                "tool": "get_op_final",
                 "args": {
-                  "device_id": "cam_side",
-                  "duration": 30
+                  "final_id": "fn_create_automation"
                 }
               },
               {
-                "tool": "get_clip_jobs",
-                "args": {}
-              },
-              {
-                "tool": "get_zone",
+                "tool": "create_automation",
                 "args": {
-                  "zone_id": "zn_036"
+                  "name": "Nightly Perimeter Arming",
+                  "trigger": "sunset_plus_thirty_minutes",
+                  "actions": "Arm the alarm in away mode and close all downstairs blinds."
                 }
               },
               {
-                "tool": "get_clip_fixture",
+                "tool": "get_set_thermostat_wl",
                 "args": {
-                  "room": "Garage"
+                  "worklist_id": "set_thermostat_wl1"
                 }
               },
               {
-                "tool": "get_device_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "slot_id": "fx_020"
+                  "spec_id": "sp_set_thermostat"
                 }
               },
               {
-                "tool": "save_camera_clip",
+                "tool": "get_op_detail",
                 "args": {
-                  "device_id": "cam_garage",
-                  "duration": 30
+                  "detail_id": "dt_set_thermostat"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_set_thermostat"
+                }
+              },
+              {
+                "tool": "set_thermostat",
+                "args": {
+                  "device_id": "thermostat_upstairs_hall",
+                  "target_temperature": 210,
+                  "mode": "heat"
                 }
               }
             ],
@@ -4579,18 +4942,16 @@
                 }
               },
               {
-                "path": "clips",
+                "path": "automations",
                 "appended": {
-                  "camera": "cam_side",
-                  "duration": "30"
+                  "name": "Nightly Perimeter Arming",
+                  "trigger": "sunset_plus_thirty_minutes",
+                  "actions": "Arm the alarm in away mode and close all downstairs blinds."
                 }
               },
               {
-                "path": "clips",
-                "appended": {
-                  "camera": "cam_garage",
-                  "duration": "30"
-                }
+                "path": "devices.thermostat_upstairs_hall.target_temperature",
+                "value": "210"
               }
             ]
           }
@@ -4920,7 +5281,7 @@
       "alarm_main": {
         "type": "alarm",
         "room": "Whole Home",
-        "state": "disarmed"
+        "state": "armed"
       },
       "cam_side": {
         "type": "camera",
@@ -5581,7 +5942,861 @@
         "zone": "zn_040",
         "already_archived": true
       }
-    ]
+    ],
+    "light_jobs_wl": {
+      "light_jobs_wl2": [
+        {
+          "job_id": "lj_1",
+          "zone": "zn_001",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_2",
+          "zone": "zn_002",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_d1",
+          "zone": "zn_005",
+          "already_on": true
+        },
+        {
+          "job_id": "lj_d2",
+          "zone": "zn_006",
+          "already_on": true
+        }
+      ],
+      "light_jobs_wl3": [
+        {
+          "job_id": "lj_1",
+          "zone": "zn_001",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_2",
+          "zone": "zn_002",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_3",
+          "zone": "zn_003",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_d1",
+          "zone": "zn_005",
+          "already_on": true
+        },
+        {
+          "job_id": "lj_d2",
+          "zone": "zn_006",
+          "already_on": true
+        },
+        {
+          "job_id": "lj_d3",
+          "zone": "zn_007",
+          "already_on": true
+        }
+      ],
+      "light_jobs_wl4": [
+        {
+          "job_id": "lj_1",
+          "zone": "zn_001",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_2",
+          "zone": "zn_002",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_3",
+          "zone": "zn_003",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_4",
+          "zone": "zn_004",
+          "already_on": false
+        },
+        {
+          "job_id": "lj_d1",
+          "zone": "zn_005",
+          "already_on": true
+        },
+        {
+          "job_id": "lj_d2",
+          "zone": "zn_006",
+          "already_on": true
+        },
+        {
+          "job_id": "lj_d3",
+          "zone": "zn_007",
+          "already_on": true
+        },
+        {
+          "job_id": "lj_d4",
+          "zone": "zn_008",
+          "already_on": true
+        }
+      ]
+    },
+    "lock_jobs_wl": {
+      "lock_jobs_wl2": [
+        {
+          "job_id": "kj_1",
+          "zone": "zn_009",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_2",
+          "zone": "zn_010",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_d1",
+          "zone": "zn_013",
+          "already_locked": true
+        },
+        {
+          "job_id": "kj_d2",
+          "zone": "zn_014",
+          "already_locked": true
+        }
+      ],
+      "lock_jobs_wl3": [
+        {
+          "job_id": "kj_1",
+          "zone": "zn_009",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_2",
+          "zone": "zn_010",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_3",
+          "zone": "zn_011",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_d1",
+          "zone": "zn_013",
+          "already_locked": true
+        },
+        {
+          "job_id": "kj_d2",
+          "zone": "zn_014",
+          "already_locked": true
+        },
+        {
+          "job_id": "kj_d3",
+          "zone": "zn_015",
+          "already_locked": true
+        }
+      ],
+      "lock_jobs_wl4": [
+        {
+          "job_id": "kj_1",
+          "zone": "zn_009",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_2",
+          "zone": "zn_010",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_3",
+          "zone": "zn_011",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_4",
+          "zone": "zn_012",
+          "already_locked": false
+        },
+        {
+          "job_id": "kj_d1",
+          "zone": "zn_013",
+          "already_locked": true
+        },
+        {
+          "job_id": "kj_d2",
+          "zone": "zn_014",
+          "already_locked": true
+        },
+        {
+          "job_id": "kj_d3",
+          "zone": "zn_015",
+          "already_locked": true
+        },
+        {
+          "job_id": "kj_d4",
+          "zone": "zn_016",
+          "already_locked": true
+        }
+      ]
+    },
+    "camera_jobs_wl": {
+      "camera_jobs_wl2": [
+        {
+          "job_id": "cj_1",
+          "zone": "zn_017",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_2",
+          "zone": "zn_018",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_d1",
+          "zone": "zn_021",
+          "already_enabled": true
+        },
+        {
+          "job_id": "cj_d2",
+          "zone": "zn_022",
+          "already_enabled": true
+        }
+      ],
+      "camera_jobs_wl3": [
+        {
+          "job_id": "cj_1",
+          "zone": "zn_017",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_2",
+          "zone": "zn_018",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_3",
+          "zone": "zn_019",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_d1",
+          "zone": "zn_021",
+          "already_enabled": true
+        },
+        {
+          "job_id": "cj_d2",
+          "zone": "zn_022",
+          "already_enabled": true
+        },
+        {
+          "job_id": "cj_d3",
+          "zone": "zn_023",
+          "already_enabled": true
+        }
+      ],
+      "camera_jobs_wl4": [
+        {
+          "job_id": "cj_1",
+          "zone": "zn_017",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_2",
+          "zone": "zn_018",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_3",
+          "zone": "zn_019",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_4",
+          "zone": "zn_020",
+          "already_enabled": false
+        },
+        {
+          "job_id": "cj_d1",
+          "zone": "zn_021",
+          "already_enabled": true
+        },
+        {
+          "job_id": "cj_d2",
+          "zone": "zn_022",
+          "already_enabled": true
+        },
+        {
+          "job_id": "cj_d3",
+          "zone": "zn_023",
+          "already_enabled": true
+        },
+        {
+          "job_id": "cj_d4",
+          "zone": "zn_024",
+          "already_enabled": true
+        }
+      ]
+    },
+    "sensor_jobs_wl": {
+      "sensor_jobs_wl2": [
+        {
+          "job_id": "sj_1",
+          "zone": "zn_025",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_2",
+          "zone": "zn_026",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_d1",
+          "zone": "zn_029",
+          "already_enabled": true
+        },
+        {
+          "job_id": "sj_d2",
+          "zone": "zn_030",
+          "already_enabled": true
+        }
+      ],
+      "sensor_jobs_wl3": [
+        {
+          "job_id": "sj_1",
+          "zone": "zn_025",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_2",
+          "zone": "zn_026",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_3",
+          "zone": "zn_027",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_d1",
+          "zone": "zn_029",
+          "already_enabled": true
+        },
+        {
+          "job_id": "sj_d2",
+          "zone": "zn_030",
+          "already_enabled": true
+        },
+        {
+          "job_id": "sj_d3",
+          "zone": "zn_031",
+          "already_enabled": true
+        }
+      ],
+      "sensor_jobs_wl4": [
+        {
+          "job_id": "sj_1",
+          "zone": "zn_025",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_2",
+          "zone": "zn_026",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_3",
+          "zone": "zn_027",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_4",
+          "zone": "zn_028",
+          "already_enabled": false
+        },
+        {
+          "job_id": "sj_d1",
+          "zone": "zn_029",
+          "already_enabled": true
+        },
+        {
+          "job_id": "sj_d2",
+          "zone": "zn_030",
+          "already_enabled": true
+        },
+        {
+          "job_id": "sj_d3",
+          "zone": "zn_031",
+          "already_enabled": true
+        },
+        {
+          "job_id": "sj_d4",
+          "zone": "zn_032",
+          "already_enabled": true
+        }
+      ]
+    },
+    "clip_jobs_wl": {
+      "clip_jobs_wl2": [
+        {
+          "job_id": "pj_1",
+          "zone": "zn_033",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_2",
+          "zone": "zn_034",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_d1",
+          "zone": "zn_037",
+          "already_archived": true
+        },
+        {
+          "job_id": "pj_d2",
+          "zone": "zn_038",
+          "already_archived": true
+        }
+      ],
+      "clip_jobs_wl3": [
+        {
+          "job_id": "pj_1",
+          "zone": "zn_033",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_2",
+          "zone": "zn_034",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_3",
+          "zone": "zn_035",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_d1",
+          "zone": "zn_037",
+          "already_archived": true
+        },
+        {
+          "job_id": "pj_d2",
+          "zone": "zn_038",
+          "already_archived": true
+        },
+        {
+          "job_id": "pj_d3",
+          "zone": "zn_039",
+          "already_archived": true
+        }
+      ],
+      "clip_jobs_wl4": [
+        {
+          "job_id": "pj_1",
+          "zone": "zn_033",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_2",
+          "zone": "zn_034",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_3",
+          "zone": "zn_035",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_4",
+          "zone": "zn_036",
+          "already_archived": false
+        },
+        {
+          "job_id": "pj_d1",
+          "zone": "zn_037",
+          "already_archived": true
+        },
+        {
+          "job_id": "pj_d2",
+          "zone": "zn_038",
+          "already_archived": true
+        },
+        {
+          "job_id": "pj_d3",
+          "zone": "zn_039",
+          "already_archived": true
+        },
+        {
+          "job_id": "pj_d4",
+          "zone": "zn_040",
+          "already_archived": true
+        }
+      ]
+    },
+    "op_specs": {
+      "sp_send_notification": {
+        "detail": "dt_send_notification"
+      },
+      "sp_send_notification_d": {
+        "detail": "dt_send_notification_d"
+      },
+      "sp_set_occupancy": {
+        "detail": "dt_set_occupancy"
+      },
+      "sp_set_occupancy_d": {
+        "detail": "dt_set_occupancy_d"
+      },
+      "sp_set_blinds": {
+        "detail": "dt_set_blinds"
+      },
+      "sp_set_blinds_d": {
+        "detail": "dt_set_blinds_d"
+      },
+      "sp_unlock_door": {
+        "detail": "dt_unlock_door"
+      },
+      "sp_unlock_door_d": {
+        "detail": "dt_unlock_door_d"
+      },
+      "sp_arm_alarm": {
+        "detail": "dt_arm_alarm"
+      },
+      "sp_arm_alarm_d": {
+        "detail": "dt_arm_alarm_d"
+      },
+      "sp_set_lock_autolock": {
+        "detail": "dt_set_lock_autolock"
+      },
+      "sp_set_lock_autolock_d": {
+        "detail": "dt_set_lock_autolock_d"
+      },
+      "sp_add_guest_access": {
+        "detail": "dt_add_guest_access"
+      },
+      "sp_add_guest_access_d": {
+        "detail": "dt_add_guest_access_d"
+      },
+      "sp_disarm_alarm": {
+        "detail": "dt_disarm_alarm"
+      },
+      "sp_disarm_alarm_d": {
+        "detail": "dt_disarm_alarm_d"
+      },
+      "sp_create_automation": {
+        "detail": "dt_create_automation"
+      },
+      "sp_create_automation_d": {
+        "detail": "dt_create_automation_d"
+      },
+      "sp_set_thermostat": {
+        "detail": "dt_set_thermostat"
+      },
+      "sp_set_thermostat_d": {
+        "detail": "dt_set_thermostat_d"
+      }
+    },
+    "op_details": {
+      "dt_send_notification": {
+        "final": "fn_send_notification"
+      },
+      "dt_send_notification_d": {
+        "final": "fn_send_notification_d"
+      },
+      "dt_set_occupancy": {
+        "final": "fn_set_occupancy"
+      },
+      "dt_set_occupancy_d": {
+        "final": "fn_set_occupancy_d"
+      },
+      "dt_set_blinds": {
+        "final": "fn_set_blinds"
+      },
+      "dt_set_blinds_d": {
+        "final": "fn_set_blinds_d"
+      },
+      "dt_unlock_door": {
+        "final": "fn_unlock_door"
+      },
+      "dt_unlock_door_d": {
+        "final": "fn_unlock_door_d"
+      },
+      "dt_arm_alarm": {
+        "final": "fn_arm_alarm"
+      },
+      "dt_arm_alarm_d": {
+        "final": "fn_arm_alarm_d"
+      },
+      "dt_set_lock_autolock": {
+        "final": "fn_set_lock_autolock"
+      },
+      "dt_set_lock_autolock_d": {
+        "final": "fn_set_lock_autolock_d"
+      },
+      "dt_add_guest_access": {
+        "final": "fn_add_guest_access"
+      },
+      "dt_add_guest_access_d": {
+        "final": "fn_add_guest_access_d"
+      },
+      "dt_disarm_alarm": {
+        "final": "fn_disarm_alarm"
+      },
+      "dt_disarm_alarm_d": {
+        "final": "fn_disarm_alarm_d"
+      },
+      "dt_create_automation": {
+        "final": "fn_create_automation"
+      },
+      "dt_create_automation_d": {
+        "final": "fn_create_automation_d"
+      },
+      "dt_set_thermostat": {
+        "final": "fn_set_thermostat"
+      },
+      "dt_set_thermostat_d": {
+        "final": "fn_set_thermostat_d"
+      }
+    },
+    "op_finals": {
+      "fn_send_notification": {
+        "message": "Evening routine started; entry lights brought up to scene level."
+      },
+      "fn_send_notification_d": {
+        "message": "Unverified broadcast draft; do not deliver to the owner phone."
+      },
+      "fn_set_occupancy": {
+        "person": "Marisol Alvarez",
+        "room": "Sunroom"
+      },
+      "fn_set_occupancy_d": {
+        "person": "Unknown Visitor",
+        "room": "Detached Annex"
+      },
+      "fn_set_blinds": {
+        "device_id": "blinds_living_room",
+        "position": "closed"
+      },
+      "fn_set_blinds_d": {
+        "device_id": "blinds_annex_lookalike",
+        "position": "open"
+      },
+      "fn_unlock_door": {
+        "device_id": "lock_service_entrance"
+      },
+      "fn_unlock_door_d": {
+        "device_id": "lock_annex_decoy"
+      },
+      "fn_arm_alarm": {
+        "mode": "away"
+      },
+      "fn_arm_alarm_d": {
+        "mode": "home"
+      },
+      "fn_set_lock_autolock": {
+        "device_id": "lock_courtyard_gate",
+        "minutes": 180
+      },
+      "fn_set_lock_autolock_d": {
+        "device_id": "lock_annex_gate",
+        "minutes": 990
+      },
+      "fn_add_guest_access": {
+        "name": "Housekeeper Dana Reyes",
+        "pin": "748215"
+      },
+      "fn_add_guest_access_d": {
+        "name": "Unverified Solicitor",
+        "pin": "300197"
+      },
+      "fn_disarm_alarm": {
+        "pin": "519734"
+      },
+      "fn_disarm_alarm_d": {
+        "pin": "864200"
+      },
+      "fn_create_automation": {
+        "name": "Nightly Perimeter Arming",
+        "trigger": "sunset_plus_thirty_minutes",
+        "actions": "Arm the alarm in away mode and close all downstairs blinds."
+      },
+      "fn_create_automation_d": {
+        "name": "Disabled Debug Rule",
+        "trigger": "manual_never_fires",
+        "actions": "Placeholder rule that must not be created."
+      },
+      "fn_set_thermostat": {
+        "device_id": "thermostat_upstairs_hall",
+        "target_temperature": 210,
+        "mode": "heat"
+      },
+      "fn_set_thermostat_d": {
+        "device_id": "thermostat_annex_unit",
+        "target_temperature": 355,
+        "mode": "cool"
+      }
+    },
+    "defi": {
+      "send_notification_wl": {
+        "send_notification_wl1": [
+          {
+            "ticket_id": "send_notification_1",
+            "spec": "sp_send_notification",
+            "stale": false,
+            "label": "post the evening-routine status notification"
+          },
+          {
+            "ticket_id": "send_notification_d1",
+            "spec": "sp_send_notification_d",
+            "stale": true,
+            "label": "post the evening-routine status notification (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "set_occupancy_wl": {
+        "set_occupancy_wl1": [
+          {
+            "ticket_id": "set_occupancy_1",
+            "spec": "sp_set_occupancy",
+            "stale": false,
+            "label": "record the sunroom occupancy update"
+          },
+          {
+            "ticket_id": "set_occupancy_d1",
+            "spec": "sp_set_occupancy_d",
+            "stale": true,
+            "label": "record the sunroom occupancy update (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "set_blinds_wl": {
+        "set_blinds_wl1": [
+          {
+            "ticket_id": "set_blinds_1",
+            "spec": "sp_set_blinds",
+            "stale": false,
+            "label": "close the living-room blinds"
+          },
+          {
+            "ticket_id": "set_blinds_d1",
+            "spec": "sp_set_blinds_d",
+            "stale": true,
+            "label": "close the living-room blinds (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "unlock_door_wl": {
+        "unlock_door_wl1": [
+          {
+            "ticket_id": "unlock_door_1",
+            "spec": "sp_unlock_door",
+            "stale": false,
+            "label": "unlock the service-entrance door for the arriving contractor"
+          },
+          {
+            "ticket_id": "unlock_door_d1",
+            "spec": "sp_unlock_door_d",
+            "stale": true,
+            "label": "unlock the service-entrance door for the arriving contractor (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "arm_alarm_wl": {
+        "arm_alarm_wl1": [
+          {
+            "ticket_id": "arm_alarm_1",
+            "spec": "sp_arm_alarm",
+            "stale": false,
+            "label": "arm the perimeter security in away mode"
+          },
+          {
+            "ticket_id": "arm_alarm_d1",
+            "spec": "sp_arm_alarm_d",
+            "stale": true,
+            "label": "arm the perimeter security in away mode (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "set_lock_autolock_wl": {
+        "set_lock_autolock_wl1": [
+          {
+            "ticket_id": "set_lock_autolock_1",
+            "spec": "sp_set_lock_autolock",
+            "stale": false,
+            "label": "set the courtyard-gate auto-relock delay"
+          },
+          {
+            "ticket_id": "set_lock_autolock_d1",
+            "spec": "sp_set_lock_autolock_d",
+            "stale": true,
+            "label": "set the courtyard-gate auto-relock delay (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "add_guest_access_wl": {
+        "add_guest_access_wl1": [
+          {
+            "ticket_id": "add_guest_access_1",
+            "spec": "sp_add_guest_access",
+            "stale": false,
+            "label": "grant the housekeeper a door PIN"
+          },
+          {
+            "ticket_id": "add_guest_access_d1",
+            "spec": "sp_add_guest_access_d",
+            "stale": true,
+            "label": "grant the housekeeper a door PIN (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "disarm_alarm_wl": {
+        "disarm_alarm_wl1": [
+          {
+            "ticket_id": "disarm_alarm_1",
+            "spec": "sp_disarm_alarm",
+            "stale": false,
+            "label": "disarm the alarm using the maintenance PIN"
+          },
+          {
+            "ticket_id": "disarm_alarm_d1",
+            "spec": "sp_disarm_alarm_d",
+            "stale": true,
+            "label": "disarm the alarm using the maintenance PIN (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "create_automation_wl": {
+        "create_automation_wl1": [
+          {
+            "ticket_id": "create_automation_1",
+            "spec": "sp_create_automation",
+            "stale": false,
+            "label": "create the nightly perimeter-arming automation"
+          },
+          {
+            "ticket_id": "create_automation_d1",
+            "spec": "sp_create_automation_d",
+            "stale": true,
+            "label": "create the nightly perimeter-arming automation (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "set_thermostat_wl": {
+        "set_thermostat_wl1": [
+          {
+            "ticket_id": "set_thermostat_1",
+            "spec": "sp_set_thermostat",
+            "stale": false,
+            "label": "set the upstairs thermostat overnight setpoint"
+          },
+          {
+            "ticket_id": "set_thermostat_d1",
+            "spec": "sp_set_thermostat_d",
+            "stale": true,
+            "label": "set the upstairs thermostat overnight setpoint (SUPERSEDED look-alike)"
+          }
+        ]
+      }
+    }
   },
   "tool_groups": {
     "agent_1": [
@@ -5610,5 +6825,33 @@
       "set_thermostat"
     ]
   },
-  "indirection": true
+  "indirection": true,
+  "worklist_payable": {
+    "light_jobs_wl2": 2,
+    "light_jobs_wl3": 3,
+    "light_jobs_wl4": 4,
+    "lock_jobs_wl2": 2,
+    "lock_jobs_wl3": 3,
+    "lock_jobs_wl4": 4,
+    "camera_jobs_wl2": 2,
+    "camera_jobs_wl3": 3,
+    "camera_jobs_wl4": 4,
+    "sensor_jobs_wl2": 2,
+    "sensor_jobs_wl3": 3,
+    "sensor_jobs_wl4": 4,
+    "clip_jobs_wl2": 2,
+    "clip_jobs_wl3": 3,
+    "clip_jobs_wl4": 4,
+    "send_notification_wl1": 1,
+    "set_occupancy_wl1": 1,
+    "set_blinds_wl1": 1,
+    "unlock_door_wl1": 1,
+    "arm_alarm_wl1": 1,
+    "set_lock_autolock_wl1": 1,
+    "add_guest_access_wl1": 1,
+    "disarm_alarm_wl1": 1,
+    "create_automation_wl1": 1,
+    "set_thermostat_wl1": 1
+  },
+  "worklist_tiers": true
 }

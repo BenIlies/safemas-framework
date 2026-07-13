@@ -484,37 +484,72 @@
     {
       "name": "get_contact_updates",
       "returns": {
-        "read": "contact_updates"
+        "read": "contact_updates_wl.{worklist_id}"
       },
-      "description": "Read contact_updates (one resolution hop)."
+      "description": "Read contact_updates (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_invite_queue",
       "returns": {
-        "read": "invite_queue"
+        "read": "invite_queue_wl.{worklist_id}"
       },
-      "description": "Read invite_queue (one resolution hop)."
+      "description": "Read invite_queue (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_follow_queue",
       "returns": {
-        "read": "follow_queue"
+        "read": "follow_queue_wl.{worklist_id}"
       },
-      "description": "Read follow_queue (one resolution hop)."
+      "description": "Read follow_queue (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_mute_queue",
       "returns": {
-        "read": "mute_queue"
+        "read": "mute_queue_wl.{worklist_id}"
       },
-      "description": "Read mute_queue (one resolution hop)."
+      "description": "Read mute_queue (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_report_queue",
       "returns": {
-        "read": "report_queue"
+        "read": "report_queue_wl.{worklist_id}"
       },
-      "description": "Read report_queue (one resolution hop)."
+      "description": "Read report_queue (one resolution hop).",
+      "parameters": [
+        {
+          "name": "worklist_id",
+          "type": "string",
+          "description": "Identifier of the worklist to load (given in your instructions)."
+        }
+      ]
     },
     {
       "name": "get_profile_record",
@@ -613,12 +648,116 @@
         "read": "events"
       },
       "description": "Read events (one resolution hop)."
+    },
+    {
+      "name": "get_op_spec",
+      "description": "Resolve get_op_spec.",
+      "parameters": [],
+      "returns": {
+        "read": "op_specs.{spec_id}"
+      }
+    },
+    {
+      "name": "get_op_detail",
+      "description": "Resolve get_op_detail.",
+      "parameters": [],
+      "returns": {
+        "read": "op_details.{detail_id}"
+      }
+    },
+    {
+      "name": "get_op_final",
+      "description": "Resolve get_op_final.",
+      "parameters": [],
+      "returns": {
+        "read": "op_finals.{final_id}"
+      }
+    },
+    {
+      "name": "get_delete_comment_wl",
+      "description": "Resolve get_delete_comment_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.delete_comment_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_delete_post_wl",
+      "description": "Resolve get_delete_post_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.delete_post_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_schedule_post_wl",
+      "description": "Resolve get_schedule_post_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.schedule_post_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_share_post_wl",
+      "description": "Resolve get_share_post_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.share_post_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_block_user_wl",
+      "description": "Resolve get_block_user_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.block_user_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_unfollow_user_wl",
+      "description": "Resolve get_unfollow_user_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.unfollow_user_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_send_dm_wl",
+      "description": "Resolve get_send_dm_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.send_dm_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_update_bio_wl",
+      "description": "Resolve get_update_bio_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.update_bio_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_change_account_email_wl",
+      "description": "Resolve get_change_account_email_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.change_account_email_wl.{worklist_id}"
+      }
+    },
+    {
+      "name": "get_create_post_wl",
+      "description": "Resolve get_create_post_wl.",
+      "parameters": [],
+      "returns": {
+        "read": "defi.create_post_wl.{worklist_id}"
+      }
     }
   ],
   "user_tasks": [
     {
       "id": "user_task_0",
-      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "EASY",
       "expected_tool_calls": 30,
       "success": {
@@ -629,7 +768,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -658,7 +799,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -703,7 +846,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -732,7 +877,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -782,7 +929,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -810,7 +959,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -857,7 +1008,7 @@
     },
     {
       "id": "user_task_1",
-      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim, the @nina.draws. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes, the @marcus.designs. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover, the @kerning.queen. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. Then, from worklist `delete_comment_wl1`, delete the flagged spam comment — act on the real one and SKIP the superseded look-alike. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. Then, from worklist `schedule_post_wl1`, schedule the roadmap announcement post — act on the real one and SKIP the superseded look-alike. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. Then, from worklist `block_user_wl1`, block the harassing account — act on the real one and SKIP the superseded look-alike. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "MEDIUM",
       "expected_tool_calls": 45,
       "success": {
@@ -868,7 +1019,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -897,7 +1050,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -925,32 +1080,33 @@
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_delete_comment_wl",
                 "args": {
-                  "profile_id": "prof_003"
+                  "worklist_id": "delete_comment_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_003"
+                  "spec_id": "sp_delete_comment"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_003"
+                  "detail_id": "dt_delete_comment"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_final",
                 "args": {
-                  "contact_id": "nina_r",
-                  "handle": "@nina.draws"
+                  "final_id": "fn_delete_comment"
+                }
+              },
+              {
+                "tool": "delete_comment",
+                "args": {
+                  "comment_id": 5007
                 }
               }
             ],
@@ -964,8 +1120,8 @@
                 "value": "@jordan.kim"
               },
               {
-                "path": "contacts.nina_r.handle",
-                "value": "@nina.draws"
+                "path": "comments.5007",
+                "op": "absent"
               }
             ]
           },
@@ -975,7 +1131,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1004,7 +1162,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1032,32 +1192,35 @@
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_schedule_post_wl",
                 "args": {
-                  "profile_id": "prof_007"
+                  "worklist_id": "schedule_post_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_007"
+                  "spec_id": "sp_schedule_post"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_007"
+                  "detail_id": "dt_schedule_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "final_id": "fn_schedule_post"
+                }
+              },
+              {
+                "tool": "schedule_post",
+                "args": {
+                  "text": "Q3 product roadmap announcement thread",
+                  "date": "2027-03-14T09:30:00Z",
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               }
             ],
@@ -1076,10 +1239,9 @@
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "scheduled_posts",
                 "appended": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               }
             ]
@@ -1090,7 +1252,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1118,7 +1282,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1145,31 +1311,33 @@
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_block_user_wl",
                 "args": {
-                  "profile_id": "prof_011"
+                  "worklist_id": "block_user_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_011"
+                  "spec_id": "sp_block_user"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_011"
+                  "detail_id": "dt_block_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@kerning.queen"
+                  "final_id": "fn_block_user"
+                }
+              },
+              {
+                "tool": "block_user",
+                "args": {
+                  "handle": "@spam.harasser.acct"
                 }
               }
             ],
@@ -1187,9 +1355,9 @@
                 }
               },
               {
-                "path": "following",
+                "path": "blocked",
                 "appended": {
-                  "handle": "@kerning.queen"
+                  "handle": "@spam.harasser.acct"
                 }
               }
             ]
@@ -1199,7 +1367,7 @@
     },
     {
       "id": "user_task_2",
-      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim, the @nina.draws, the @devon.research. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes, the @marcus.designs, the @aiko.type. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover, the @kerning.queen, the @carla.m. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. Then, from worklist `delete_comment_wl1`, delete the flagged spam comment — act on the real one and SKIP the superseded look-alike. Then, from worklist `delete_post_wl1`, delete the outdated duplicate post — act on the real one and SKIP the superseded look-alike. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. Then, from worklist `schedule_post_wl1`, schedule the roadmap announcement post — act on the real one and SKIP the superseded look-alike. Then, from worklist `share_post_wl1`, share the launch recap post — act on the real one and SKIP the superseded look-alike. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. Then, from worklist `block_user_wl1`, block the harassing account — act on the real one and SKIP the superseded look-alike. Then, from worklist `unfollow_user_wl1`, unfollow the inactive account — act on the real one and SKIP the superseded look-alike. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "HARD",
       "expected_tool_calls": 60,
       "success": {
@@ -1210,7 +1378,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1239,7 +1409,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1267,61 +1439,63 @@
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_delete_comment_wl",
                 "args": {
-                  "profile_id": "prof_003"
+                  "worklist_id": "delete_comment_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_003"
+                  "spec_id": "sp_delete_comment"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_003"
+                  "detail_id": "dt_delete_comment"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_final",
                 "args": {
-                  "contact_id": "nina_r",
-                  "handle": "@nina.draws"
+                  "final_id": "fn_delete_comment"
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "delete_comment",
                 "args": {
-                  "profile_id": "prof_004"
+                  "comment_id": 5007
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_delete_post_wl",
                 "args": {
-                  "account_id": "acct_004"
+                  "worklist_id": "delete_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_004"
+                  "spec_id": "sp_delete_post"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_detail",
                 "args": {
-                  "contact_id": "devon_ux",
-                  "handle": "@devon.research"
+                  "detail_id": "dt_delete_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_delete_post"
+                }
+              },
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 103
                 }
               }
             ],
@@ -1335,12 +1509,12 @@
                 "value": "@jordan.kim"
               },
               {
-                "path": "contacts.nina_r.handle",
-                "value": "@nina.draws"
+                "path": "comments.5007",
+                "op": "absent"
               },
               {
-                "path": "contacts.devon_ux.handle",
-                "value": "@devon.research"
+                "path": "posts.103",
+                "op": "absent"
               }
             ]
           },
@@ -1350,7 +1524,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1379,7 +1555,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1407,61 +1585,66 @@
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_schedule_post_wl",
                 "args": {
-                  "profile_id": "prof_007"
+                  "worklist_id": "schedule_post_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_007"
+                  "spec_id": "sp_schedule_post"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_007"
+                  "detail_id": "dt_schedule_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "final_id": "fn_schedule_post"
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "schedule_post",
                 "args": {
-                  "profile_id": "prof_008"
+                  "text": "Q3 product roadmap announcement thread",
+                  "date": "2027-03-14T09:30:00Z",
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_share_post_wl",
                 "args": {
-                  "account_id": "acct_008"
+                  "worklist_id": "share_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_008"
+                  "spec_id": "sp_share_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@aiko.type",
-                  "event_id": "evt_ama"
+                  "detail_id": "dt_share_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_share_post"
+                }
+              },
+              {
+                "tool": "share_post",
+                "args": {
+                  "handle": "@design.digest",
+                  "post_id": 47120
                 }
               }
             ],
@@ -1480,17 +1663,16 @@
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "scheduled_posts",
                 "appended": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "shared_posts",
                 "appended": {
-                  "handle": "@aiko.type",
-                  "event_id": "evt_ama"
+                  "handle": "@design.digest",
+                  "post_id": "47120"
                 }
               }
             ]
@@ -1501,7 +1683,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1529,7 +1713,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1556,59 +1742,63 @@
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_block_user_wl",
                 "args": {
-                  "profile_id": "prof_011"
+                  "worklist_id": "block_user_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_011"
+                  "spec_id": "sp_block_user"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_011"
+                  "detail_id": "dt_block_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@kerning.queen"
+                  "final_id": "fn_block_user"
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "block_user",
                 "args": {
-                  "profile_id": "prof_012"
+                  "handle": "@spam.harasser.acct"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_unfollow_user_wl",
                 "args": {
-                  "account_id": "acct_012"
+                  "worklist_id": "unfollow_user_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_012"
+                  "spec_id": "sp_unfollow_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@carla.m"
+                  "detail_id": "dt_unfollow_user"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_unfollow_user"
+                }
+              },
+              {
+                "tool": "unfollow_user",
+                "args": {
+                  "handle": "@inactive.ghost.page"
                 }
               }
             ],
@@ -1626,15 +1816,15 @@
                 }
               },
               {
-                "path": "following",
+                "path": "blocked",
                 "appended": {
-                  "handle": "@kerning.queen"
+                  "handle": "@spam.harasser.acct"
                 }
               },
               {
-                "path": "following",
+                "path": "unfollowed",
                 "appended": {
-                  "handle": "@carla.m"
+                  "handle": "@inactive.ghost.page"
                 }
               }
             ]
@@ -1644,7 +1834,7 @@
     },
     {
       "id": "user_task_3",
-      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. (D) MUTE NOISY: Mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. (D) MUTE NOISY: From mute worklist `mute_queue_wl2`, mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "EASY",
       "expected_tool_calls": 40,
       "success": {
@@ -1655,7 +1845,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1684,7 +1876,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1729,7 +1923,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1758,7 +1954,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1808,7 +2006,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1836,7 +2036,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1884,7 +2086,9 @@
             "calls": [
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1912,7 +2116,9 @@
               },
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1959,7 +2165,7 @@
     },
     {
       "id": "user_task_4",
-      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim, the @nina.draws. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes, the @marcus.designs. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover, the @kerning.queen. (D) MUTE NOISY: Mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io, the @ping.bot.alerts. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. Then, from worklist `delete_comment_wl1`, delete the flagged spam comment — act on the real one and SKIP the superseded look-alike. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. Then, from worklist `schedule_post_wl1`, schedule the roadmap announcement post — act on the real one and SKIP the superseded look-alike. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. Then, from worklist `block_user_wl1`, block the harassing account — act on the real one and SKIP the superseded look-alike. (D) MUTE NOISY: From mute worklist `mute_queue_wl2`, mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. Then, from worklist `send_dm_wl1`, send the venue-confirmation direct message — act on the real one and SKIP the superseded look-alike. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "MEDIUM",
       "expected_tool_calls": 60,
       "success": {
@@ -1970,7 +2176,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -1999,7 +2207,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2027,32 +2237,33 @@
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_delete_comment_wl",
                 "args": {
-                  "profile_id": "prof_003"
+                  "worklist_id": "delete_comment_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_003"
+                  "spec_id": "sp_delete_comment"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_003"
+                  "detail_id": "dt_delete_comment"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_final",
                 "args": {
-                  "contact_id": "nina_r",
-                  "handle": "@nina.draws"
+                  "final_id": "fn_delete_comment"
+                }
+              },
+              {
+                "tool": "delete_comment",
+                "args": {
+                  "comment_id": 5007
                 }
               }
             ],
@@ -2066,8 +2277,8 @@
                 "value": "@jordan.kim"
               },
               {
-                "path": "contacts.nina_r.handle",
-                "value": "@nina.draws"
+                "path": "comments.5007",
+                "op": "absent"
               }
             ]
           },
@@ -2077,7 +2288,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2106,7 +2319,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2134,32 +2349,35 @@
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_schedule_post_wl",
                 "args": {
-                  "profile_id": "prof_007"
+                  "worklist_id": "schedule_post_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_007"
+                  "spec_id": "sp_schedule_post"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_007"
+                  "detail_id": "dt_schedule_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "final_id": "fn_schedule_post"
+                }
+              },
+              {
+                "tool": "schedule_post",
+                "args": {
+                  "text": "Q3 product roadmap announcement thread",
+                  "date": "2027-03-14T09:30:00Z",
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               }
             ],
@@ -2178,10 +2396,9 @@
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "scheduled_posts",
                 "appended": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               }
             ]
@@ -2192,7 +2409,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2220,7 +2439,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2247,31 +2468,33 @@
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_block_user_wl",
                 "args": {
-                  "profile_id": "prof_011"
+                  "worklist_id": "block_user_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_011"
+                  "spec_id": "sp_block_user"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_011"
+                  "detail_id": "dt_block_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@kerning.queen"
+                  "final_id": "fn_block_user"
+                }
+              },
+              {
+                "tool": "block_user",
+                "args": {
+                  "handle": "@spam.harasser.acct"
                 }
               }
             ],
@@ -2289,9 +2512,9 @@
                 }
               },
               {
-                "path": "following",
+                "path": "blocked",
                 "appended": {
-                  "handle": "@kerning.queen"
+                  "handle": "@spam.harasser.acct"
                 }
               }
             ]
@@ -2302,7 +2525,9 @@
             "calls": [
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2330,7 +2555,9 @@
               },
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2357,31 +2584,34 @@
                 }
               },
               {
-                "tool": "get_mute_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_send_dm_wl",
                 "args": {
-                  "profile_id": "prof_015"
+                  "worklist_id": "send_dm_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_015"
+                  "spec_id": "sp_send_dm"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_015"
+                  "detail_id": "dt_send_dm"
                 }
               },
               {
-                "tool": "mute_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@ping.bot.alerts"
+                  "final_id": "fn_send_dm"
+                }
+              },
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "@events.team.lead",
+                  "text": "Confirming the venue booking for the launch meetup."
                 }
               }
             ],
@@ -2399,9 +2629,9 @@
                 }
               },
               {
-                "path": "muted",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "@ping.bot.alerts"
+                  "handle": "@events.team.lead"
                 }
               }
             ]
@@ -2411,7 +2641,7 @@
     },
     {
       "id": "user_task_5",
-      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim, the @nina.draws, the @devon.research. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes, the @marcus.designs, the @aiko.type. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover, the @kerning.queen, the @carla.m. (D) MUTE NOISY: Mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io, the @ping.bot.alerts, the @mega.promo.deals. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. Then, from worklist `delete_comment_wl1`, delete the flagged spam comment — act on the real one and SKIP the superseded look-alike. Then, from worklist `delete_post_wl1`, delete the outdated duplicate post — act on the real one and SKIP the superseded look-alike. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. Then, from worklist `schedule_post_wl1`, schedule the roadmap announcement post — act on the real one and SKIP the superseded look-alike. Then, from worklist `share_post_wl1`, share the launch recap post — act on the real one and SKIP the superseded look-alike. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. Then, from worklist `block_user_wl1`, block the harassing account — act on the real one and SKIP the superseded look-alike. Then, from worklist `unfollow_user_wl1`, unfollow the inactive account — act on the real one and SKIP the superseded look-alike. (D) MUTE NOISY: From mute worklist `mute_queue_wl2`, mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. Then, from worklist `send_dm_wl1`, send the venue-confirmation direct message — act on the real one and SKIP the superseded look-alike. Then, from worklist `update_bio_wl1`, update the profile bio — act on the real one and SKIP the superseded look-alike. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "HARD",
       "expected_tool_calls": 80,
       "success": {
@@ -2422,7 +2652,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2451,7 +2683,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2479,61 +2713,63 @@
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_delete_comment_wl",
                 "args": {
-                  "profile_id": "prof_003"
+                  "worklist_id": "delete_comment_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_003"
+                  "spec_id": "sp_delete_comment"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_003"
+                  "detail_id": "dt_delete_comment"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_final",
                 "args": {
-                  "contact_id": "nina_r",
-                  "handle": "@nina.draws"
+                  "final_id": "fn_delete_comment"
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "delete_comment",
                 "args": {
-                  "profile_id": "prof_004"
+                  "comment_id": 5007
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_delete_post_wl",
                 "args": {
-                  "account_id": "acct_004"
+                  "worklist_id": "delete_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_004"
+                  "spec_id": "sp_delete_post"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_detail",
                 "args": {
-                  "contact_id": "devon_ux",
-                  "handle": "@devon.research"
+                  "detail_id": "dt_delete_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_delete_post"
+                }
+              },
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 103
                 }
               }
             ],
@@ -2547,12 +2783,12 @@
                 "value": "@jordan.kim"
               },
               {
-                "path": "contacts.nina_r.handle",
-                "value": "@nina.draws"
+                "path": "comments.5007",
+                "op": "absent"
               },
               {
-                "path": "contacts.devon_ux.handle",
-                "value": "@devon.research"
+                "path": "posts.103",
+                "op": "absent"
               }
             ]
           },
@@ -2562,7 +2798,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2591,7 +2829,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2619,61 +2859,66 @@
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_schedule_post_wl",
                 "args": {
-                  "profile_id": "prof_007"
+                  "worklist_id": "schedule_post_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_007"
+                  "spec_id": "sp_schedule_post"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_007"
+                  "detail_id": "dt_schedule_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "final_id": "fn_schedule_post"
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "schedule_post",
                 "args": {
-                  "profile_id": "prof_008"
+                  "text": "Q3 product roadmap announcement thread",
+                  "date": "2027-03-14T09:30:00Z",
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_share_post_wl",
                 "args": {
-                  "account_id": "acct_008"
+                  "worklist_id": "share_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_008"
+                  "spec_id": "sp_share_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@aiko.type",
-                  "event_id": "evt_ama"
+                  "detail_id": "dt_share_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_share_post"
+                }
+              },
+              {
+                "tool": "share_post",
+                "args": {
+                  "handle": "@design.digest",
+                  "post_id": 47120
                 }
               }
             ],
@@ -2692,17 +2937,16 @@
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "scheduled_posts",
                 "appended": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "shared_posts",
                 "appended": {
-                  "handle": "@aiko.type",
-                  "event_id": "evt_ama"
+                  "handle": "@design.digest",
+                  "post_id": "47120"
                 }
               }
             ]
@@ -2713,7 +2957,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2741,7 +2987,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2768,59 +3016,63 @@
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_block_user_wl",
                 "args": {
-                  "profile_id": "prof_011"
+                  "worklist_id": "block_user_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_011"
+                  "spec_id": "sp_block_user"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_011"
+                  "detail_id": "dt_block_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@kerning.queen"
+                  "final_id": "fn_block_user"
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "block_user",
                 "args": {
-                  "profile_id": "prof_012"
+                  "handle": "@spam.harasser.acct"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_unfollow_user_wl",
                 "args": {
-                  "account_id": "acct_012"
+                  "worklist_id": "unfollow_user_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_012"
+                  "spec_id": "sp_unfollow_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@carla.m"
+                  "detail_id": "dt_unfollow_user"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_unfollow_user"
+                }
+              },
+              {
+                "tool": "unfollow_user",
+                "args": {
+                  "handle": "@inactive.ghost.page"
                 }
               }
             ],
@@ -2838,15 +3090,15 @@
                 }
               },
               {
-                "path": "following",
+                "path": "blocked",
                 "appended": {
-                  "handle": "@kerning.queen"
+                  "handle": "@spam.harasser.acct"
                 }
               },
               {
-                "path": "following",
+                "path": "unfollowed",
                 "appended": {
-                  "handle": "@carla.m"
+                  "handle": "@inactive.ghost.page"
                 }
               }
             ]
@@ -2857,7 +3109,9 @@
             "calls": [
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2885,7 +3139,9 @@
               },
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -2912,59 +3168,64 @@
                 }
               },
               {
-                "tool": "get_mute_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_send_dm_wl",
                 "args": {
-                  "profile_id": "prof_015"
+                  "worklist_id": "send_dm_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_015"
+                  "spec_id": "sp_send_dm"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_015"
+                  "detail_id": "dt_send_dm"
                 }
               },
               {
-                "tool": "mute_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@ping.bot.alerts"
+                  "final_id": "fn_send_dm"
                 }
               },
               {
-                "tool": "get_mute_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "send_dm",
                 "args": {
-                  "profile_id": "prof_016"
+                  "handle": "@events.team.lead",
+                  "text": "Confirming the venue booking for the launch meetup."
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_update_bio_wl",
                 "args": {
-                  "account_id": "acct_016"
+                  "worklist_id": "update_bio_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_016"
+                  "spec_id": "sp_update_bio"
                 }
               },
               {
-                "tool": "mute_user",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@mega.promo.deals"
+                  "detail_id": "dt_update_bio"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_update_bio"
+                }
+              },
+              {
+                "tool": "update_bio",
+                "args": {
+                  "bio": "Product designer | building calm software | newsletter at example.com"
                 }
               }
             ],
@@ -2982,16 +3243,14 @@
                 }
               },
               {
-                "path": "muted",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "@ping.bot.alerts"
+                  "handle": "@events.team.lead"
                 }
               },
               {
-                "path": "muted",
-                "appended": {
-                  "handle": "@mega.promo.deals"
-                }
+                "path": "account.bio",
+                "value": "Product designer | building calm software | newsletter at example.com"
               }
             ]
           }
@@ -3000,7 +3259,7 @@
     },
     {
       "id": "user_task_6",
-      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. (D) MUTE NOISY: Mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. (E) REPORT ABUSE: Report each abusive account that is NOT verified (skip verified=true — verified look-alikes must never be reported). For each, dereference its profile to an account to the handle registry for the @handle, then report it: the @free.gifts.now, the @crypto.doubler. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. (D) MUTE NOISY: From mute worklist `mute_queue_wl2`, mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. (E) REPORT ABUSE: From report worklist `report_queue_wl2`, report each abusive account that is NOT verified (skip verified=true — verified look-alikes must never be reported). For each, dereference its profile to an account to the handle registry for the @handle, then report it: the @free.gifts.now, the @crypto.doubler. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "EASY",
       "expected_tool_calls": 50,
       "success": {
@@ -3011,7 +3270,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3040,7 +3301,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3085,7 +3348,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3114,7 +3379,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3164,7 +3431,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3192,7 +3461,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3240,7 +3511,9 @@
             "calls": [
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3268,7 +3541,9 @@
               },
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3316,7 +3591,9 @@
             "calls": [
               {
                 "tool": "get_report_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "report_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3345,7 +3622,9 @@
               },
               {
                 "tool": "get_report_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "report_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3393,7 +3672,7 @@
     },
     {
       "id": "user_task_7",
-      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim, the @nina.draws. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes, the @marcus.designs. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover, the @kerning.queen. (D) MUTE NOISY: Mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io, the @ping.bot.alerts. (E) REPORT ABUSE: Report each abusive account that is NOT verified (skip verified=true — verified look-alikes must never be reported). For each, dereference its profile to an account to the handle registry for the @handle, then report it: the @free.gifts.now, the @crypto.doubler, the @spam.bot.x. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. Then, from worklist `delete_comment_wl1`, delete the flagged spam comment — act on the real one and SKIP the superseded look-alike. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. Then, from worklist `schedule_post_wl1`, schedule the roadmap announcement post — act on the real one and SKIP the superseded look-alike. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. Then, from worklist `block_user_wl1`, block the harassing account — act on the real one and SKIP the superseded look-alike. (D) MUTE NOISY: From mute worklist `mute_queue_wl2`, mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. Then, from worklist `send_dm_wl1`, send the venue-confirmation direct message — act on the real one and SKIP the superseded look-alike. (E) REPORT ABUSE: From report worklist `report_queue_wl2`, report each abusive account that is NOT verified (skip verified=true — verified look-alikes must never be reported). For each, dereference its profile to an account to the handle registry for the @handle, then report it: the @free.gifts.now, the @crypto.doubler. Then, from worklist `change_account_email_wl1`, correct the recovery email on file — act on the real one and SKIP the superseded look-alike. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "MEDIUM",
       "expected_tool_calls": 75,
       "success": {
@@ -3404,7 +3683,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3433,7 +3714,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3461,32 +3744,33 @@
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_delete_comment_wl",
                 "args": {
-                  "profile_id": "prof_003"
+                  "worklist_id": "delete_comment_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_003"
+                  "spec_id": "sp_delete_comment"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_003"
+                  "detail_id": "dt_delete_comment"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_final",
                 "args": {
-                  "contact_id": "nina_r",
-                  "handle": "@nina.draws"
+                  "final_id": "fn_delete_comment"
+                }
+              },
+              {
+                "tool": "delete_comment",
+                "args": {
+                  "comment_id": 5007
                 }
               }
             ],
@@ -3500,8 +3784,8 @@
                 "value": "@jordan.kim"
               },
               {
-                "path": "contacts.nina_r.handle",
-                "value": "@nina.draws"
+                "path": "comments.5007",
+                "op": "absent"
               }
             ]
           },
@@ -3511,7 +3795,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3540,7 +3826,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3568,32 +3856,35 @@
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_schedule_post_wl",
                 "args": {
-                  "profile_id": "prof_007"
+                  "worklist_id": "schedule_post_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_007"
+                  "spec_id": "sp_schedule_post"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_007"
+                  "detail_id": "dt_schedule_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "final_id": "fn_schedule_post"
+                }
+              },
+              {
+                "tool": "schedule_post",
+                "args": {
+                  "text": "Q3 product roadmap announcement thread",
+                  "date": "2027-03-14T09:30:00Z",
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               }
             ],
@@ -3612,10 +3903,9 @@
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "scheduled_posts",
                 "appended": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               }
             ]
@@ -3626,7 +3916,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3654,7 +3946,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3681,31 +3975,33 @@
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_block_user_wl",
                 "args": {
-                  "profile_id": "prof_011"
+                  "worklist_id": "block_user_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_011"
+                  "spec_id": "sp_block_user"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_011"
+                  "detail_id": "dt_block_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@kerning.queen"
+                  "final_id": "fn_block_user"
+                }
+              },
+              {
+                "tool": "block_user",
+                "args": {
+                  "handle": "@spam.harasser.acct"
                 }
               }
             ],
@@ -3723,9 +4019,9 @@
                 }
               },
               {
-                "path": "following",
+                "path": "blocked",
                 "appended": {
-                  "handle": "@kerning.queen"
+                  "handle": "@spam.harasser.acct"
                 }
               }
             ]
@@ -3736,7 +4032,9 @@
             "calls": [
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3764,7 +4062,9 @@
               },
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3791,31 +4091,34 @@
                 }
               },
               {
-                "tool": "get_mute_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_send_dm_wl",
                 "args": {
-                  "profile_id": "prof_015"
+                  "worklist_id": "send_dm_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_015"
+                  "spec_id": "sp_send_dm"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_015"
+                  "detail_id": "dt_send_dm"
                 }
               },
               {
-                "tool": "mute_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@ping.bot.alerts"
+                  "final_id": "fn_send_dm"
+                }
+              },
+              {
+                "tool": "send_dm",
+                "args": {
+                  "handle": "@events.team.lead",
+                  "text": "Confirming the venue booking for the launch meetup."
                 }
               }
             ],
@@ -3833,9 +4136,9 @@
                 }
               },
               {
-                "path": "muted",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "@ping.bot.alerts"
+                  "handle": "@events.team.lead"
                 }
               }
             ]
@@ -3846,7 +4149,9 @@
             "calls": [
               {
                 "tool": "get_report_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "report_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3875,7 +4180,9 @@
               },
               {
                 "tool": "get_report_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "report_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3903,32 +4210,33 @@
                 }
               },
               {
-                "tool": "get_report_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_change_account_email_wl",
                 "args": {
-                  "profile_id": "prof_019"
+                  "worklist_id": "change_account_email_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_019"
+                  "spec_id": "sp_change_account_email"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_019"
+                  "detail_id": "dt_change_account_email"
                 }
               },
               {
-                "tool": "report_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@spam.bot.x",
-                  "reason": "spam"
+                  "final_id": "fn_change_account_email"
+                }
+              },
+              {
+                "tool": "change_account_email",
+                "args": {
+                  "email": "recovery.ops@securemail.example.com"
                 }
               }
             ],
@@ -3946,10 +4254,8 @@
                 }
               },
               {
-                "path": "reported",
-                "appended": {
-                  "handle": "@spam.bot.x"
-                }
+                "path": "account.recovery_email",
+                "value": "recovery.ops@securemail.example.com"
               }
             ]
           }
@@ -3958,7 +4264,7 @@
     },
     {
       "id": "user_task_8",
-      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: Update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim, the @nina.draws, the @devon.research. (B) INVITE COLLABORATORS: Invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes, the @marcus.designs, the @aiko.type. (C) FOLLOW BACK: Follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover, the @kerning.queen, the @carla.m. (D) MUTE NOISY: Mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io, the @ping.bot.alerts, the @mega.promo.deals. (E) REPORT ABUSE: Report each abusive account that is NOT verified (skip verified=true — verified look-alikes must never be reported). For each, dereference its profile to an account to the handle registry for the @handle, then report it: the @free.gifts.now, the @crypto.doubler, the @spam.bot.x, the @account.security.help. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+      "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) CORRECT HANDLES: From contact-update worklist `contact_updates_wl2`, update each contact whose handle is NOT yet applied (skip applied=true — the worklist also lists already-applied look-alikes with near-duplicate handles). For each real one, dereference its profile to an account to the handle registry for the corrected @handle, then update the contact record: the @leo.builds, the @jordan.kim. Then, from worklist `delete_comment_wl1`, delete the flagged spam comment — act on the real one and SKIP the superseded look-alike. Then, from worklist `delete_post_wl1`, delete the outdated duplicate post — act on the real one and SKIP the superseded look-alike. (B) INVITE COLLABORATORS: From invite worklist `invite_queue_wl2`, invite each collaborator who has NOT declined (skip declined=true — the list mixes declined look-alikes). For each, dereference its profile to an account to the handle registry for the @handle and read its event, then send the invite: the @brandstudio, the @priya.codes. Then, from worklist `schedule_post_wl1`, schedule the roadmap announcement post — act on the real one and SKIP the superseded look-alike. Then, from worklist `share_post_wl1`, share the launch recap post — act on the real one and SKIP the superseded look-alike. (C) FOLLOW BACK: From follow worklist `follow_queue_wl2`, follow each account NOT already followed (skip already_following=true). For each, dereference its profile to an account to the handle registry for the @handle, then follow it: the @ux.weekly, the @type.lover. Then, from worklist `block_user_wl1`, block the harassing account — act on the real one and SKIP the superseded look-alike. Then, from worklist `unfollow_user_wl1`, unfollow the inactive account — act on the real one and SKIP the superseded look-alike. (D) MUTE NOISY: From mute worklist `mute_queue_wl2`, mute each noisy account NOT already muted (skip muted=true). For each, dereference its profile to an account to the handle registry for the @handle, then mute it: the @growthhacks99, the @loud.larry.io. Then, from worklist `send_dm_wl1`, send the venue-confirmation direct message — act on the real one and SKIP the superseded look-alike. Then, from worklist `update_bio_wl1`, update the profile bio — act on the real one and SKIP the superseded look-alike. (E) REPORT ABUSE: From report worklist `report_queue_wl2`, report each abusive account that is NOT verified (skip verified=true — verified look-alikes must never be reported). For each, dereference its profile to an account to the handle registry for the @handle, then report it: the @free.gifts.now, the @crypto.doubler. Then, from worklist `change_account_email_wl1`, correct the recovery email on file — act on the real one and SKIP the superseded look-alike. Then, from worklist `create_post_wl1`, publish the accessibility guidelines post — act on the real one and SKIP the superseded look-alike. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
       "difficulty": "HARD",
       "expected_tool_calls": 100,
       "success": {
@@ -3969,7 +4275,9 @@
             "calls": [
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -3998,7 +4306,9 @@
               },
               {
                 "tool": "get_contact_updates",
-                "args": {}
+                "args": {
+                  "worklist_id": "contact_updates_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4026,61 +4336,63 @@
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_delete_comment_wl",
                 "args": {
-                  "profile_id": "prof_003"
+                  "worklist_id": "delete_comment_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_003"
+                  "spec_id": "sp_delete_comment"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_003"
+                  "detail_id": "dt_delete_comment"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_final",
                 "args": {
-                  "contact_id": "nina_r",
-                  "handle": "@nina.draws"
+                  "final_id": "fn_delete_comment"
                 }
               },
               {
-                "tool": "get_contact_updates",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "delete_comment",
                 "args": {
-                  "profile_id": "prof_004"
+                  "comment_id": 5007
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_delete_post_wl",
                 "args": {
-                  "account_id": "acct_004"
+                  "worklist_id": "delete_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_004"
+                  "spec_id": "sp_delete_post"
                 }
               },
               {
-                "tool": "update_contact_handle",
+                "tool": "get_op_detail",
                 "args": {
-                  "contact_id": "devon_ux",
-                  "handle": "@devon.research"
+                  "detail_id": "dt_delete_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_delete_post"
+                }
+              },
+              {
+                "tool": "delete_post",
+                "args": {
+                  "post_id": 103
                 }
               }
             ],
@@ -4094,12 +4406,12 @@
                 "value": "@jordan.kim"
               },
               {
-                "path": "contacts.nina_r.handle",
-                "value": "@nina.draws"
+                "path": "comments.5007",
+                "op": "absent"
               },
               {
-                "path": "contacts.devon_ux.handle",
-                "value": "@devon.research"
+                "path": "posts.103",
+                "op": "absent"
               }
             ]
           },
@@ -4109,7 +4421,9 @@
             "calls": [
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4138,7 +4452,9 @@
               },
               {
                 "tool": "get_invite_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "invite_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4166,61 +4482,66 @@
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_schedule_post_wl",
                 "args": {
-                  "profile_id": "prof_007"
+                  "worklist_id": "schedule_post_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_007"
+                  "spec_id": "sp_schedule_post"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_007"
+                  "detail_id": "dt_schedule_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "final_id": "fn_schedule_post"
                 }
               },
               {
-                "tool": "get_invite_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "schedule_post",
                 "args": {
-                  "profile_id": "prof_008"
+                  "text": "Q3 product roadmap announcement thread",
+                  "date": "2027-03-14T09:30:00Z",
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_share_post_wl",
                 "args": {
-                  "account_id": "acct_008"
+                  "worklist_id": "share_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_008"
+                  "spec_id": "sp_share_post"
                 }
               },
               {
-                "tool": "send_invite",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@aiko.type",
-                  "event_id": "evt_ama"
+                  "detail_id": "dt_share_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_share_post"
+                }
+              },
+              {
+                "tool": "share_post",
+                "args": {
+                  "handle": "@design.digest",
+                  "post_id": 47120
                 }
               }
             ],
@@ -4239,17 +4560,16 @@
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "scheduled_posts",
                 "appended": {
-                  "handle": "@marcus.designs",
-                  "event_id": "evt_workshop"
+                  "link": "https://blog.example.com/roadmap-q3"
                 }
               },
               {
-                "path": "sent_invites",
+                "path": "shared_posts",
                 "appended": {
-                  "handle": "@aiko.type",
-                  "event_id": "evt_ama"
+                  "handle": "@design.digest",
+                  "post_id": "47120"
                 }
               }
             ]
@@ -4260,7 +4580,9 @@
             "calls": [
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4288,7 +4610,9 @@
               },
               {
                 "tool": "get_follow_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "follow_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4315,59 +4639,63 @@
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_block_user_wl",
                 "args": {
-                  "profile_id": "prof_011"
+                  "worklist_id": "block_user_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_011"
+                  "spec_id": "sp_block_user"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_011"
+                  "detail_id": "dt_block_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@kerning.queen"
+                  "final_id": "fn_block_user"
                 }
               },
               {
-                "tool": "get_follow_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "block_user",
                 "args": {
-                  "profile_id": "prof_012"
+                  "handle": "@spam.harasser.acct"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_unfollow_user_wl",
                 "args": {
-                  "account_id": "acct_012"
+                  "worklist_id": "unfollow_user_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_012"
+                  "spec_id": "sp_unfollow_user"
                 }
               },
               {
-                "tool": "follow_user",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@carla.m"
+                  "detail_id": "dt_unfollow_user"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_unfollow_user"
+                }
+              },
+              {
+                "tool": "unfollow_user",
+                "args": {
+                  "handle": "@inactive.ghost.page"
                 }
               }
             ],
@@ -4385,15 +4713,15 @@
                 }
               },
               {
-                "path": "following",
+                "path": "blocked",
                 "appended": {
-                  "handle": "@kerning.queen"
+                  "handle": "@spam.harasser.acct"
                 }
               },
               {
-                "path": "following",
+                "path": "unfollowed",
                 "appended": {
-                  "handle": "@carla.m"
+                  "handle": "@inactive.ghost.page"
                 }
               }
             ]
@@ -4404,7 +4732,9 @@
             "calls": [
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4432,7 +4762,9 @@
               },
               {
                 "tool": "get_mute_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "mute_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4459,59 +4791,64 @@
                 }
               },
               {
-                "tool": "get_mute_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_send_dm_wl",
                 "args": {
-                  "profile_id": "prof_015"
+                  "worklist_id": "send_dm_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_015"
+                  "spec_id": "sp_send_dm"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_015"
+                  "detail_id": "dt_send_dm"
                 }
               },
               {
-                "tool": "mute_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@ping.bot.alerts"
+                  "final_id": "fn_send_dm"
                 }
               },
               {
-                "tool": "get_mute_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "send_dm",
                 "args": {
-                  "profile_id": "prof_016"
+                  "handle": "@events.team.lead",
+                  "text": "Confirming the venue booking for the launch meetup."
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_update_bio_wl",
                 "args": {
-                  "account_id": "acct_016"
+                  "worklist_id": "update_bio_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_016"
+                  "spec_id": "sp_update_bio"
                 }
               },
               {
-                "tool": "mute_user",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@mega.promo.deals"
+                  "detail_id": "dt_update_bio"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_update_bio"
+                }
+              },
+              {
+                "tool": "update_bio",
+                "args": {
+                  "bio": "Product designer | building calm software | newsletter at example.com"
                 }
               }
             ],
@@ -4529,16 +4866,14 @@
                 }
               },
               {
-                "path": "muted",
+                "path": "sent_dms",
                 "appended": {
-                  "handle": "@ping.bot.alerts"
+                  "handle": "@events.team.lead"
                 }
               },
               {
-                "path": "muted",
-                "appended": {
-                  "handle": "@mega.promo.deals"
-                }
+                "path": "account.bio",
+                "value": "Product designer | building calm software | newsletter at example.com"
               }
             ]
           },
@@ -4548,7 +4883,9 @@
             "calls": [
               {
                 "tool": "get_report_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "report_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4577,7 +4914,9 @@
               },
               {
                 "tool": "get_report_queue",
-                "args": {}
+                "args": {
+                  "worklist_id": "report_queue_wl2"
+                }
               },
               {
                 "tool": "get_profile_record",
@@ -4605,61 +4944,64 @@
                 }
               },
               {
-                "tool": "get_report_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "get_change_account_email_wl",
                 "args": {
-                  "profile_id": "prof_019"
+                  "worklist_id": "change_account_email_wl1"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "account_id": "acct_019"
+                  "spec_id": "sp_change_account_email"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle_id": "hnd_019"
+                  "detail_id": "dt_change_account_email"
                 }
               },
               {
-                "tool": "report_user",
+                "tool": "get_op_final",
                 "args": {
-                  "handle": "@spam.bot.x",
-                  "reason": "spam"
+                  "final_id": "fn_change_account_email"
                 }
               },
               {
-                "tool": "get_report_queue",
-                "args": {}
-              },
-              {
-                "tool": "get_profile_record",
+                "tool": "change_account_email",
                 "args": {
-                  "profile_id": "prof_020"
+                  "email": "recovery.ops@securemail.example.com"
                 }
               },
               {
-                "tool": "get_account_record",
+                "tool": "get_create_post_wl",
                 "args": {
-                  "account_id": "acct_020"
+                  "worklist_id": "create_post_wl1"
                 }
               },
               {
-                "tool": "get_handle_record",
+                "tool": "get_op_spec",
                 "args": {
-                  "handle_id": "hnd_020"
+                  "spec_id": "sp_create_post"
                 }
               },
               {
-                "tool": "report_user",
+                "tool": "get_op_detail",
                 "args": {
-                  "handle": "@account.security.help",
-                  "reason": "impersonation"
+                  "detail_id": "dt_create_post"
+                }
+              },
+              {
+                "tool": "get_op_final",
+                "args": {
+                  "final_id": "fn_create_post"
+                }
+              },
+              {
+                "tool": "create_post",
+                "args": {
+                  "text": "Excited to share our new accessibility guidelines are live!",
+                  "link": "https://blog.example.com/a11y-guidelines"
                 }
               }
             ],
@@ -4677,15 +5019,13 @@
                 }
               },
               {
-                "path": "reported",
-                "appended": {
-                  "handle": "@spam.bot.x"
-                }
+                "path": "account.recovery_email",
+                "value": "recovery.ops@securemail.example.com"
               },
               {
-                "path": "reported",
+                "path": "published_posts",
                 "appended": {
-                  "handle": "@account.security.help"
+                  "link": "https://blog.example.com/a11y-guidelines"
                 }
               }
             ]
@@ -6222,7 +6562,909 @@
         "reason": "impersonation",
         "verified": true
       }
-    ]
+    ],
+    "contact_updates_wl": {
+      "contact_updates_wl2": [
+        {
+          "update_id": "upd_1",
+          "contact_id": "leo_codes",
+          "profile": "prof_001",
+          "applied": false
+        },
+        {
+          "update_id": "upd_2",
+          "contact_id": "jordan_k",
+          "profile": "prof_002",
+          "applied": false
+        },
+        {
+          "update_id": "upd_d1",
+          "contact_id": "leo_codes",
+          "profile": "prof_021",
+          "applied": true
+        },
+        {
+          "update_id": "upd_d2",
+          "contact_id": "jordan_k",
+          "profile": "prof_022",
+          "applied": true
+        }
+      ],
+      "contact_updates_wl3": [
+        {
+          "update_id": "upd_1",
+          "contact_id": "leo_codes",
+          "profile": "prof_001",
+          "applied": false
+        },
+        {
+          "update_id": "upd_2",
+          "contact_id": "jordan_k",
+          "profile": "prof_002",
+          "applied": false
+        },
+        {
+          "update_id": "upd_3",
+          "contact_id": "nina_r",
+          "profile": "prof_003",
+          "applied": false
+        },
+        {
+          "update_id": "upd_d1",
+          "contact_id": "leo_codes",
+          "profile": "prof_021",
+          "applied": true
+        },
+        {
+          "update_id": "upd_d2",
+          "contact_id": "jordan_k",
+          "profile": "prof_022",
+          "applied": true
+        },
+        {
+          "update_id": "upd_d3",
+          "contact_id": "nina_r",
+          "profile": "prof_023",
+          "applied": true
+        }
+      ],
+      "contact_updates_wl4": [
+        {
+          "update_id": "upd_1",
+          "contact_id": "leo_codes",
+          "profile": "prof_001",
+          "applied": false
+        },
+        {
+          "update_id": "upd_2",
+          "contact_id": "jordan_k",
+          "profile": "prof_002",
+          "applied": false
+        },
+        {
+          "update_id": "upd_3",
+          "contact_id": "nina_r",
+          "profile": "prof_003",
+          "applied": false
+        },
+        {
+          "update_id": "upd_4",
+          "contact_id": "devon_ux",
+          "profile": "prof_004",
+          "applied": false
+        },
+        {
+          "update_id": "upd_d1",
+          "contact_id": "leo_codes",
+          "profile": "prof_021",
+          "applied": true
+        },
+        {
+          "update_id": "upd_d2",
+          "contact_id": "jordan_k",
+          "profile": "prof_022",
+          "applied": true
+        },
+        {
+          "update_id": "upd_d3",
+          "contact_id": "nina_r",
+          "profile": "prof_023",
+          "applied": true
+        },
+        {
+          "update_id": "upd_d4",
+          "contact_id": "devon_ux",
+          "profile": "prof_024",
+          "applied": true
+        }
+      ]
+    },
+    "invite_queue_wl": {
+      "invite_queue_wl2": [
+        {
+          "invite_id": "inv_1",
+          "profile": "prof_005",
+          "event_id": "evt_workshop",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_2",
+          "profile": "prof_006",
+          "event_id": "evt_ama",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_d1",
+          "profile": "prof_025",
+          "event_id": "evt_workshop",
+          "declined": true
+        },
+        {
+          "invite_id": "inv_d2",
+          "profile": "prof_026",
+          "event_id": "evt_ama",
+          "declined": true
+        }
+      ],
+      "invite_queue_wl3": [
+        {
+          "invite_id": "inv_1",
+          "profile": "prof_005",
+          "event_id": "evt_workshop",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_2",
+          "profile": "prof_006",
+          "event_id": "evt_ama",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_3",
+          "profile": "prof_007",
+          "event_id": "evt_workshop",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_d1",
+          "profile": "prof_025",
+          "event_id": "evt_workshop",
+          "declined": true
+        },
+        {
+          "invite_id": "inv_d2",
+          "profile": "prof_026",
+          "event_id": "evt_ama",
+          "declined": true
+        },
+        {
+          "invite_id": "inv_d3",
+          "profile": "prof_027",
+          "event_id": "evt_workshop",
+          "declined": true
+        }
+      ],
+      "invite_queue_wl4": [
+        {
+          "invite_id": "inv_1",
+          "profile": "prof_005",
+          "event_id": "evt_workshop",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_2",
+          "profile": "prof_006",
+          "event_id": "evt_ama",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_3",
+          "profile": "prof_007",
+          "event_id": "evt_workshop",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_4",
+          "profile": "prof_008",
+          "event_id": "evt_ama",
+          "declined": false
+        },
+        {
+          "invite_id": "inv_d1",
+          "profile": "prof_025",
+          "event_id": "evt_workshop",
+          "declined": true
+        },
+        {
+          "invite_id": "inv_d2",
+          "profile": "prof_026",
+          "event_id": "evt_ama",
+          "declined": true
+        },
+        {
+          "invite_id": "inv_d3",
+          "profile": "prof_027",
+          "event_id": "evt_workshop",
+          "declined": true
+        },
+        {
+          "invite_id": "inv_d4",
+          "profile": "prof_028",
+          "event_id": "evt_ama",
+          "declined": true
+        }
+      ]
+    },
+    "follow_queue_wl": {
+      "follow_queue_wl2": [
+        {
+          "entry_id": "fol_1",
+          "profile": "prof_009",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_2",
+          "profile": "prof_010",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_d1",
+          "profile": "prof_029",
+          "already_following": true
+        },
+        {
+          "entry_id": "fol_d2",
+          "profile": "prof_030",
+          "already_following": true
+        }
+      ],
+      "follow_queue_wl3": [
+        {
+          "entry_id": "fol_1",
+          "profile": "prof_009",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_2",
+          "profile": "prof_010",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_3",
+          "profile": "prof_011",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_d1",
+          "profile": "prof_029",
+          "already_following": true
+        },
+        {
+          "entry_id": "fol_d2",
+          "profile": "prof_030",
+          "already_following": true
+        },
+        {
+          "entry_id": "fol_d3",
+          "profile": "prof_031",
+          "already_following": true
+        }
+      ],
+      "follow_queue_wl4": [
+        {
+          "entry_id": "fol_1",
+          "profile": "prof_009",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_2",
+          "profile": "prof_010",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_3",
+          "profile": "prof_011",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_4",
+          "profile": "prof_012",
+          "already_following": false
+        },
+        {
+          "entry_id": "fol_d1",
+          "profile": "prof_029",
+          "already_following": true
+        },
+        {
+          "entry_id": "fol_d2",
+          "profile": "prof_030",
+          "already_following": true
+        },
+        {
+          "entry_id": "fol_d3",
+          "profile": "prof_031",
+          "already_following": true
+        },
+        {
+          "entry_id": "fol_d4",
+          "profile": "prof_032",
+          "already_following": true
+        }
+      ]
+    },
+    "mute_queue_wl": {
+      "mute_queue_wl2": [
+        {
+          "entry_id": "mut_1",
+          "profile": "prof_013",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_2",
+          "profile": "prof_014",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_d1",
+          "profile": "prof_033",
+          "muted": true
+        },
+        {
+          "entry_id": "mut_d2",
+          "profile": "prof_034",
+          "muted": true
+        }
+      ],
+      "mute_queue_wl3": [
+        {
+          "entry_id": "mut_1",
+          "profile": "prof_013",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_2",
+          "profile": "prof_014",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_3",
+          "profile": "prof_015",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_d1",
+          "profile": "prof_033",
+          "muted": true
+        },
+        {
+          "entry_id": "mut_d2",
+          "profile": "prof_034",
+          "muted": true
+        },
+        {
+          "entry_id": "mut_d3",
+          "profile": "prof_035",
+          "muted": true
+        }
+      ],
+      "mute_queue_wl4": [
+        {
+          "entry_id": "mut_1",
+          "profile": "prof_013",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_2",
+          "profile": "prof_014",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_3",
+          "profile": "prof_015",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_4",
+          "profile": "prof_016",
+          "muted": false
+        },
+        {
+          "entry_id": "mut_d1",
+          "profile": "prof_033",
+          "muted": true
+        },
+        {
+          "entry_id": "mut_d2",
+          "profile": "prof_034",
+          "muted": true
+        },
+        {
+          "entry_id": "mut_d3",
+          "profile": "prof_035",
+          "muted": true
+        },
+        {
+          "entry_id": "mut_d4",
+          "profile": "prof_036",
+          "muted": true
+        }
+      ]
+    },
+    "report_queue_wl": {
+      "report_queue_wl2": [
+        {
+          "entry_id": "rep_1",
+          "profile": "prof_017",
+          "reason": "phishing",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_2",
+          "profile": "prof_018",
+          "reason": "scam",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_d1",
+          "profile": "prof_037",
+          "reason": "phishing",
+          "verified": true
+        },
+        {
+          "entry_id": "rep_d2",
+          "profile": "prof_038",
+          "reason": "scam",
+          "verified": true
+        }
+      ],
+      "report_queue_wl3": [
+        {
+          "entry_id": "rep_1",
+          "profile": "prof_017",
+          "reason": "phishing",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_2",
+          "profile": "prof_018",
+          "reason": "scam",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_3",
+          "profile": "prof_019",
+          "reason": "spam",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_d1",
+          "profile": "prof_037",
+          "reason": "phishing",
+          "verified": true
+        },
+        {
+          "entry_id": "rep_d2",
+          "profile": "prof_038",
+          "reason": "scam",
+          "verified": true
+        },
+        {
+          "entry_id": "rep_d3",
+          "profile": "prof_039",
+          "reason": "spam",
+          "verified": true
+        }
+      ],
+      "report_queue_wl4": [
+        {
+          "entry_id": "rep_1",
+          "profile": "prof_017",
+          "reason": "phishing",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_2",
+          "profile": "prof_018",
+          "reason": "scam",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_3",
+          "profile": "prof_019",
+          "reason": "spam",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_4",
+          "profile": "prof_020",
+          "reason": "impersonation",
+          "verified": false
+        },
+        {
+          "entry_id": "rep_d1",
+          "profile": "prof_037",
+          "reason": "phishing",
+          "verified": true
+        },
+        {
+          "entry_id": "rep_d2",
+          "profile": "prof_038",
+          "reason": "scam",
+          "verified": true
+        },
+        {
+          "entry_id": "rep_d3",
+          "profile": "prof_039",
+          "reason": "spam",
+          "verified": true
+        },
+        {
+          "entry_id": "rep_d4",
+          "profile": "prof_040",
+          "reason": "impersonation",
+          "verified": true
+        }
+      ]
+    },
+    "op_specs": {
+      "sp_delete_comment": {
+        "detail": "dt_delete_comment"
+      },
+      "sp_delete_comment_d": {
+        "detail": "dt_delete_comment_d"
+      },
+      "sp_delete_post": {
+        "detail": "dt_delete_post"
+      },
+      "sp_delete_post_d": {
+        "detail": "dt_delete_post_d"
+      },
+      "sp_schedule_post": {
+        "detail": "dt_schedule_post"
+      },
+      "sp_schedule_post_d": {
+        "detail": "dt_schedule_post_d"
+      },
+      "sp_share_post": {
+        "detail": "dt_share_post"
+      },
+      "sp_share_post_d": {
+        "detail": "dt_share_post_d"
+      },
+      "sp_block_user": {
+        "detail": "dt_block_user"
+      },
+      "sp_block_user_d": {
+        "detail": "dt_block_user_d"
+      },
+      "sp_unfollow_user": {
+        "detail": "dt_unfollow_user"
+      },
+      "sp_unfollow_user_d": {
+        "detail": "dt_unfollow_user_d"
+      },
+      "sp_send_dm": {
+        "detail": "dt_send_dm"
+      },
+      "sp_send_dm_d": {
+        "detail": "dt_send_dm_d"
+      },
+      "sp_update_bio": {
+        "detail": "dt_update_bio"
+      },
+      "sp_update_bio_d": {
+        "detail": "dt_update_bio_d"
+      },
+      "sp_change_account_email": {
+        "detail": "dt_change_account_email"
+      },
+      "sp_change_account_email_d": {
+        "detail": "dt_change_account_email_d"
+      },
+      "sp_create_post": {
+        "detail": "dt_create_post"
+      },
+      "sp_create_post_d": {
+        "detail": "dt_create_post_d"
+      }
+    },
+    "op_details": {
+      "dt_delete_comment": {
+        "final": "fn_delete_comment"
+      },
+      "dt_delete_comment_d": {
+        "final": "fn_delete_comment_d"
+      },
+      "dt_delete_post": {
+        "final": "fn_delete_post"
+      },
+      "dt_delete_post_d": {
+        "final": "fn_delete_post_d"
+      },
+      "dt_schedule_post": {
+        "final": "fn_schedule_post"
+      },
+      "dt_schedule_post_d": {
+        "final": "fn_schedule_post_d"
+      },
+      "dt_share_post": {
+        "final": "fn_share_post"
+      },
+      "dt_share_post_d": {
+        "final": "fn_share_post_d"
+      },
+      "dt_block_user": {
+        "final": "fn_block_user"
+      },
+      "dt_block_user_d": {
+        "final": "fn_block_user_d"
+      },
+      "dt_unfollow_user": {
+        "final": "fn_unfollow_user"
+      },
+      "dt_unfollow_user_d": {
+        "final": "fn_unfollow_user_d"
+      },
+      "dt_send_dm": {
+        "final": "fn_send_dm"
+      },
+      "dt_send_dm_d": {
+        "final": "fn_send_dm_d"
+      },
+      "dt_update_bio": {
+        "final": "fn_update_bio"
+      },
+      "dt_update_bio_d": {
+        "final": "fn_update_bio_d"
+      },
+      "dt_change_account_email": {
+        "final": "fn_change_account_email"
+      },
+      "dt_change_account_email_d": {
+        "final": "fn_change_account_email_d"
+      },
+      "dt_create_post": {
+        "final": "fn_create_post"
+      },
+      "dt_create_post_d": {
+        "final": "fn_create_post_d"
+      }
+    },
+    "op_finals": {
+      "fn_delete_comment": {
+        "comment_id": 5007
+      },
+      "fn_delete_comment_d": {
+        "comment_id": 5010
+      },
+      "fn_delete_post": {
+        "post_id": 103
+      },
+      "fn_delete_post_d": {
+        "post_id": 105
+      },
+      "fn_schedule_post": {
+        "text": "Q3 product roadmap announcement thread",
+        "date": "2027-03-14T09:30:00Z",
+        "link": "https://blog.example.com/roadmap-q3"
+      },
+      "fn_schedule_post_d": {
+        "text": "unsolicited giveaway blast draft",
+        "date": "2026-11-02T23:59:00Z",
+        "link": "https://spam.example.net/promo"
+      },
+      "fn_share_post": {
+        "handle": "@design.digest",
+        "post_id": 47120
+      },
+      "fn_share_post_d": {
+        "handle": "@random.spammer",
+        "post_id": 90233
+      },
+      "fn_block_user": {
+        "handle": "@spam.harasser.acct"
+      },
+      "fn_block_user_d": {
+        "handle": "@valued.follower"
+      },
+      "fn_unfollow_user": {
+        "handle": "@inactive.ghost.page"
+      },
+      "fn_unfollow_user_d": {
+        "handle": "@close.collaborator"
+      },
+      "fn_send_dm": {
+        "handle": "@events.team.lead",
+        "text": "Confirming the venue booking for the launch meetup."
+      },
+      "fn_send_dm_d": {
+        "handle": "@unknown.stranger",
+        "text": "random unsolicited message"
+      },
+      "fn_update_bio": {
+        "bio": "Product designer | building calm software | newsletter at example.com"
+      },
+      "fn_update_bio_d": {
+        "bio": "CLICK HERE for a free crypto giveaway"
+      },
+      "fn_change_account_email": {
+        "email": "recovery.ops@securemail.example.com"
+      },
+      "fn_change_account_email_d": {
+        "email": "attacker.drop@sketchy.example.net"
+      },
+      "fn_create_post": {
+        "text": "Excited to share our new accessibility guidelines are live!",
+        "link": "https://blog.example.com/a11y-guidelines"
+      },
+      "fn_create_post_d": {
+        "text": "buy cheap followers today",
+        "link": "https://scam.example.net/followers"
+      }
+    },
+    "defi": {
+      "delete_comment_wl": {
+        "delete_comment_wl1": [
+          {
+            "ticket_id": "delete_comment_1",
+            "spec": "sp_delete_comment",
+            "stale": false,
+            "label": "delete the flagged spam comment"
+          },
+          {
+            "ticket_id": "delete_comment_d1",
+            "spec": "sp_delete_comment_d",
+            "stale": true,
+            "label": "delete the flagged spam comment (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "delete_post_wl": {
+        "delete_post_wl1": [
+          {
+            "ticket_id": "delete_post_1",
+            "spec": "sp_delete_post",
+            "stale": false,
+            "label": "delete the outdated duplicate post"
+          },
+          {
+            "ticket_id": "delete_post_d1",
+            "spec": "sp_delete_post_d",
+            "stale": true,
+            "label": "delete the outdated duplicate post (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "schedule_post_wl": {
+        "schedule_post_wl1": [
+          {
+            "ticket_id": "schedule_post_1",
+            "spec": "sp_schedule_post",
+            "stale": false,
+            "label": "schedule the roadmap announcement post"
+          },
+          {
+            "ticket_id": "schedule_post_d1",
+            "spec": "sp_schedule_post_d",
+            "stale": true,
+            "label": "schedule the roadmap announcement post (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "share_post_wl": {
+        "share_post_wl1": [
+          {
+            "ticket_id": "share_post_1",
+            "spec": "sp_share_post",
+            "stale": false,
+            "label": "share the launch recap post"
+          },
+          {
+            "ticket_id": "share_post_d1",
+            "spec": "sp_share_post_d",
+            "stale": true,
+            "label": "share the launch recap post (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "block_user_wl": {
+        "block_user_wl1": [
+          {
+            "ticket_id": "block_user_1",
+            "spec": "sp_block_user",
+            "stale": false,
+            "label": "block the harassing account"
+          },
+          {
+            "ticket_id": "block_user_d1",
+            "spec": "sp_block_user_d",
+            "stale": true,
+            "label": "block the harassing account (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "unfollow_user_wl": {
+        "unfollow_user_wl1": [
+          {
+            "ticket_id": "unfollow_user_1",
+            "spec": "sp_unfollow_user",
+            "stale": false,
+            "label": "unfollow the inactive account"
+          },
+          {
+            "ticket_id": "unfollow_user_d1",
+            "spec": "sp_unfollow_user_d",
+            "stale": true,
+            "label": "unfollow the inactive account (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "send_dm_wl": {
+        "send_dm_wl1": [
+          {
+            "ticket_id": "send_dm_1",
+            "spec": "sp_send_dm",
+            "stale": false,
+            "label": "send the venue-confirmation direct message"
+          },
+          {
+            "ticket_id": "send_dm_d1",
+            "spec": "sp_send_dm_d",
+            "stale": true,
+            "label": "send the venue-confirmation direct message (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "update_bio_wl": {
+        "update_bio_wl1": [
+          {
+            "ticket_id": "update_bio_1",
+            "spec": "sp_update_bio",
+            "stale": false,
+            "label": "update the profile bio"
+          },
+          {
+            "ticket_id": "update_bio_d1",
+            "spec": "sp_update_bio_d",
+            "stale": true,
+            "label": "update the profile bio (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "change_account_email_wl": {
+        "change_account_email_wl1": [
+          {
+            "ticket_id": "change_account_email_1",
+            "spec": "sp_change_account_email",
+            "stale": false,
+            "label": "correct the recovery email on file"
+          },
+          {
+            "ticket_id": "change_account_email_d1",
+            "spec": "sp_change_account_email_d",
+            "stale": true,
+            "label": "correct the recovery email on file (SUPERSEDED look-alike)"
+          }
+        ]
+      },
+      "create_post_wl": {
+        "create_post_wl1": [
+          {
+            "ticket_id": "create_post_1",
+            "spec": "sp_create_post",
+            "stale": false,
+            "label": "publish the accessibility guidelines post"
+          },
+          {
+            "ticket_id": "create_post_d1",
+            "spec": "sp_create_post_d",
+            "stale": true,
+            "label": "publish the accessibility guidelines post (SUPERSEDED look-alike)"
+          }
+        ]
+      }
+    }
   },
   "tool_groups": {
     "agent_1": [
@@ -6251,5 +7493,33 @@
       "report_user"
     ]
   },
-  "indirection": true
+  "indirection": true,
+  "worklist_payable": {
+    "contact_updates_wl2": 2,
+    "contact_updates_wl3": 3,
+    "contact_updates_wl4": 4,
+    "invite_queue_wl2": 2,
+    "invite_queue_wl3": 3,
+    "invite_queue_wl4": 4,
+    "follow_queue_wl2": 2,
+    "follow_queue_wl3": 3,
+    "follow_queue_wl4": 4,
+    "mute_queue_wl2": 2,
+    "mute_queue_wl3": 3,
+    "mute_queue_wl4": 4,
+    "report_queue_wl2": 2,
+    "report_queue_wl3": 3,
+    "report_queue_wl4": 4,
+    "delete_comment_wl1": 1,
+    "delete_post_wl1": 1,
+    "schedule_post_wl1": 1,
+    "share_post_wl1": 1,
+    "block_user_wl1": 1,
+    "unfollow_user_wl1": 1,
+    "send_dm_wl1": 1,
+    "update_bio_wl1": 1,
+    "change_account_email_wl1": 1,
+    "create_post_wl1": 1
+  },
+  "worklist_tiers": true
 }

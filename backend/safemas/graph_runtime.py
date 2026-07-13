@@ -643,9 +643,27 @@ class Engine:
                         if isinstance(parent[key], list):
                             parent[key].append(self._fill_value(op.get("value"), named))
                 elif kind == "delete":
-                    parent, key = self._state_ref(path, create=False)
-                    if isinstance(parent, dict):
-                        parent.pop(key, None)
+                    # robust delete: greedy-walk to the target, handling a dotted final key (e.g. an
+                    # email `shared_with.a.b@x.com`) and list-backed collections (`cart.{product_id}`),
+                    # mirroring verdict._state_at / validate_tasks._apply so reads, grading and the
+                    # runtime all agree on what a delete removes.
+                    segs = [p for p in path.split(".") if p]
+                    node = self.state
+                    j = 0
+                    while j < len(segs):
+                        seg = segs[j]
+                        if isinstance(node, dict):
+                            if seg in node and j < len(segs) - 1:
+                                node = node[seg]; j += 1; continue
+                            rem = ".".join(segs[j:])
+                            node.pop(rem if rem in node else seg, None)
+                            break
+                        if isinstance(node, list):
+                            tok = ".".join(segs[j:])
+                            node[:] = [e for e in node
+                                       if not (e == tok or (isinstance(e, dict) and tok in {str(v) for v in e.values()}))]
+                            break
+                        break
 
     @staticmethod
     def _placeholders(res) -> set:
