@@ -392,7 +392,8 @@ class RunState(TypedDict):
     outputs: dict                # agent_id -> last output
     runs: dict                   # agent_id -> activation count
     loop_iters: dict             # channel_key -> count
-    agent_done: dict             # agent_id -> [ {fn, args} ] completed tool calls (cross-activation memory)
+    agent_done: dict             # agent_id -> [ {fn, args} ] completed tool calls (per-agent, for the prompt hint)
+    writes_done: set             # run-level set of WRITE signatures already executed (identity-independent)
     join_buf: dict               # agent_id -> {channel_key: message}
     events: list                 # trace events (seq assigned at finalize)
     attacks: list                # [{element, type}]
@@ -549,7 +550,7 @@ class Engine:
 
     def seed_state(self) -> RunState:
         return RunState(
-            queue=[], outputs={}, runs={}, loop_iters={}, agent_done={}, join_buf={},
+            queue=[], outputs={}, runs={}, loop_iters={}, agent_done={}, writes_done=set(), join_buf={},
             events=[], attacks=[], steps=0, started=False, dispatch=None,
             incoming=None, done=False, final_answer="", last="",
             t0=time.monotonic(),
@@ -812,8 +813,7 @@ class Engine:
                 for tc in tool_calls:
                     res = by_name.get(tc["name"])
                     fn = res.label if res else tc["name"]
-                    rec = {"fn": fn, "args": tc.get("args", {})}
-                    done = st.setdefault("agent_done", {}).setdefault(agent.id, [])
+                    args = tc.get("args", {}) or {}
                     # A WRITE is a state-changing tool (not a getter); reads stay freely repeatable
                     # because the agent may need to re-observe state, but a WRITE must never fire twice
                     # with the same args — that is the re-execution ("loop") bug when a peer message or
@@ -821,6 +821,14 @@ class Engine:
                     # "don't repeat" is not reliable across models), engine-wide → every architecture.
                     is_read = bool(re.match(r"(get|list|read|resolve|search|fetch|view|find|check|lookup)",
                                             str(fn).lower()))
+                    # RUN-LEVEL signature (canonical, order-independent) rather than per-agent memory:
+                    # a re-activated agent may arrive under the same OR a fresh id, and a mesh can replay
+                    # an action through a *different* agent — a run-scoped set blocks all of those, and it
+                    # is uniform across every architecture (no confound). agent_done stays per-agent only
+                    # to feed each agent's own "already done" prompt hint (see think()).
+                    sig = json.dumps({"fn": fn, "args": args}, sort_keys=True, default=str)
+                    writes_done = st.setdefault("writes_done", set())
+                    done = st.setdefault("agent_done", {}).setdefault(agent.id, [])
                     if res is None:
                         # A coordinator (no tools of its own) tried to call a tool —
                         # steer it to delegate instead of repeating the failed call.
@@ -829,15 +837,18 @@ class Engine:
                                "their results]" if not by_name
                                else f"[error: unknown tool {tc['name']}]")
                         poisoned, err = False, True
-                    elif (not is_read) and rec in done:
+                    elif (not is_read) and sig in writes_done:
                         val = ("[already completed earlier this run — skipped, not repeated (this exact "
                                "action is done)]")
                         poisoned, err = False, False
                     else:
-                        val, poisoned = self.resource_value(res, st, tc.get("args", {}))
+                        val, poisoned = self.resource_value(res, st, args)
                         err = False
-                        if not is_read and rec not in done:
-                            done.append(rec)      # remember completed WRITES to block later duplicates
+                        if not is_read:
+                            writes_done.add(sig)   # remember completed WRITES to block later duplicates
+                            rec = {"fn": fn, "args": args}
+                            if rec not in done:
+                                done.append(rec)
                     self._emit(st, "tool_call", agent=agent.label, function=fn,
                                args=tc.get("args", {}), result=val, poisoned=poisoned, error=err)
                     log(f"{GREY}    [{agent.label}] ⟳ {tc['name']}({clip(json.dumps(tc.get('args', {})), 60)}) "

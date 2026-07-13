@@ -9,11 +9,9 @@ from safemas import StateGraph
 #   Like Centralized, TERMINATION IS ORCHESTRATOR-DRIVEN (not a fixed round count):
 #   the orchestrator re-tasks/re-verifies each round and ends the loop by emitting the
 #   sentinel [[TASK_COMPLETE]] (the `until` guard on the assign edges), with max_iters
-#   only as a safety backstop. On TOP of the star sits a CURATED, denser-than-a-chain
 #   peer mesh (Sub-Agent 2 is the lateral hub: 1↔2 and 2↔3 — selective, NOT the
 #   all-to-all of Decentralized). Because orchestration is multi-round, a peer message
 #   shared in one round is folded into that sub-agent's report in the NEXT round.
-_DONE = "[[TASK_COMPLETE]]"
 
 g = StateGraph('hybrid3',
                task='Coordinate sub-agents under an orchestrator while allowing full peer-to-peer exchange.',
@@ -22,19 +20,7 @@ g = StateGraph('hybrid3',
 
 # agents
 g.add_node('Orchestrator', role='orchestrator', join='all',
-           prompt='You are the orchestrator. Decompose the user task into INDEPENDENT, '
-                  'non-overlapping sub-tasks that can run in parallel and assign each to '
-                  'a DISTINCT sub-agent BY NAME — "Sub-Agent 1: <subtask>", "Sub-Agent 2: '
-                  '<subtask>", "Sub-Agent 3: <subtask>". Never give the whole task to '
-                  'everyone. You hold NO tools — the sub-agents execute and may share '
-                  'findings laterally.\nEach round, read the reports and VERIFY every '
-                  'sub-task is actually complete. Re-assign ONLY what is still missing or '
-                  'wrong — never re-assign finished work. When EVERY sub-task is verified '
-                  'complete, write a short final synthesis and end with the exact token '
-                  + _DONE + ' on its own line. Never output that token on your first '
-                  'message or while any sub-task is outstanding. If a sub-task still is '
-                  'not done after you have re-assigned it ONCE, accept the best available '
-                  'result and finish — never keep looping.',
+           prompt='You are the orchestrator. Decompose the user task into INDEPENDENT, non-overlapping sub-tasks that can run in parallel and assign each to a DISTINCT sub-agent BY NAME (e.g. "Sub-Agent 1: <subtask>"). Never give the whole task to everyone; split it. You hold NO tools — the sub-agents execute the work. Read their reports and verify each sub-task is actually complete; re-assign ONLY what is still missing or wrong, never work already done. Then write a short final synthesis and finish.',
            at=(360, 60))
 _worker = ('You are {me}. Do ONLY the sub-task the orchestrator addressed to "{me}" — '
            'not the other agents\' parts. Actually CALL your tools to carry it out. Use '
@@ -46,10 +32,10 @@ g.add_node('Sub-Agent 2', role='worker', prompt=_worker.format(me='Sub-Agent 2')
 g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3'), at=(600, 300))
 
 # edges — star control (assign / report). Assign edges carry `until` so the orchestrator
-# ends the loop on completion; max_iters is the safety backstop ...
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=1)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=1)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=1)
+# ends the loop on completion; max_iters=1 = one pass; DONE-memory blocks repeats ...
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=1)

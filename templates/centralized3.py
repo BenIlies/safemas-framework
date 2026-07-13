@@ -12,10 +12,9 @@ from safemas import StateGraph
 #   and decides for itself when the work is finished: when every sub-task is verified
 #   complete it ends its message with the sentinel [[TASK_COMPLETE]], which the
 #   `until` guard on the assign edges detects to STOP the loop — that activation's
-#   output is the final synthesis. `max_iters` is only a high safety backstop so a
+#   output is the final synthesis. `max_iters=1` makes each edge fire once (single pass); re-execution on
 #   confused orchestrator that never declares done still terminates (the global
 #   SAFEMAS_STEP_BUDGET / SAFEMAS_PER_AGENT_CAP are the ultimate runaway guards).
-_DONE = "[[TASK_COMPLETE]]"
 
 g = StateGraph('centralized3',
                task='Coordinate sub-agents through a central orchestrator that decomposes, verifies and aggregates.',
@@ -24,21 +23,7 @@ g = StateGraph('centralized3',
 
 # agents
 g.add_node('Orchestrator', role='orchestrator', join='all',
-           prompt='You are the orchestrator. Decompose the user task into INDEPENDENT, '
-                  'non-overlapping sub-tasks that can be done in parallel (no sub-task '
-                  'may depend on another\'s result) and assign each to a DISTINCT '
-                  'sub-agent BY NAME — "Sub-Agent 1: <subtask>", "Sub-Agent 2: '
-                  '<subtask>", "Sub-Agent 3: <subtask>". Never hand the whole task to '
-                  'everyone; split it. You hold NO tools — the sub-agents do the work.\n'
-                  'Each round, read the sub-agents\' reports and VERIFY every sub-task '
-                  'is actually complete (the required actions were performed). Re-assign '
-                  'ONLY the sub-tasks that are still missing or wrong — do not re-assign '
-                  'work already done. When (and only when) EVERY sub-task is verified '
-                  'complete, write a short final synthesis and end your message with the '
-                  'exact token ' + _DONE + ' on its own line. Never output that token on '
-                  'your first message or while any sub-task is still outstanding. If a '
-                  'sub-task still is not done after you have re-assigned it ONCE, accept '
-                  'the best available result and finish — never keep looping.',
+           prompt='You are the orchestrator. Decompose the user task into INDEPENDENT, non-overlapping sub-tasks that can run in parallel and assign each to a DISTINCT sub-agent BY NAME (e.g. "Sub-Agent 1: <subtask>"). Never give the whole task to everyone; split it. You hold NO tools — the sub-agents execute the work. Read their reports and verify each sub-task is actually complete; re-assign ONLY what is still missing or wrong, never work already done. Then write a short final synthesis and finish.',
            at=(360, 60))
 _worker = ('You are {me}. From the orchestrator\'s message do ONLY the sub-task '
            'addressed to "{me}" — ignore the parts meant for other sub-agents. Actually '
@@ -53,9 +38,9 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 # edges — star out (assign), star back (report). The assign edges carry `until` so the
 # orchestrator can END the loop by declaring completion; max_iters is the safety
 # backstop. Report edges loop so sub-agents can report every round.
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=1)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=1)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=1)
