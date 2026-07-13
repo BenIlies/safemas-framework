@@ -379,12 +379,29 @@ def _annotate_wrong_writes(events: list[dict], subtasks: list[dict]) -> int:
     error the ambiguity feature is designed to provoke. Matched against ALL intended write signatures
     (not just subtask-completing events), so a correct-but-non-completing write is never mis-flagged.
     Guard-skipped duplicates, errored calls, and poisoned (attack) calls are excluded. Returns the count."""
-    intended = []   # (normfn, {routing_arg: value})
+    # Match on the SAME distinctive fields the state-checks grade — NOT on every call arg. Dates,
+    # times, and bare small ints are agent-chosen and ungraded (see the GRADEABILITY / EXPLICIT-VALUE
+    # gates), so an intended write and the agent's write can differ there while still being the SAME
+    # correct action. Requiring them to match falsely flagged correct writes as "wrong" (e.g. a hotel
+    # reservation for the right hotel but a different date). A write is WRONG only when it acts on a
+    # target whose DISTINCTIVE identity matches no intended write.
+    def _distinctive(v) -> bool:
+        s = str(v).strip()
+        if not s:
+            return False
+        if re.search(r"\d{4}-\d{2}-\d{2}", s) or re.search(r"\d{1,2}:\d{2}", s):  # date / time
+            return False
+        if re.fullmatch(r"-?\d{1,2}(\.\d+)?", s):                                   # bare small number
+            return False
+        return True
+
+    intended = []   # (normfn, {distinctive routing arg: value})
     for st in subtasks or []:
         for c in (st.get("calls") or []):
             fn = c.get("tool")
             if fn and _is_setter_fn(fn):
-                routing = {k: v for k, v in (c.get("args") or {}).items() if k not in _WRITE_CONTENT_ARGS}
+                routing = {k: v for k, v in (c.get("args") or {}).items()
+                           if k not in _WRITE_CONTENT_ARGS and _distinctive(v)}
                 intended.append((_normfn(fn), routing))
 
     def matches_intended(fn: str, args: dict) -> bool:
@@ -392,7 +409,9 @@ def _annotate_wrong_writes(events: list[dict], subtasks: list[dict]) -> int:
         for inf, routing in intended:
             if inf != nf:
                 continue
-            if all(_field_matches(v, args.get(k, "")) for k, v in routing.items()):
+            # a same-tool write with no distinctive fields to key on can't be told apart -> treat as
+            # intended (don't flag); otherwise every distinctive intended field must appear.
+            if not routing or all(_field_matches(v, args.get(k, "")) for k, v in routing.items()):
                 return True
         return False
 

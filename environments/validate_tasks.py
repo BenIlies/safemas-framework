@@ -345,6 +345,22 @@ def rederive_env(env, eff):
     return n
 
 
+def _write_record_path(op, args):
+    """The record a SET-field or DELETE op targets — the path up to & including its templated ``{id}``
+    segment, filled — or None for a create-style write (APPEND, or a SET of a whole new record) that
+    needs no pre-existing target. Mirrors graph_runtime._missing_write_target so the validator measures
+    exactly what the engine now enforces at run time."""
+    kind = op.get("op")
+    segs = str(op.get("path", "")).split(".")
+    ti = next((i for i, s in enumerate(segs) if "{" in s), None)
+    if ti is None:
+        return None                                   # static path -> no per-record target
+    field_after = ti < len(segs) - 1
+    if kind == "delete" or (kind == "set" and field_after):
+        return _fill(".".join(segs[:ti + 1]), args)
+    return None
+
+
 def validate_task(env, task, tools, blob, eff):
     """Grader self-consistency + resolvability for one graded user task. Self-consistency is now
     STATE-based: build the perfect-solver final state, then require the task's authored ``checks``
@@ -361,6 +377,27 @@ def validate_task(env, task, tools, blob, eff):
                 issues.append(f"GRADER {task['id']}: subtask '{s.get('id')}' scores "
                               f"{s.get('checks_done')}/{s.get('checks_total')} state-checks on the "
                               f"perfect-solver final state")
+    # TARGET-EXISTS gate: a graded write that UPDATES a field of a record or DELETES a record must
+    # target a record that EXISTS when the write runs. Acting on a phantom id (e.g. a worklist ref
+    # passed straight through instead of dereferenced to the real id) is a no-op the engine now
+    # rejects (graph_runtime._missing_write_target) — so if a task's own canonical solution targets a
+    # non-existent record, the task is un-doable and must fail here. Replayed sequentially so a record
+    # created by an earlier append/set in the same stream counts as present.
+    for st in subtasks:
+        state = json.loads(json.dumps(env.get("state", {})))
+        for c in (st.get("calls") or []):
+            ops = eff.get(c.get("tool"))
+            cargs = c.get("args") or {}
+            if not ops:
+                continue
+            for op in ops:
+                rec = _write_record_path(op, cargs)
+                if rec is not None and _state_at(state, rec) is None:
+                    issues.append(f"TARGET-EXISTS {task['id']}: subtask '{st.get('id')}' write "
+                                  f"'{c.get('tool')}' targets record '{rec}' that does not exist when "
+                                  f"called — a phantom target the engine rejects (no-op); the canonical "
+                                  f"solution must resolve to a real id")
+            _apply(ops, cargs, state)
     # DO-NOTHING gate: grading against the UNTOUCHED initial state must yield 0 — otherwise some
     # check passes for free (utility earned without acting). This is the core integrity guarantee.
     init_state = json.loads(json.dumps(env.get("state", {})))

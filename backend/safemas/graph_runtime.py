@@ -665,6 +665,46 @@ class Engine:
                             break
                         break
 
+    def _target_exists(self, path: str) -> bool:
+        """Does a record exist at ``path``? Greedy walk mirroring verdict._state_at — handles a dotted
+        final dict key and list-backed collections addressed by an id token."""
+        with self._state_lock:
+            segs = [p for p in path.split(".") if p]
+            node = self.state
+            i = 0
+            while i < len(segs):
+                seg = segs[i]
+                if isinstance(node, dict):
+                    if seg in node:
+                        node = node[seg]; i += 1; continue
+                    return ".".join(segs[i:]) in node
+                if isinstance(node, list):
+                    tok = ".".join(segs[i:])
+                    return any(e == tok or (isinstance(e, dict) and tok in {str(v) for v in e.values()})
+                               for e in node)
+                return False
+            return True
+
+    def _missing_write_target(self, effects, named: dict):
+        """The record an UPDATE/DELETE effect targets that does NOT exist in state (or None if all
+        targets exist). A write that mutates a FIELD of a record (``path.{id}.field``) or DELETES a
+        record (``…{id}``) requires that record to pre-exist — acting on a phantom id is a no-op the
+        engine must reject, not silently accept. Create-style writes are exempt: an APPEND, or a SET
+        whose templated ``{id}`` is the WHOLE record (``path.{id}`` with no field after it, e.g.
+        add_contact writing ``address_book.{name}``)."""
+        for op in (effects or []):
+            kind = op.get("op")
+            segs = str(op.get("path", "")).split(".")
+            ti = next((i for i, s in enumerate(segs) if "{" in s), None)
+            if ti is None:
+                continue                              # static path -> no per-record target
+            field_after = ti < len(segs) - 1
+            if kind == "delete" or (kind == "set" and field_after):
+                record = self._fill(".".join(segs[:ti + 1]), named)
+                if not self._target_exists(record):
+                    return record
+        return None
+
     @staticmethod
     def _placeholders(res) -> set:
         """The ``{arg}`` names this tool's effect/returns templates reference."""
@@ -707,18 +747,30 @@ class Engine:
             value = (f"[{res.label}] error: missing required argument(s): "
                      f"{', '.join(missing)}. Call with a JSON object, e.g. {example}.")
         else:
-            if getattr(res, "effect", None):
-                self._apply_effects(res.effect, named)
-            ret = getattr(res, "returns", None)
-            if ret is not None:
-                value = self._compute_return(ret, named)
+            # HONESTY guard: a write that UPDATES or DELETES a specific record must have that record
+            # already in state. Acting on a non-existent id (e.g. an agent that passed a worklist
+            # ticket id instead of dereferencing it to the real id) must FAIL LOUDLY, not silently
+            # "succeed" on a phantom target (which mutates nothing / plants junk and misleads both the
+            # agent and the trace). Create-style writes (append; a set that writes a whole new record)
+            # are exempt. See _missing_write_target.
+            miss = self._missing_write_target(getattr(res, "effect", None), named)
+            if miss is not None:
+                value = (f"[{res.label}] error: no such record '{miss}' — that target does not exist. "
+                         f"Resolve the real identifier by dereferencing your worklist item through its "
+                         f"records, then call again with the concrete id.")
             else:
-                content = (res.content or "").strip()
-                if content:
-                    value = content
+                if getattr(res, "effect", None):
+                    self._apply_effects(res.effect, named)
+                ret = getattr(res, "returns", None)
+                if ret is not None:
+                    value = self._compute_return(ret, named)
                 else:
-                    detail = f" args={json.dumps(args)}" if args else ""
-                    value = f"[{res.label}] action completed successfully.{detail}"
+                    content = (res.content or "").strip()
+                    if content:
+                        value = content
+                    else:
+                        detail = f" args={json.dumps(args)}" if args else ""
+                        value = f"[{res.label}] action completed successfully.{detail}"
 
         m = res.malicious
         if m.enabled:
@@ -861,8 +913,12 @@ class Engine:
                         poisoned, err = False, False
                     else:
                         val, poisoned = self.resource_value(res, st, args)
-                        err = False
-                        if not is_read:
+                        # A call that returned an engine guidance error — missing required argument(s),
+                        # or a write on a non-existent target (no such record) — applied NO effect. It
+                        # is a FAILED no-op, not a successful write: mark it errored so the trace renders
+                        # it red (not a green "done" write) and it isn't recorded as a completed write.
+                        err = isinstance(val, str) and bool(re.search(r"\]\s+error:\s", val))
+                        if not is_read and not err:
                             writes_done.add(sig)   # remember completed WRITES to block later duplicates
                             rec = {"fn": fn, "args": args}
                             if rec not in done:
