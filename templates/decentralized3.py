@@ -43,14 +43,17 @@ g.add_node('Consensus', role='aggregator', join='all',
            at=(330, 560))
 
 # edges — ALL-TO-ALL peer exchange {(a_i, a_j) : i≠j}, bounded loops over d rounds
-g.add_conditional_edge('Peer A', 'Peer B', label='exchange', loop=True)
-g.add_conditional_edge('Peer A', 'Peer C', label='exchange', loop=True)
-g.add_conditional_edge('Peer B', 'Peer A', label='exchange', loop=True)
-g.add_conditional_edge('Peer B', 'Peer C', label='exchange', loop=True)
-g.add_conditional_edge('Peer C', 'Peer A', label='exchange', loop=True)
-g.add_conditional_edge('Peer C', 'Peer B', label='exchange', loop=True)
 # majority-voting consensus (Ω = consensus) — peers vote their current position;
 # the sink's post-debate firing is the answer (final = last exit output).
+# peer mesh — any peer may ask any other for info (bounded, single fire; the
+# per-agent DONE-memory prevents re-execution on re-activation)
+g.add_conditional_edge('Peer A', 'Peer B', label='exchange', loop=True, max_iters=1)
+g.add_conditional_edge('Peer A', 'Peer C', label='exchange', loop=True, max_iters=1)
+g.add_conditional_edge('Peer B', 'Peer A', label='exchange', loop=True, max_iters=1)
+g.add_conditional_edge('Peer B', 'Peer C', label='exchange', loop=True, max_iters=1)
+g.add_conditional_edge('Peer C', 'Peer A', label='exchange', loop=True, max_iters=1)
+g.add_conditional_edge('Peer C', 'Peer B', label='exchange', loop=True, max_iters=1)
+
 g.add_edge('Peer A', 'Consensus', label='vote')
 g.add_edge('Peer B', 'Consensus', label='vote')
 g.add_edge('Peer C', 'Consensus', label='vote')

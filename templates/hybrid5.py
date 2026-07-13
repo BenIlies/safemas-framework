@@ -29,20 +29,18 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 g.add_node('Sub-Agent 4', role='worker', prompt=_worker.format(me='Sub-Agent 4'), at=(600, 300))
 g.add_node('Sub-Agent 5', role='worker', prompt=_worker.format(me='Sub-Agent 5'), at=(760, 300))
 
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 4', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 5', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True)
-g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True)
-g.add_conditional_edge('Sub-Agent 5', 'Orchestrator', label='report', loop=True)
-
-# full peer mesh — every sub-agent can message every other (bidirectional); the
-# orchestrator (hierarchy) is what distinguishes this from leaderless Decentralized,
-# NOT peer sparsity — so an AiTM source->sink channel exists for ANY (origin,sink) pair
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 4', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 5', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 4', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 5', 'Orchestrator', label='report', loop=True, max_iters=1)
+# peer mesh — any worker may ask any other (bounded single fire; DONE-memory
+# prevents re-execution on re-activation)
 g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 1', 'Sub-Agent 4', label='peer', loop=True, max_iters=1)
@@ -63,6 +61,10 @@ g.add_conditional_edge('Sub-Agent 5', 'Sub-Agent 1', label='peer', loop=True, ma
 g.add_conditional_edge('Sub-Agent 5', 'Sub-Agent 2', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 5', 'Sub-Agent 3', label='peer', loop=True, max_iters=1)
 g.add_conditional_edge('Sub-Agent 5', 'Sub-Agent 4', label='peer', loop=True, max_iters=1)
+
+# full peer mesh — every sub-agent can message every other (bidirectional); the
+# orchestrator (hierarchy) is what distinguishes this from leaderless Decentralized,
+# NOT peer sparsity — so an AiTM source->sink channel exists for ANY (origin,sink) pair
 
 g.set_entry('Orchestrator', at=(60, 60))
 g.set_finish('Orchestrator', at=(660, 60))

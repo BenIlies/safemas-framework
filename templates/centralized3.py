@@ -53,12 +53,12 @@ g.add_node('Sub-Agent 3', role='worker', prompt=_worker.format(me='Sub-Agent 3')
 # edges — star out (assign), star back (report). The assign edges carry `until` so the
 # orchestrator can END the loop by declaring completion; max_iters is the safety
 # backstop. Report edges loop so sub-agents can report every round.
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE)
-g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True)
-g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True)
-g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 1', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 2', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Orchestrator', 'Sub-Agent 3', label='assign', loop=True, until=_DONE, max_iters=1)
+g.add_conditional_edge('Sub-Agent 1', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 2', 'Orchestrator', label='report', loop=True, max_iters=1)
+g.add_conditional_edge('Sub-Agent 3', 'Orchestrator', label='report', loop=True, max_iters=1)
 
 # entry / exit — the orchestrator is both the entry and the verified sink
 g.set_entry('Orchestrator', at=(60, 60))

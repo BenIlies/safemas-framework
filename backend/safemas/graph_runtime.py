@@ -57,13 +57,14 @@ DEFAULT_MAX_ITERS = _env_int("SAFEMAS_MAX_ROUNDS", 3)    # loop edges with no ex
 STEP_BUDGET = _env_int("SAFEMAS_STEP_BUDGET", 256)       # global cap on activations (runaway backstop)
 PER_AGENT_CAP = _env_int("SAFEMAS_PER_AGENT_CAP", 64)    # cap on activations of a single agent
 TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 6)     # k: tool-calling rounds within one agent activation
-LLM_RETRIES = _env_int("SAFEMAS_LLM_RETRIES", 2)         # retry transient LLM errors per agent call
-LLM_BACKOFF = max(0.0, float(os.environ.get("SAFEMAS_LLM_BACKOFF") or 2.0))  # linear backoff seconds
+LLM_RETRIES = _env_int("SAFEMAS_LLM_RETRIES", 12)        # retry transient LLM errors per agent call
+LLM_BACKOFF = max(0.0, float(os.environ.get("SAFEMAS_LLM_BACKOFF") or 3.0))  # base for exp backoff (s)
 
 # A transient LLM error (network reset, timeout, rate limit, 5xx, overload) should
 # be retried, not allowed to poison a whole run by becoming the agent's "answer".
 _TRANSIENT_ERR = ("connection reset", "reset by peer", "timed out", "timeout",
-                  "rate limit", "429", "500", "502", "503", "504",
+                  "rate limit", "ratelimit", "429", "too many requests", "toomanyrequests",
+                  "500", "502", "503", "504", "529",
                   "temporarily unavailable", "overloaded", "apiconnection",
                   "serviceunavailable", "internalservererror", "remotedisconnected")
 
@@ -391,6 +392,7 @@ class RunState(TypedDict):
     outputs: dict                # agent_id -> last output
     runs: dict                   # agent_id -> activation count
     loop_iters: dict             # channel_key -> count
+    agent_done: dict             # agent_id -> [ {fn, args} ] completed tool calls (cross-activation memory)
     join_buf: dict               # agent_id -> {channel_key: message}
     events: list                 # trace events (seq assigned at finalize)
     attacks: list                # [{element, type}]
@@ -547,7 +549,7 @@ class Engine:
 
     def seed_state(self) -> RunState:
         return RunState(
-            queue=[], outputs={}, runs={}, loop_iters={}, join_buf={},
+            queue=[], outputs={}, runs={}, loop_iters={}, agent_done={}, join_buf={},
             events=[], attacks=[], steps=0, started=False, dispatch=None,
             incoming=None, done=False, final_answer="", last="",
             t0=time.monotonic(),
@@ -745,9 +747,13 @@ class Engine:
                 return acc, "".join(content_parts), "".join(reasoning_parts)
             except Exception as exc:
                 if attempt < LLM_RETRIES and _is_transient(exc):
+                    # exponential backoff + jitter, capped — absorbs sustained 429/overload during a
+                    # long unattended run rather than letting a rate limit become the agent's answer.
+                    import random
+                    delay = min(LLM_BACKOFF * (2 ** attempt), 120.0) + random.uniform(0, 3.0)
                     log(f"{YELLOW}[llm-retry {attempt + 1}/{LLM_RETRIES}] {type(exc).__name__}: "
-                        f"{clip(str(exc), 80)}{RESET}")
-                    time.sleep(LLM_BACKOFF * (attempt + 1))
+                        f"{clip(str(exc), 80)} — sleeping {delay:.1f}s{RESET}")
+                    time.sleep(delay)
                     continue
                 raise
 
@@ -805,6 +811,16 @@ class Engine:
                     break
                 for tc in tool_calls:
                     res = by_name.get(tc["name"])
+                    fn = res.label if res else tc["name"]
+                    rec = {"fn": fn, "args": tc.get("args", {})}
+                    done = st.setdefault("agent_done", {}).setdefault(agent.id, [])
+                    # A WRITE is a state-changing tool (not a getter); reads stay freely repeatable
+                    # because the agent may need to re-observe state, but a WRITE must never fire twice
+                    # with the same args — that is the re-execution ("loop") bug when a peer message or
+                    # coordinator loop re-activates an agent. Enforce it deterministically (prompt-based
+                    # "don't repeat" is not reliable across models), engine-wide → every architecture.
+                    is_read = bool(re.match(r"(get|list|read|resolve|search|fetch|view|find|check|lookup)",
+                                            str(fn).lower()))
                     if res is None:
                         # A coordinator (no tools of its own) tried to call a tool —
                         # steer it to delegate instead of repeating the failed call.
@@ -813,11 +829,16 @@ class Engine:
                                "their results]" if not by_name
                                else f"[error: unknown tool {tc['name']}]")
                         poisoned, err = False, True
+                    elif (not is_read) and rec in done:
+                        val = ("[already completed earlier this run — skipped, not repeated (this exact "
+                               "action is done)]")
+                        poisoned, err = False, False
                     else:
                         val, poisoned = self.resource_value(res, st, tc.get("args", {}))
                         err = False
-                    self._emit(st, "tool_call", agent=agent.label,
-                               function=(res.label if res else tc["name"]),
+                        if not is_read and rec not in done:
+                            done.append(rec)      # remember completed WRITES to block later duplicates
+                    self._emit(st, "tool_call", agent=agent.label, function=fn,
                                args=tc.get("args", {}), result=val, poisoned=poisoned, error=err)
                     log(f"{GREY}    [{agent.label}] ⟳ {tc['name']}({clip(json.dumps(tc.get('args', {})), 60)}) "
                         f"→ {clip(val, 80)}{RESET}")
@@ -848,6 +869,15 @@ class Engine:
         user_input = incoming
         if self.shared_context:
             user_input = f"[Shared context]\n{self.shared_context}\n\n{incoming}"
+
+        # Cross-activation MEMORY: if this agent already ran (e.g. re-activated by a peer message or a
+        # coordinator loop), tell it exactly which tool calls it has ALREADY completed so it does not
+        # repeat its writes. Without this, each re-activation re-executes the whole task (the loop bug).
+        done = (st.get("agent_done") or {}).get(agent.id) or []
+        if done:
+            lines = "; ".join(f"{d['fn']}({json.dumps(d['args'], separators=(',', ':'))})" for d in done)
+            user_input += ("\n\n[ALREADY DONE by you this run — these tool calls succeeded; do NOT "
+                           f"repeat them, only do work that remains]:\n{lines}")
 
         if injected is not None:
             st["attacks"].append({"element": agent.id, "type": "prompt-injection"})
