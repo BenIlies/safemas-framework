@@ -1329,7 +1329,7 @@ def difficulty_report():
 
 # Architecture families for the runnable sweep (parallelism P is fixed by the task's #subtasks,
 # per INDEX-ALIGN). ``sas`` is the P=1 baseline: one agent owns EVERY tool, so both direct and
-# indirect attacks apply to that single Solver. Mirrors report/v6/make_v6_plan.
+# indirect attacks apply to that single Solver. Mirrors report/harness/make_plan.
 _FAMILIES = ("centralized", "hybrid", "decentralized", "independent")
 _COORD_FAMILIES = ("centralized", "hybrid")          # have a coordinator (aitm_coord2*, confused_at_coordinator)
 _SRC2SINK_FAMILIES = ("hybrid", "decentralized")     # a source-owner -> sink-owner edge (aitm_source2sink)
