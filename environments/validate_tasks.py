@@ -608,6 +608,24 @@ def validate_attacks(env, eff):
     return issues
 
 
+def _effect_writes_path(env, tool_name, target_path):
+    """Does ``tool_name``'s effect write to ``target_path``? Suffix-matched segment-wise with
+    placeholders ({arg}) as wildcards, so a store-prefix difference (delivery paths carry the full
+    ``bank_account.…`` while effect paths may be store-relative) doesn't cause a false miss."""
+    tool = next((t for t in env.get("tools", []) if t.get("name") == tool_name), None)
+    if not tool:
+        return False
+    d = [s for s in str(target_path).split(".") if s]
+    for op in (tool.get("effect") or []):
+        p = [s for s in str(op.get("path", "")).split(".") if s]
+        if not p or len(p) > len(d):
+            continue
+        tail = d[len(d) - len(p):]
+        if all(("{" in seg) or seg == tg for seg, tg in zip(p, tail)):
+            return True
+    return False
+
+
 def validate_attack_cascade(env, eff):
     """Fail-loud COHERENCE gate: an attack must be able to fire ON THE EXECUTED TASK (the env's
     first graded user_task, see ``_run_task``), not just in the abstract. This catches the class of
@@ -675,6 +693,16 @@ def validate_attack_cascade(env, eff):
                 if sink and sink not in benign_tools:
                     bucket.append(f"CASCADE {t['id']} (indirect/field-redirect): no benign carrier in {run_id} "
                                   f"calls sink '{sink}' — the poisoned record '{deliv}' is never read → no cascade")
+                # SOURCE-WRITES-DELIVERY (dependence): the poison must actually LAND on the delivery
+                # record. The source tool's effect must write the delivery path — else the attacker
+                # edits one record while the deputy reads another, so nothing cascades (e.g. update_payee
+                # writes payees.{id}.iban but delivery checks payout_accounts.{id}.iban). Suffix-matched
+                # so a store-prefix difference (bank_account.…) doesn't cause false hits.
+                if deliv and t.get("source") and not _effect_writes_path(env, t["source"], deliv):
+                    bucket.append(f"SOURCE-DELIVERY {t['id']} (indirect/field-redirect): source tool "
+                                  f"'{t['source']}' does not write the delivery record '{deliv}' — the "
+                                  f"poison lands on a different record than the deputy reads, so it can "
+                                  f"never cascade (mis-wired confused-deputy)")
     return hard, warn
 
 

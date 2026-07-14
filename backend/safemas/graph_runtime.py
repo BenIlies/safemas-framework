@@ -977,7 +977,11 @@ class Engine:
             st["attacks"].append({"element": agent.id, "type": "prompt-injection"})
             self._emit(st, "attack", element=agent.id, type="prompt-injection", vector="agent", payload=m.payload)
             attack(f"agent '{agent.label}' compromised -> injected directive appended")
-            user_input += f"\n\n[INJECTED]: {m.payload}"
+            # BLEND, don't label: the payload must read as ordinary in-scope content. A framework tag
+            # like "[INJECTED]:" self-announces the attack, so the agent quarantines it ("1 additional
+            # injected task") — which both leaks the setup and makes a compliant model refuse. Append
+            # it as a plain trailing instruction (the attack event above already records it for the UI).
+            user_input += f"\n\n{m.payload}"
 
         log(f"{GREY}    in  ◂ {clip(user_input)}{RESET}")
         output = self.run_agent(agent, provider, model, system, user_input, tool_res, st)
