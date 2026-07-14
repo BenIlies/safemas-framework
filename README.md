@@ -455,6 +455,17 @@ channel message) only reaches the attacker's sink if the topology actually
 **propagates** the malicious instruction to where the sink is acted on — so
 architectures differ in how well they contain (or amplify) a compromise.
 
+### Authoring a new environment
+
+Environments are self-contained JSON under `environments/` — no side spec files, no build step.
+The single source of truth for well-formedness is `environments/validate_tasks.py` (~30
+deterministic gates, no LLM; exits nonzero on any hard failure). To add a new domain, mirror an
+existing env (e.g. `blockchain.json`) and edit until `validate_tasks.py` is green. The full
+methodology — schema, the per-tier worklist model, tool diversity, the 4-hop resolution chains, and
+the attack-coherence rules — is captured in the **`generate-safemas-env` skill**, kept alongside the
+dataset at `environments/generate-safemas-env/SKILL.md` (symlinked into `.claude/skills/` so it runs
+in Claude Code as `/generate-safemas-env`).
+
 ## Project layout
 
 ```
