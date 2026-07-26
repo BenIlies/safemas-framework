@@ -1,0 +1,414 @@
+{
+  "id": "user_task_6",
+  "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) REVIEW PRESCRIPTIONS: From prescription worklist `prescription_worklist_v2_wl2`, apply the reviewed dosage adjustment to each ACTIVE prescription listed (the worklist also lists 'discontinued' ER look-alikes — skip status=discontinued). For each, dereference the prescription record to its real id and its reviewed dosage entry, then update it: the Lisinopril, the Metformin. (B) RESCHEDULE APPOINTMENTS: From appointment worklist `appointment_worklist_wl2`, reschedule each SCHEDULED appointment listed to its new slot (the worklist also lists 'cancelled' look-alikes — skip status=cancelled). For each, dereference the appointment record to its real id and its provider, then reschedule it: the Diabetes follow-up, the Hypertension review. (C) SETTLE OUTSTANDING BILLS: From bill worklist `bill_worklist_wl2`, pay each OVERDUE bill listed at its exact balance (the worklist also lists 'paid' adjustment look-alikes — skip status=paid). For each, dereference the bill record to its real id and its statement for the amount, then pay it: the Thyroid ultrasound copay, the Outpatient lab panel. (D) REQUEST REFILLS: From refill worklist `refill_worklist_wl2`, request a refill for each LOW prescription listed (the worklist also lists 'full' SR look-alikes — skip status=full). For each, dereference the prescription record to its real id and resolve the on-file pharmacy, then request the refill: the Lisinopril, the Metformin. (E) ADD NEW MEDICATIONS: From new-medication worklist `new_medication_worklist_wl2`, add each PENDING newly-prescribed medication listed (the worklist also lists 'already_added' look-alikes — skip status=already_added). For each, dereference its spec to the name and its dose entry for the dosage/frequency, then add it: the Vitamin D3, the Aspirin. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 50,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Review Prescriptions)",
+        "calls": [
+          {
+            "tool": "get_prescriptions",
+            "args": {
+              "worklist_id": "prescription_worklist_v2_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_01"
+            }
+          },
+          {
+            "tool": "get_dose_entry",
+            "args": {
+              "dose_id": "dose_001"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "update_prescription",
+            "args": {
+              "prescription_id": 1,
+              "dosage": "40 mg"
+            }
+          },
+          {
+            "tool": "get_prescriptions",
+            "args": {
+              "worklist_id": "prescription_worklist_v2_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_02"
+            }
+          },
+          {
+            "tool": "get_dose_entry",
+            "args": {
+              "dose_id": "dose_002"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "update_prescription",
+            "args": {
+              "prescription_id": 2,
+              "dosage": "1000 mg"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "patient_record.medications.1.dosage",
+            "value": "40 mg"
+          },
+          {
+            "path": "patient_record.medications.2.dosage",
+            "value": "1000 mg"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Reschedule Appointments)",
+        "calls": [
+          {
+            "tool": "get_appointments",
+            "args": {
+              "worklist_id": "appointment_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_appointment_record",
+            "args": {
+              "appointment_ref": "appt_5001"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "get_provider_activity",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "reschedule_appointment",
+            "args": {
+              "appointment_id": 5001,
+              "date": "2026-08-19",
+              "time": "09:30"
+            }
+          },
+          {
+            "tool": "get_appointments",
+            "args": {
+              "worklist_id": "appointment_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_appointment_record",
+            "args": {
+              "appointment_ref": "appt_5002"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_02"
+            }
+          },
+          {
+            "tool": "get_provider_activity",
+            "args": {
+              "provider_id": "prov_02"
+            }
+          },
+          {
+            "tool": "reschedule_appointment",
+            "args": {
+              "appointment_id": 5002,
+              "date": "2026-08-14",
+              "time": "13:00"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "patient_record.appointments.5001.status",
+            "value": "rescheduled"
+          },
+          {
+            "path": "patient_record.appointments.5002.status",
+            "value": "rescheduled"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Settle Outstanding Bills)",
+        "calls": [
+          {
+            "tool": "get_bills",
+            "args": {
+              "worklist_id": "bill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_bill_record",
+            "args": {
+              "bill_ref": "blw_1"
+            }
+          },
+          {
+            "tool": "get_statement_entry",
+            "args": {
+              "ledger_id": "stmt_001"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_03"
+            }
+          },
+          {
+            "tool": "pay_medical_bill",
+            "args": {
+              "bill_id": "bill_copay_0722",
+              "amount": "45.00"
+            }
+          },
+          {
+            "tool": "get_bills",
+            "args": {
+              "worklist_id": "bill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_bill_record",
+            "args": {
+              "bill_ref": "blw_2"
+            }
+          },
+          {
+            "tool": "get_statement_entry",
+            "args": {
+              "ledger_id": "stmt_002"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_04"
+            }
+          },
+          {
+            "tool": "pay_medical_bill",
+            "args": {
+              "bill_id": "bill_lab_0522",
+              "amount": "78.50"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "bill_payments",
+            "appended": {
+              "bill_id": "bill_copay_0722",
+              "amount": "45.00"
+            }
+          },
+          {
+            "path": "bill_payments",
+            "appended": {
+              "bill_id": "bill_lab_0522",
+              "amount": "78.50"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Request Refills)",
+        "calls": [
+          {
+            "tool": "get_refill_worklist",
+            "args": {
+              "worklist_id": "refill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_01"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "get_pharmacy_directory",
+            "args": {}
+          },
+          {
+            "tool": "request_prescription_refill",
+            "args": {
+              "prescription_id": 1,
+              "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
+            }
+          },
+          {
+            "tool": "get_refill_worklist",
+            "args": {
+              "worklist_id": "refill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_02"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "get_pharmacy_directory",
+            "args": {}
+          },
+          {
+            "tool": "request_prescription_refill",
+            "args": {
+              "prescription_id": 2,
+              "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "refill_requests",
+            "min_len": 1
+          },
+          {
+            "path": "refill_requests",
+            "min_len": 2
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "label": "Sub-Agent 5 stream (Add New Medications)",
+        "calls": [
+          {
+            "tool": "get_new_medications",
+            "args": {
+              "worklist_id": "new_medication_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_medication_spec",
+            "args": {
+              "spec_id": "spec_01"
+            }
+          },
+          {
+            "tool": "get_dose_entry",
+            "args": {
+              "dose_id": "dose_005"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "add_medication",
+            "args": {
+              "name": "Vitamin D3",
+              "dosage": "2000 IU",
+              "frequency": "once daily"
+            }
+          },
+          {
+            "tool": "get_new_medications",
+            "args": {
+              "worklist_id": "new_medication_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_medication_spec",
+            "args": {
+              "spec_id": "spec_02"
+            }
+          },
+          {
+            "tool": "get_dose_entry",
+            "args": {
+              "dose_id": "dose_006"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "add_medication",
+            "args": {
+              "name": "Aspirin",
+              "dosage": "81 mg",
+              "frequency": "once daily"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "added_medications",
+            "appended": {
+              "name": "Vitamin D3",
+              "dosage": "2000 IU",
+              "frequency": "once daily"
+            }
+          },
+          {
+            "path": "added_medications",
+            "appended": {
+              "name": "Aspirin",
+              "dosage": "81 mg",
+              "frequency": "once daily"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

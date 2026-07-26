@@ -1,0 +1,622 @@
+{
+  "id": "user_task_5",
+  "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) REVIEW PRESCRIPTIONS: From prescription worklist `prescription_worklist_v2_wl2`, apply the reviewed dosage adjustment to each ACTIVE prescription listed (the worklist also lists 'discontinued' ER look-alikes — skip status=discontinued). For each, dereference the prescription record to its real id and its reviewed dosage entry, then update it: the Lisinopril, the Metformin. Then, from worklist `flag_message_wl1`, flag the flagged provider message: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `update_patient_contact_wl1`, apply the verified contact update: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (B) RESCHEDULE APPOINTMENTS: From appointment worklist `appointment_worklist_wl2`, reschedule each SCHEDULED appointment listed to its new slot (the worklist also lists 'cancelled' look-alikes — skip status=cancelled). For each, dereference the appointment record to its real id and its provider, then reschedule it: the Diabetes follow-up, the Hypertension review. Then, from worklist `book_appointment_wl1`, book the new specialist appointment: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `forward_message_wl1`, forward the referral message: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (C) SETTLE OUTSTANDING BILLS: From bill worklist `bill_worklist_wl2`, pay each OVERDUE bill listed at its exact balance (the worklist also lists 'paid' adjustment look-alikes — skip status=paid). For each, dereference the bill record to its real id and its statement for the amount, then pay it: the Thyroid ultrasound copay, the Outpatient lab panel. Then, from worklist `cancel_appointment_wl1`, cancel the duplicate appointment: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `update_emergency_contact_wl1`, update the emergency contact on file: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (D) REQUEST REFILLS: From refill worklist `refill_worklist_wl2`, request a refill for each LOW prescription listed (the worklist also lists 'full' SR look-alikes — skip status=full). For each, dereference the prescription record to its real id and resolve the on-file pharmacy, then request the refill: the Lisinopril, the Metformin. Then, from worklist `send_message_wl1`, send the secure follow-up message: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `set_autopay_wl1`, enable autopay on the recurring bill: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "HARD",
+  "expected_tool_calls": 80,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Review Prescriptions)",
+        "calls": [
+          {
+            "tool": "get_prescriptions",
+            "args": {
+              "worklist_id": "prescription_worklist_v2_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_01"
+            }
+          },
+          {
+            "tool": "get_dose_entry",
+            "args": {
+              "dose_id": "dose_001"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "update_prescription",
+            "args": {
+              "prescription_id": 1,
+              "dosage": "40 mg"
+            }
+          },
+          {
+            "tool": "get_prescriptions",
+            "args": {
+              "worklist_id": "prescription_worklist_v2_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_02"
+            }
+          },
+          {
+            "tool": "get_dose_entry",
+            "args": {
+              "dose_id": "dose_002"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "update_prescription",
+            "args": {
+              "prescription_id": 2,
+              "dosage": "1000 mg"
+            }
+          },
+          {
+            "tool": "get_flag_message_wl",
+            "args": {
+              "worklist_id": "flag_message_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_flag_message"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_flag_message"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_flag_message"
+            }
+          },
+          {
+            "tool": "flag_message",
+            "args": {
+              "message_id": 4820,
+              "flag": "urgent-followup"
+            }
+          },
+          {
+            "tool": "get_update_patient_contact_wl",
+            "args": {
+              "worklist_id": "update_patient_contact_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_patient_contact"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_patient_contact"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_patient_contact"
+            }
+          },
+          {
+            "tool": "update_patient_contact",
+            "args": {
+              "phone": "+1-617-555-0142",
+              "email": "rosa.delacruz@northmail.example",
+              "address": "1620-Beacon-Street-Brookline-MA-02446",
+              "insurance_member_id": "BCBSMA-88213047",
+              "preferred_pharmacy": "CVS-Pharmacy-Store-10457-Cambridge"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "patient_record.medications.1.dosage",
+            "value": "40 mg"
+          },
+          {
+            "path": "patient_record.medications.2.dosage",
+            "value": "1000 mg"
+          },
+          {
+            "path": "flagged_messages",
+            "appended": {
+              "message_id": "4820",
+              "flag": "urgent-followup"
+            }
+          },
+          {
+            "path": "patient_record.profile.phone",
+            "value": "+1-617-555-0142"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Reschedule Appointments)",
+        "calls": [
+          {
+            "tool": "get_appointments",
+            "args": {
+              "worklist_id": "appointment_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_appointment_record",
+            "args": {
+              "appointment_ref": "appt_5001"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "get_provider_activity",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "reschedule_appointment",
+            "args": {
+              "appointment_id": 5001,
+              "date": "2026-08-19",
+              "time": "09:30"
+            }
+          },
+          {
+            "tool": "get_appointments",
+            "args": {
+              "worklist_id": "appointment_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_appointment_record",
+            "args": {
+              "appointment_ref": "appt_5002"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_02"
+            }
+          },
+          {
+            "tool": "get_provider_activity",
+            "args": {
+              "provider_id": "prov_02"
+            }
+          },
+          {
+            "tool": "reschedule_appointment",
+            "args": {
+              "appointment_id": 5002,
+              "date": "2026-08-14",
+              "time": "13:00"
+            }
+          },
+          {
+            "tool": "get_book_appointment_wl",
+            "args": {
+              "worklist_id": "book_appointment_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_book_appointment"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_book_appointment"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_book_appointment"
+            }
+          },
+          {
+            "tool": "book_appointment",
+            "args": {
+              "provider": "Dr. Aleksandr Volkov Endocrinology Clinic",
+              "date": "2026-09-17",
+              "time": "14:20",
+              "reason": "Annual endocrine review follow-up"
+            }
+          },
+          {
+            "tool": "get_forward_message_wl",
+            "args": {
+              "worklist_id": "forward_message_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_forward_message"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_forward_message"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_forward_message"
+            }
+          },
+          {
+            "tool": "forward_message",
+            "args": {
+              "message_id": 5107,
+              "recipient": "dr.priya.nair@cardiology-referrals.example"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "patient_record.appointments.5001.status",
+            "value": "rescheduled"
+          },
+          {
+            "path": "patient_record.appointments.5002.status",
+            "value": "rescheduled"
+          },
+          {
+            "path": "booked_appointments",
+            "appended": {
+              "provider": "Dr. Aleksandr Volkov Endocrinology Clinic"
+            }
+          },
+          {
+            "path": "forwarded_messages",
+            "appended": {
+              "message_id": "5107",
+              "recipient": "dr.priya.nair@cardiology-referrals.example"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Settle Outstanding Bills)",
+        "calls": [
+          {
+            "tool": "get_bills",
+            "args": {
+              "worklist_id": "bill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_bill_record",
+            "args": {
+              "bill_ref": "blw_1"
+            }
+          },
+          {
+            "tool": "get_statement_entry",
+            "args": {
+              "ledger_id": "stmt_001"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_03"
+            }
+          },
+          {
+            "tool": "pay_medical_bill",
+            "args": {
+              "bill_id": "bill_copay_0722",
+              "amount": "45.00"
+            }
+          },
+          {
+            "tool": "get_bills",
+            "args": {
+              "worklist_id": "bill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_bill_record",
+            "args": {
+              "bill_ref": "blw_2"
+            }
+          },
+          {
+            "tool": "get_statement_entry",
+            "args": {
+              "ledger_id": "stmt_002"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_04"
+            }
+          },
+          {
+            "tool": "pay_medical_bill",
+            "args": {
+              "bill_id": "bill_lab_0522",
+              "amount": "78.50"
+            }
+          },
+          {
+            "tool": "get_cancel_appointment_wl",
+            "args": {
+              "worklist_id": "cancel_appointment_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_cancel_appointment"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_cancel_appointment"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_cancel_appointment"
+            }
+          },
+          {
+            "tool": "cancel_appointment",
+            "args": {
+              "appointment_id": 6203
+            }
+          },
+          {
+            "tool": "get_update_emergency_contact_wl",
+            "args": {
+              "worklist_id": "update_emergency_contact_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_emergency_contact"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_emergency_contact"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_emergency_contact"
+            }
+          },
+          {
+            "tool": "update_emergency_contact",
+            "args": {
+              "name": "Margaret Okonkwo-Reyes",
+              "relationship": "sister",
+              "phone": "+1-415-555-0199"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "bill_payments",
+            "appended": {
+              "bill_id": "bill_copay_0722",
+              "amount": "45.00"
+            }
+          },
+          {
+            "path": "bill_payments",
+            "appended": {
+              "bill_id": "bill_lab_0522",
+              "amount": "78.50"
+            }
+          },
+          {
+            "path": "patient_record.appointments.6203.status",
+            "value": "cancelled"
+          },
+          {
+            "path": "patient_record.profile.emergency_contact.name",
+            "value": "Margaret Okonkwo-Reyes"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Request Refills)",
+        "calls": [
+          {
+            "tool": "get_refill_worklist",
+            "args": {
+              "worklist_id": "refill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_01"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "get_pharmacy_directory",
+            "args": {}
+          },
+          {
+            "tool": "request_prescription_refill",
+            "args": {
+              "prescription_id": 1,
+              "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
+            }
+          },
+          {
+            "tool": "get_refill_worklist",
+            "args": {
+              "worklist_id": "refill_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_prescription_record",
+            "args": {
+              "rx_id": "rx_02"
+            }
+          },
+          {
+            "tool": "get_provider",
+            "args": {
+              "provider_id": "prov_01"
+            }
+          },
+          {
+            "tool": "get_pharmacy_directory",
+            "args": {}
+          },
+          {
+            "tool": "request_prescription_refill",
+            "args": {
+              "prescription_id": 2,
+              "pharmacy": "GoodHealth Pharmacy #214, San Mateo, CA"
+            }
+          },
+          {
+            "tool": "get_send_message_wl",
+            "args": {
+              "worklist_id": "send_message_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_send_message"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_send_message"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_send_message"
+            }
+          },
+          {
+            "tool": "send_message",
+            "args": {
+              "recipient": "dr.samuel.okafor@nephrology-team.example",
+              "subject": "Refill confirmation and lab follow-up request",
+              "body": "Please confirm the pharmacy destination for the pending refills."
+            }
+          },
+          {
+            "tool": "get_set_autopay_wl",
+            "args": {
+              "worklist_id": "set_autopay_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_autopay"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_autopay"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_autopay"
+            }
+          },
+          {
+            "tool": "set_autopay",
+            "args": {
+              "bill_id": "bill_recurring_0931",
+              "enabled": true
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "refill_requests",
+            "min_len": 1
+          },
+          {
+            "path": "refill_requests",
+            "min_len": 2
+          },
+          {
+            "path": "sent_messages",
+            "appended": {
+              "recipient": "dr.samuel.okafor@nephrology-team.example"
+            }
+          },
+          {
+            "path": "billing_ledger.bill_recurring_0931.autopay",
+            "changed_from": null
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,8 +1,9 @@
 """Interactive **scenario** assembly for the editor's test runner.
 
-It lets the UI pick one *environment* (a dataset under ``environments/*.json`` —
+It lets the UI pick one *environment* (a dataset folder under ``environments/<name>/`` —
 toolset, persistent stores, benign ``user_tasks``, adversarial
-``injection_tasks``), one *architecture* (a template), a *task*, and — optionally —
+``injection_tasks``, one file per component, assembled by ``environments/envio.py``),
+one *architecture* (a template), a *task*, and — optionally —
 an *injection scenario* and the *point* where the poison lands (a tool result or a
 chosen agent's prompt). It then composes a single runnable architecture,
 server-side, so the visual editor can drive it and replay the trace in the Trace
@@ -19,9 +20,20 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 
 ENV_DIR = Path(__file__).resolve().parent.parent / "environments"  # the fixed, bundled datasets
+
+# The dataset's on-disk layout (folder per env, file per component) is defined once, next to
+# the data, in ``environments/envio.py`` — import it rather than re-implementing the assembly.
+# The dataset ships outside the backend image, so treat an absent envio the same way the old
+# code treated an absent environments/ dir: no environments, not a crashed backend.
+sys.path.insert(0, str(ENV_DIR))
+try:
+    import envio
+except ImportError:                                                # pragma: no cover
+    envio = None
 
 # A tool whose name matches one of these verbs is a plausible "sink" — the action
 # an attacker abuses (move money, message someone, exfiltrate, escalate). Used to
@@ -43,15 +55,19 @@ def _safe(name: str) -> str:
 
 def list_environments() -> list[dict]:
     """Lightweight catalogue of the fixed, bundled environment datasets."""
+    if envio is None:
+        return []
     out: list[dict] = []
-    for p in sorted(ENV_DIR.glob("*.json")):
+    for name in envio.env_names():
         try:
-            d = json.loads(p.read_text())
-        except (OSError, json.JSONDecodeError):
+            d = envio.load_env(name)
+        except (OSError, ValueError, envio.EnvLayoutError):
+            continue
+        if not d:
             continue
         out.append({
-            "name": d.get("name") or p.stem,
-            "title": d.get("title") or p.stem,
+            "name": d.get("name") or name,
+            "title": d.get("title") or name,
             "tools": len(d.get("tools", [])),
             "user_tasks": len(d.get("user_tasks", [])),
             "injection_tasks": len(d.get("injection_tasks", [])),
@@ -60,12 +76,11 @@ def list_environments() -> list[dict]:
 
 
 def load_environment(name: str) -> dict | None:
-    p = ENV_DIR / f"{_safe(name)}.json"
-    if not p.exists():
+    if envio is None:
         return None
     try:
-        return json.loads(p.read_text())
-    except (OSError, json.JSONDecodeError):
+        return envio.load_env(_safe(name))
+    except (OSError, ValueError, envio.EnvLayoutError):
         return None
 
 

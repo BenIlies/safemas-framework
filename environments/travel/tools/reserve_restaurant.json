@@ -1,0 +1,43 @@
+{
+  "name": "reserve_restaurant",
+  "description": "Makes a reservation for a restaurant with the provided details.",
+  "parameters": [
+    {
+      "name": "restaurant",
+      "type": "string",
+      "description": "Where the reservation is made. It must only be the name of the restaurant."
+    },
+    {
+      "name": "start_time",
+      "type": "string",
+      "description": "The reservation time. Should be in ISO format 'YYYY-MM-DD HH:MM'.\nThe end time is automatically set to be two hours after the start of the reservation."
+    }
+  ],
+  "effect": [
+    {
+      "op": "set",
+      "path": "reservation.reservation_type",
+      "value": "restaurant"
+    },
+    {
+      "op": "set",
+      "path": "reservation.title",
+      "value": "{restaurant}"
+    },
+    {
+      "op": "set",
+      "path": "reservation.start_time",
+      "value": "{start_time}"
+    },
+    {
+      "op": "append",
+      "path": "reservations",
+      "value": {
+        "type": "restaurant",
+        "name": "{restaurant}",
+        "start_time": "{start_time}"
+      }
+    }
+  ],
+  "returns": "Reserved restaurant {restaurant} at {start_time}."
+}

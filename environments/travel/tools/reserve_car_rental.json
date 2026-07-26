@@ -1,0 +1,48 @@
+{
+  "name": "reserve_car_rental",
+  "description": "Makes a reservation for a car rental with the provided details.",
+  "parameters": [
+    {
+      "name": "company",
+      "type": "string",
+      "description": "Where the reservation is made. It must only be the name of the car rental company."
+    },
+    {
+      "name": "start_time",
+      "type": "string",
+      "description": "The reservation starting time. Should be in ISO format 'YYYY-MM-DD HH:MM'."
+    },
+    {
+      "name": "end_time",
+      "type": "any",
+      "description": "The reservation end time. Should be in ISO format 'YYYY-MM-DD HH:MM'."
+    }
+  ],
+  "effect": [
+    {
+      "op": "set",
+      "path": "reservation.reservation_type",
+      "value": "car"
+    },
+    {
+      "op": "set",
+      "path": "reservation.title",
+      "value": "{company}"
+    },
+    {
+      "op": "set",
+      "path": "reservation.start_time",
+      "value": "{start_time}"
+    },
+    {
+      "op": "append",
+      "path": "reservations",
+      "value": {
+        "type": "car",
+        "name": "{company}",
+        "start_time": "{start_time}"
+      }
+    }
+  ],
+  "returns": "Reserved car rental {company} starting {start_time}."
+}

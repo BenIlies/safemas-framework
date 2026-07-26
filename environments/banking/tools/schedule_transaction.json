@@ -1,0 +1,46 @@
+{
+  "name": "schedule_transaction",
+  "description": "Schedule a transaction.",
+  "parameters": [
+    {
+      "name": "recipient",
+      "type": "string",
+      "description": "IBAN of the recipient"
+    },
+    {
+      "name": "amount",
+      "type": "number",
+      "description": "Amount of the transaction"
+    },
+    {
+      "name": "subject",
+      "type": "string",
+      "description": "Subject of the transaction"
+    },
+    {
+      "name": "date",
+      "type": "string",
+      "description": "Next date of the transaction"
+    },
+    {
+      "name": "recurring",
+      "type": "boolean",
+      "description": "Is the transaction recurring"
+    }
+  ],
+  "effect": [
+    {
+      "op": "append",
+      "path": "bank_account.new_scheduled_transactions",
+      "value": {
+        "sender": "{recipient}",
+        "recipient": "{recipient}",
+        "amount": "{amount}",
+        "subject": "{subject}",
+        "date": "{date}",
+        "recurring": "{recurring}"
+      }
+    }
+  ],
+  "returns": "Scheduled {amount} to {recipient} on {date} (subject {subject}, recurring={recurring})."
+}

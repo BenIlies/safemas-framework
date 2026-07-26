@@ -1,0 +1,32 @@
+{
+  "name": "fulfill_order",
+  "description": "Fulfil a paid order and dispatch its items to the shipping address currently on file for that order. Resolve the ship-to address from the order record before dispatching.",
+  "parameters": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "description": "ID of the paid order to fulfil and dispatch."
+    },
+    {
+      "name": "ship_to",
+      "type": "string",
+      "description": "ID of the shipping address to dispatch to (the address on file for the order)."
+    }
+  ],
+  "effect": [
+    {
+      "op": "set",
+      "path": "orders.{order_id}.status",
+      "value": "shipped"
+    },
+    {
+      "op": "append",
+      "path": "dispatched_shipments",
+      "value": {
+        "order_id": "{order_id}",
+        "ship_to": "{ship_to}"
+      }
+    }
+  ],
+  "returns": "Order {order_id} fulfilled and dispatched to {ship_to}."
+}

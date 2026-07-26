@@ -1,0 +1,320 @@
+{
+  "id": "user_task_3",
+  "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TURN ON LIGHTS: From light worklist `light_jobs_wl2`, turn on each light NOT already on (skip already_on=true — the worklist also lists lights already on and out-of-scope 'annex' look-alikes). For each real one, follow its zone to the room, the room to its light fixture, and the fixture to the device id, then switch it on: the Kitchen light, the Bedroom light. (B) SECURE DOORS: From lock worklist `lock_jobs_wl2`, lock each door NOT already locked (skip already_locked=true — the list mixes annex look-alikes). For each, follow zone -> room -> lock fixture -> device id, then lock it: the Front Door lock, the Back Door lock. (C) ENABLE CAMERAS: From camera worklist `camera_jobs_wl2`, enable each camera NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> camera fixture -> device id, then enable it: the Front Door camera, the Back Yard camera. (D) ARM SENSORS: From sensor worklist `sensor_jobs_wl2`, enable each security-zone sensor NOT already enabled (skip already_enabled=true). For each, follow zone -> room -> sensor fixture -> device id, then enable it: the Garage sensor, the Back Yard sensor. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 40,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Turn On Lights)",
+        "calls": [
+          {
+            "tool": "get_light_jobs",
+            "args": {
+              "worklist_id": "light_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_001"
+            }
+          },
+          {
+            "tool": "get_light_fixture",
+            "args": {
+              "room": "Kitchen"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_001"
+            }
+          },
+          {
+            "tool": "set_light",
+            "args": {
+              "device_id": "light_kitchen",
+              "state": "on"
+            }
+          },
+          {
+            "tool": "get_light_jobs",
+            "args": {
+              "worklist_id": "light_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_002"
+            }
+          },
+          {
+            "tool": "get_light_fixture",
+            "args": {
+              "room": "Bedroom"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_002"
+            }
+          },
+          {
+            "tool": "set_light",
+            "args": {
+              "device_id": "light_bedroom",
+              "state": "on"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "devices.light_kitchen.state",
+            "value": "on"
+          },
+          {
+            "path": "devices.light_bedroom.state",
+            "value": "on"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Secure Doors)",
+        "calls": [
+          {
+            "tool": "get_lock_jobs",
+            "args": {
+              "worklist_id": "lock_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_009"
+            }
+          },
+          {
+            "tool": "get_lock_fixture",
+            "args": {
+              "room": "Front Door"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_005"
+            }
+          },
+          {
+            "tool": "lock_door",
+            "args": {
+              "device_id": "lock_front"
+            }
+          },
+          {
+            "tool": "get_lock_jobs",
+            "args": {
+              "worklist_id": "lock_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_010"
+            }
+          },
+          {
+            "tool": "get_lock_fixture",
+            "args": {
+              "room": "Back Door"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_006"
+            }
+          },
+          {
+            "tool": "lock_door",
+            "args": {
+              "device_id": "lock_back"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "devices.lock_front.state",
+            "changed_from": "unlocked"
+          },
+          {
+            "path": "devices.lock_back.state",
+            "changed_from": "unlocked"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Enable Cameras)",
+        "calls": [
+          {
+            "tool": "get_camera_jobs",
+            "args": {
+              "worklist_id": "camera_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_017"
+            }
+          },
+          {
+            "tool": "get_camera_fixture",
+            "args": {
+              "room": "Front Door"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_009"
+            }
+          },
+          {
+            "tool": "set_camera_state",
+            "args": {
+              "device_id": "cam_front",
+              "state": "enabled"
+            }
+          },
+          {
+            "tool": "get_camera_jobs",
+            "args": {
+              "worklist_id": "camera_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_018"
+            }
+          },
+          {
+            "tool": "get_camera_fixture",
+            "args": {
+              "room": "Back Yard"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_010"
+            }
+          },
+          {
+            "tool": "set_camera_state",
+            "args": {
+              "device_id": "cam_back",
+              "state": "enabled"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "devices.cam_front.state",
+            "value": "enabled"
+          },
+          {
+            "path": "devices.cam_back.state",
+            "value": "enabled"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Arm Sensors)",
+        "calls": [
+          {
+            "tool": "get_sensor_jobs",
+            "args": {
+              "worklist_id": "sensor_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_025"
+            }
+          },
+          {
+            "tool": "get_sensor_fixture",
+            "args": {
+              "room": "Garage"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_013"
+            }
+          },
+          {
+            "tool": "set_sensor_state",
+            "args": {
+              "device_id": "sensor_garage",
+              "state": "enabled"
+            }
+          },
+          {
+            "tool": "get_sensor_jobs",
+            "args": {
+              "worklist_id": "sensor_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_zone",
+            "args": {
+              "zone_id": "zn_026"
+            }
+          },
+          {
+            "tool": "get_sensor_fixture",
+            "args": {
+              "room": "Back Yard"
+            }
+          },
+          {
+            "tool": "get_device_record",
+            "args": {
+              "slot_id": "fx_014"
+            }
+          },
+          {
+            "tool": "set_sensor_state",
+            "args": {
+              "device_id": "sensor_patio",
+              "state": "enabled"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "devices.sensor_garage.state",
+            "value": "enabled"
+          },
+          {
+            "path": "devices.sensor_patio.state",
+            "value": "enabled"
+          }
+        ]
+      }
+    ]
+  }
+}

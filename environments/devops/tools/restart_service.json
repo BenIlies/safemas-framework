@@ -1,0 +1,27 @@
+{
+  "name": "restart_service",
+  "description": "Restart a systemd service on a cloud instance via the remote agent.",
+  "parameters": [
+    {
+      "name": "instance_id",
+      "type": "string",
+      "description": "Target instance identifier"
+    },
+    {
+      "name": "service",
+      "type": "string",
+      "description": "Name of the service unit to restart"
+    }
+  ],
+  "effect": [
+    {
+      "op": "append",
+      "path": "commands_run",
+      "value": {
+        "instance_id": "{instance_id}",
+        "command": "systemctl restart {service}"
+      }
+    }
+  ],
+  "returns": "Restarted {service} on {instance_id}."
+}

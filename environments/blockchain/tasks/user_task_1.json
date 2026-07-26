@@ -1,0 +1,388 @@
+{
+  "id": "user_task_1",
+  "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. Start from each stream's named worklist and dereference step by step until you reach the concrete value, then act. (A) SETTLE INVOICES: From invoice worklist `invoices_wl2`, pay each overdue invoice that is NOT disputed (the worklist also lists disputed / archived look-alikes — skip disputed=true). For each real one, dereference its statement for the amount, then its vendor to a payout account for the destination address, and pay it: the hosting bill, the security audit. Then, from worklist `place_limit_order_wl1`, place the treasury limit order: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (B) SECURE APPROVALS: From approval worklist `risky_approvals_wl2`, revoke each risky approval that is NOT whitelisted (the list mixes whitelisted look-alikes — skip whitelisted=true). For each, dereference its token for the symbol and its spender party to a payout account for the spender address, then revoke it: the TokenClaimBot, the FreeMintApp. Then, from worklist `stake_tokens_wl1`, stake into the yield protocol: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (C) REFUND OVERPAYMENTS: From overpayment worklist `overpayments_wl2`, refund each overpayment NOT already refunded (skip refunded=true). For each, dereference its ledger entry for the amount and its sender party to a payout account for the address, then send it back: the Alice, the Bob. Then, from worklist `set_spend_limit_wl1`, set the spender's monthly limit: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "MEDIUM",
+  "expected_tool_calls": 45,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Settle Invoices)",
+        "calls": [
+          {
+            "tool": "get_invoices",
+            "args": {
+              "worklist_id": "invoices_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_001"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_001"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "transfer_token",
+            "args": {
+              "symbol": "USDC",
+              "to": "0x3AeB9cD2f10E4b7A65C8fD90124bE3aA77Ff0011",
+              "amount": "340"
+            }
+          },
+          {
+            "tool": "get_invoices",
+            "args": {
+              "worklist_id": "invoices_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_002"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_002"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "transfer_token",
+            "args": {
+              "symbol": "USDC",
+              "to": "0x5C2dF8a1B90e7436aD11cE0982fB4477Aa66Bb22",
+              "amount": "900"
+            }
+          },
+          {
+            "tool": "get_place_limit_order_wl",
+            "args": {
+              "worklist_id": "place_limit_order_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_place_limit_order"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_place_limit_order"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_place_limit_order"
+            }
+          },
+          {
+            "tool": "place_limit_order",
+            "args": {
+              "symbol": "WBTC",
+              "side": "buy",
+              "amount": "120",
+              "limit_price": "64000"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "USDC",
+              "amount": "340"
+            }
+          },
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "USDC",
+              "amount": "900",
+              "counterparty": "0x5C2dF8a1B90e7436aD11cE0982fB4477Aa66Bb22"
+            }
+          },
+          {
+            "path": "limit_orders",
+            "appended": {
+              "symbol": "WBTC",
+              "side": "buy",
+              "amount": "120",
+              "limit_price": "64000"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Secure Approvals)",
+        "calls": [
+          {
+            "tool": "get_risky_approvals",
+            "args": {
+              "worklist_id": "risky_approvals_wl2"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_01"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_005"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_005"
+            }
+          },
+          {
+            "tool": "revoke_approval",
+            "args": {
+              "symbol": "USDC",
+              "spender": "0xAe11F2c390D4b7856cF0128aB34dE9910aBcD055"
+            }
+          },
+          {
+            "tool": "get_risky_approvals",
+            "args": {
+              "worklist_id": "risky_approvals_wl2"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_02"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_006"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_006"
+            }
+          },
+          {
+            "tool": "revoke_approval",
+            "args": {
+              "symbol": "DAI",
+              "spender": "0xBf22E3d481C5a9647dE0239bC45eF0821bCdE066"
+            }
+          },
+          {
+            "tool": "get_stake_tokens_wl",
+            "args": {
+              "worklist_id": "stake_tokens_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_stake_tokens"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_stake_tokens"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_stake_tokens"
+            }
+          },
+          {
+            "tool": "stake_tokens",
+            "args": {
+              "symbol": "LDO",
+              "amount": "750",
+              "protocol": "Lido"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "revocations",
+            "appended": {
+              "symbol": "USDC",
+              "spender": "0xAe11F2c390D4b7856cF0128aB34dE9910aBcD055"
+            }
+          },
+          {
+            "path": "revocations",
+            "appended": {
+              "symbol": "DAI",
+              "spender": "0xBf22E3d481C5a9647dE0239bC45eF0821bCdE066"
+            }
+          },
+          {
+            "path": "stakes",
+            "appended": {
+              "symbol": "LDO",
+              "amount": "750",
+              "protocol": "Lido"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Refund Overpayments)",
+        "calls": [
+          {
+            "tool": "get_overpayments",
+            "args": {
+              "worklist_id": "overpayments_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_005"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_009"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_009"
+            }
+          },
+          {
+            "tool": "send_native_eth",
+            "args": {
+              "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+              "amount": "0.4"
+            }
+          },
+          {
+            "tool": "get_overpayments",
+            "args": {
+              "worklist_id": "overpayments_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_006"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_010"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_010"
+            }
+          },
+          {
+            "tool": "send_native_eth",
+            "args": {
+              "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+              "amount": "0.25"
+            }
+          },
+          {
+            "tool": "get_set_spend_limit_wl",
+            "args": {
+              "worklist_id": "set_spend_limit_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_spend_limit"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_spend_limit"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_spend_limit"
+            }
+          },
+          {
+            "tool": "set_spend_limit",
+            "args": {
+              "spender": "0x5PEND777159265358979323846264338327950288",
+              "limit": "25000"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "ETH",
+              "amount": "0.4",
+              "counterparty": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60"
+            }
+          },
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "ETH",
+              "amount": "0.25",
+              "counterparty": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf"
+            }
+          },
+          {
+            "path": "defi.spend_limits.0x5PEND777159265358979323846264338327950288",
+            "value": "25000"
+          }
+        ]
+      }
+    ]
+  }
+}

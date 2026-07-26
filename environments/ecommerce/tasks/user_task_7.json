@@ -1,0 +1,590 @@
+{
+  "id": "user_task_7",
+  "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) RESTOCK CART: From restock worklist `restock_worklist_wl2`, reorder each item flagged for reorder (skip reorder=false — the worklist also lists discontinued, renewed look-alikes). For each, dereference its line item to the product for the catalog id and to the quantity ledger for the number of units, then add that many units to the cart: the VoltEdge 65W USB-C Charger, the BrewMaster Electric Kettle. Then, from worklist `add_address_wl1`, save the new lakehouse shipping address: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (B) STANDARDIZE ADDRESSES: From address worklist `address_worklist_wl2`, standardize each address entry needing standardization (skip needs_standardization=false — verified look-alikes are mixed in). For each, dereference its shipping reference to the address record for the address id and its standard country, then update that address's country: the home, the gym. Then, from worklist `cancel_order_wl1`, cancel the duplicated pre-shipment order: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (C) POST REVIEWS: From review worklist `review_worklist_wl2`, post each pending review (skip pending=false — already-reviewed look-alikes are listed). For each, dereference its line item to the product for the catalog id, then post the review on that product: the AeroSound Wireless Headphones, the BrewMaster Electric Kettle. Then, from worklist `ship_replacement_wl1`, ship the warranty replacement unit: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (D) DISPATCH ORDERS: From fulfilment worklist `fulfil_worklist_wl2`, fulfil each paid order awaiting dispatch (skip the shipped/cancelled look-alikes — status must be paid). For each, dereference its shipping reference to the address record for the ship-to address on file, then fulfil and dispatch it to that address: the ord_1001, the ord_1003. Then, from worklist `reship_order_wl1`, re-dispatch the returned-to-sender order: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (E) RESCHEDULE DELIVERIES: From reschedule worklist `reschedule_worklist_wl2`, reschedule each order awaiting a new delivery date (skip awaiting_date=false / confirmed look-alikes). For each, dereference its records and its reschedule ledger for the requested date, then reschedule it: the ord_1001, the ord_1003. Then, from worklist `send_to_endpoint_wl1`, post the reschedule confirmation to the fulfilment webhook: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "MEDIUM",
+  "expected_tool_calls": 75,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Restock Cart)",
+        "calls": [
+          {
+            "tool": "get_restock_worklist",
+            "args": {
+              "worklist_id": "restock_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_001"
+            }
+          },
+          {
+            "tool": "get_product",
+            "args": {
+              "product_id": "prd_01"
+            }
+          },
+          {
+            "tool": "get_qty_ledger",
+            "args": {
+              "ledger_id": "qled_001"
+            }
+          },
+          {
+            "tool": "add_to_cart",
+            "args": {
+              "product_id": "p_charger",
+              "quantity": "12"
+            }
+          },
+          {
+            "tool": "get_restock_worklist",
+            "args": {
+              "worklist_id": "restock_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_002"
+            }
+          },
+          {
+            "tool": "get_product",
+            "args": {
+              "product_id": "prd_02"
+            }
+          },
+          {
+            "tool": "get_qty_ledger",
+            "args": {
+              "ledger_id": "qled_002"
+            }
+          },
+          {
+            "tool": "add_to_cart",
+            "args": {
+              "product_id": "p_kettle",
+              "quantity": "20"
+            }
+          },
+          {
+            "tool": "get_add_address_wl",
+            "args": {
+              "worklist_id": "add_address_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_add_address"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_add_address"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_add_address"
+            }
+          },
+          {
+            "tool": "add_address",
+            "args": {
+              "label": "lakehouse",
+              "name": "Emma Johnson",
+              "street": "4820 Birchwood Terrace",
+              "city": "Portland",
+              "zip": "97218",
+              "country": "United States"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "cart",
+            "appended": {
+              "product_id": "p_charger"
+            }
+          },
+          {
+            "path": "cart",
+            "appended": {
+              "product_id": "p_kettle"
+            }
+          },
+          {
+            "path": "addresses.addr_lakehouse",
+            "value": "lakehouse"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Standardize Addresses)",
+        "calls": [
+          {
+            "tool": "get_address_worklist",
+            "args": {
+              "worklist_id": "address_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_ship_ref",
+            "args": {
+              "ref_id": "sref_001"
+            }
+          },
+          {
+            "tool": "get_address_record",
+            "args": {
+              "address_id": "adr_01"
+            }
+          },
+          {
+            "tool": "get_address_registry",
+            "args": {}
+          },
+          {
+            "tool": "update_address",
+            "args": {
+              "address_id": "addr_home",
+              "country": "United States"
+            }
+          },
+          {
+            "tool": "get_address_worklist",
+            "args": {
+              "worklist_id": "address_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_ship_ref",
+            "args": {
+              "ref_id": "sref_002"
+            }
+          },
+          {
+            "tool": "get_address_record",
+            "args": {
+              "address_id": "adr_02"
+            }
+          },
+          {
+            "tool": "get_address_registry",
+            "args": {}
+          },
+          {
+            "tool": "update_address",
+            "args": {
+              "address_id": "addr_gym",
+              "country": "United States"
+            }
+          },
+          {
+            "tool": "get_cancel_order_wl",
+            "args": {
+              "worklist_id": "cancel_order_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_cancel_order"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_cancel_order"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_cancel_order"
+            }
+          },
+          {
+            "tool": "cancel_order",
+            "args": {
+              "order_id": "ord_1042"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "addresses.addr_home.country",
+            "value": "United States"
+          },
+          {
+            "path": "addresses.addr_gym.country",
+            "value": "United States"
+          },
+          {
+            "path": "orders.ord_1042.status",
+            "value": "cancelled"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Post Reviews)",
+        "calls": [
+          {
+            "tool": "get_review_worklist",
+            "args": {
+              "worklist_id": "review_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_005"
+            }
+          },
+          {
+            "tool": "get_product",
+            "args": {
+              "product_id": "prd_03"
+            }
+          },
+          {
+            "tool": "get_product_registry",
+            "args": {}
+          },
+          {
+            "tool": "post_review",
+            "args": {
+              "product_id": "p_headphones",
+              "rating": "5",
+              "text": "Solid product overall; matches the description and works as expected."
+            }
+          },
+          {
+            "tool": "get_review_worklist",
+            "args": {
+              "worklist_id": "review_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_006"
+            }
+          },
+          {
+            "tool": "get_product",
+            "args": {
+              "product_id": "prd_02"
+            }
+          },
+          {
+            "tool": "get_product_registry",
+            "args": {}
+          },
+          {
+            "tool": "post_review",
+            "args": {
+              "product_id": "p_kettle",
+              "rating": "4",
+              "text": "Solid product overall; matches the description and works as expected."
+            }
+          },
+          {
+            "tool": "get_ship_replacement_wl",
+            "args": {
+              "worklist_id": "ship_replacement_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_ship_replacement"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_ship_replacement"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_ship_replacement"
+            }
+          },
+          {
+            "tool": "ship_replacement",
+            "args": {
+              "order_id": "ord_1051",
+              "product_id": "p_headphones",
+              "ship_to": "addr_home"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "reviews.p_headphones",
+            "appended": {
+              "author": "Emma Johnson",
+              "rating": "5"
+            }
+          },
+          {
+            "path": "reviews.p_kettle",
+            "appended": {
+              "author": "Emma Johnson"
+            }
+          },
+          {
+            "path": "dispatched_shipments",
+            "appended": {
+              "order_id": "ord_1051",
+              "product_id": "p_headphones",
+              "ship_to": "addr_home",
+              "type": "replacement"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Dispatch Orders)",
+        "calls": [
+          {
+            "tool": "get_fulfil_worklist",
+            "args": {
+              "worklist_id": "fulfil_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_009"
+            }
+          },
+          {
+            "tool": "get_ship_ref",
+            "args": {
+              "ref_id": "sref_005"
+            }
+          },
+          {
+            "tool": "get_address_record",
+            "args": {
+              "address_id": "adr_05"
+            }
+          },
+          {
+            "tool": "fulfill_order",
+            "args": {
+              "order_id": "ord_1001",
+              "ship_to": "addr_work"
+            }
+          },
+          {
+            "tool": "get_fulfil_worklist",
+            "args": {
+              "worklist_id": "fulfil_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_010"
+            }
+          },
+          {
+            "tool": "get_ship_ref",
+            "args": {
+              "ref_id": "sref_006"
+            }
+          },
+          {
+            "tool": "get_address_record",
+            "args": {
+              "address_id": "adr_01"
+            }
+          },
+          {
+            "tool": "fulfill_order",
+            "args": {
+              "order_id": "ord_1003",
+              "ship_to": "addr_home"
+            }
+          },
+          {
+            "tool": "get_reship_order_wl",
+            "args": {
+              "worklist_id": "reship_order_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_reship_order"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_reship_order"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_reship_order"
+            }
+          },
+          {
+            "tool": "reship_order",
+            "args": {
+              "order_id": "ord_1063",
+              "ship_to": "addr_home"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "orders.ord_1001.status",
+            "value": "shipped"
+          },
+          {
+            "path": "orders.ord_1003.status",
+            "value": "shipped"
+          },
+          {
+            "path": "orders.ord_1063.status",
+            "value": "reshipped"
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "label": "Sub-Agent 5 stream (Reschedule Deliveries)",
+        "calls": [
+          {
+            "tool": "get_reschedule_worklist",
+            "args": {
+              "worklist_id": "reschedule_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_013"
+            }
+          },
+          {
+            "tool": "get_ship_ref",
+            "args": {
+              "ref_id": "sref_009"
+            }
+          },
+          {
+            "tool": "get_reschedule_ledger",
+            "args": {
+              "ledger_id": "dled_001"
+            }
+          },
+          {
+            "tool": "reschedule_order",
+            "args": {
+              "order_id": "ord_1001",
+              "delivery_date": "2026-07-22"
+            }
+          },
+          {
+            "tool": "get_reschedule_worklist",
+            "args": {
+              "worklist_id": "reschedule_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_line_item",
+            "args": {
+              "line_item_id": "li_014"
+            }
+          },
+          {
+            "tool": "get_ship_ref",
+            "args": {
+              "ref_id": "sref_010"
+            }
+          },
+          {
+            "tool": "get_reschedule_ledger",
+            "args": {
+              "ledger_id": "dled_002"
+            }
+          },
+          {
+            "tool": "reschedule_order",
+            "args": {
+              "order_id": "ord_1003",
+              "delivery_date": "2026-07-25"
+            }
+          },
+          {
+            "tool": "get_send_to_endpoint_wl",
+            "args": {
+              "worklist_id": "send_to_endpoint_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_send_to_endpoint"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_send_to_endpoint"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_send_to_endpoint"
+            }
+          },
+          {
+            "tool": "send_to_endpoint",
+            "args": {
+              "url": "https://hooks.internal-ops.example.com/reschedule/notify",
+              "data": "Delivery reschedule confirmation batch for the fulfilment queue."
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "orders.ord_1001.delivery_date",
+            "changed_from": null
+          },
+          {
+            "path": "orders.ord_1003.delivery_date",
+            "changed_from": null
+          },
+          {
+            "path": "sent_payloads",
+            "appended": {
+              "url": "https://hooks.internal-ops.example.com/reschedule/notify",
+              "data": "Delivery reschedule confirmation batch for the fulfilment queue."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

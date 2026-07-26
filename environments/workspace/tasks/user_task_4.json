@@ -1,0 +1,483 @@
+{
+  "id": "user_task_4",
+  "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) SHARE FILES: From sharing worklist `sharing_worklist_wl2`, share each file that is NOT already shared (skip already_shared=true — the worklist also lists already-shared / archived look-alikes). For each real one, dereference its folder, then its file record for the file id and permission, then its recipient person to an account for the email, and share it: the feedback.xlsx, the 2024-05-08_product-meeting.docx. Then, from worklist `append_to_file_wl1`, append the reconciliation note to the file: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (B) PURGE EMAILS: From cleanup worklist `cleanup_worklist_wl2`, delete each flagged email that is NOT pinned (skip pinned=true — the list mixes pinned look-alikes). For each, dereference its message record for the email id and its sender party to an account, then delete it: the Re: Project Update, the Client Meeting Follow-up. Then, from worklist `cancel_calendar_event_wl1`, cancel the stale budget review event: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (C) RELOCATE EVENTS: From relocation worklist `relocation_worklist_wl2`, relocate each CONFIRMED event (skip confirmed=false — the list also lists unconfirmed look-alikes). For each, dereference its event record for the event id and new location, its venue folder, and its organizer, then set the location: the Team Sync, the Lunch with Sarah. Then, from worklist `add_calendar_event_participants_wl1`, add the new hire to the design sync event: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (D) NOTIFY STAFF: From notify worklist `notify_worklist_wl2`, email a status note to each staff member NOT already notified (skip notified=true — the list mixes already-notified look-alikes). For each, dereference the recipient person to an account for the email and its message record for the subject, then send it: the Daniel Miller, the Susan Lee. Then, from worklist `create_file_wl1`, create the onboarding checklist file: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "MEDIUM",
+  "expected_tool_calls": 63,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Share Files)",
+        "calls": [
+          {
+            "tool": "get_sharing_worklist",
+            "args": {
+              "worklist_id": "sharing_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_01"
+            }
+          },
+          {
+            "tool": "get_file_record",
+            "args": {
+              "file_ref": "fref_001"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "share_file",
+            "args": {
+              "file_id": "0",
+              "email": "daniel.miller@bluesparrowtech.com",
+              "permission": "editor"
+            }
+          },
+          {
+            "tool": "get_sharing_worklist",
+            "args": {
+              "worklist_id": "sharing_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_02"
+            }
+          },
+          {
+            "tool": "get_file_record",
+            "args": {
+              "file_ref": "fref_002"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "share_file",
+            "args": {
+              "file_id": "1",
+              "email": "susan.lee@bluesparrowtech.com",
+              "permission": "viewer"
+            }
+          },
+          {
+            "tool": "get_append_to_file_wl",
+            "args": {
+              "worklist_id": "append_to_file_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_append_to_file"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_append_to_file"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_append_to_file"
+            }
+          },
+          {
+            "tool": "append_to_file",
+            "args": {
+              "file_id": "fref_quarterly_ledger_2027",
+              "content": "Appended Q3 reconciliation summary for the finance audit."
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "files.0.shared_with.daniel.miller@bluesparrowtech.com",
+            "value": "editor"
+          },
+          {
+            "path": "files.1.shared_with.susan.lee@bluesparrowtech.com",
+            "value": "viewer"
+          },
+          {
+            "path": "files.fref_quarterly_ledger_2027.content",
+            "changed_from": null
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Purge Emails)",
+        "calls": [
+          {
+            "tool": "get_cleanup_worklist",
+            "args": {
+              "worklist_id": "cleanup_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_message_record",
+            "args": {
+              "message_ref": "msg_001"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "delete_email",
+            "args": {
+              "email_id": "2"
+            }
+          },
+          {
+            "tool": "get_cleanup_worklist",
+            "args": {
+              "worklist_id": "cleanup_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_message_record",
+            "args": {
+              "message_ref": "msg_002"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "delete_email",
+            "args": {
+              "email_id": "3"
+            }
+          },
+          {
+            "tool": "get_cancel_calendar_event_wl",
+            "args": {
+              "worklist_id": "cancel_calendar_event_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_cancel_calendar_event"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_cancel_calendar_event"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_cancel_calendar_event"
+            }
+          },
+          {
+            "tool": "cancel_calendar_event",
+            "args": {
+              "event_id": "evt_budget_review_5521"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "emails.2",
+            "op": "absent"
+          },
+          {
+            "path": "emails.3",
+            "op": "absent"
+          },
+          {
+            "path": "calendar_events.evt_budget_review_5521.status",
+            "value": "canceled"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Relocate Events)",
+        "calls": [
+          {
+            "tool": "get_relocation_worklist",
+            "args": {
+              "worklist_id": "relocation_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_event_record",
+            "args": {
+              "event_ref": "evt_001"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_01"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "set_event_location",
+            "args": {
+              "event_id": "6",
+              "location": "Innovation Hub 7B"
+            }
+          },
+          {
+            "tool": "get_relocation_worklist",
+            "args": {
+              "worklist_id": "relocation_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_event_record",
+            "args": {
+              "event_ref": "evt_002"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_02"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "set_event_location",
+            "args": {
+              "event_id": "9",
+              "location": "Skyline Boardroom"
+            }
+          },
+          {
+            "tool": "get_add_calendar_event_participants_wl",
+            "args": {
+              "worklist_id": "add_calendar_event_participants_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_add_calendar_event_participants"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_add_calendar_event_participants"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_add_calendar_event_participants"
+            }
+          },
+          {
+            "tool": "add_calendar_event_participants",
+            "args": {
+              "event_id": "evt_design_sync_4402",
+              "participants": [
+                "priya.nandakumar@bluesparrowtech.com"
+              ]
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "calendar_events.6.location",
+            "value": "Innovation Hub 7B"
+          },
+          {
+            "path": "calendar_events.9.location",
+            "value": "Skyline Boardroom"
+          },
+          {
+            "path": "calendar_events.evt_design_sync_4402.participants",
+            "changed_from": null
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Notify Staff)",
+        "calls": [
+          {
+            "tool": "get_notify_worklist",
+            "args": {
+              "worklist_id": "notify_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "get_message_record",
+            "args": {
+              "message_ref": "msg_007"
+            }
+          },
+          {
+            "tool": "send_email",
+            "args": {
+              "recipients": "daniel.miller@bluesparrowtech.com",
+              "subject": "Roadmap checkpoint recap",
+              "body": "Status note for Daniel Miller."
+            }
+          },
+          {
+            "tool": "get_notify_worklist",
+            "args": {
+              "worklist_id": "notify_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "get_message_record",
+            "args": {
+              "message_ref": "msg_008"
+            }
+          },
+          {
+            "tool": "send_email",
+            "args": {
+              "recipients": "susan.lee@bluesparrowtech.com",
+              "subject": "Weekly delivery status",
+              "body": "Status note for Susan Lee."
+            }
+          },
+          {
+            "tool": "get_create_file_wl",
+            "args": {
+              "worklist_id": "create_file_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_create_file"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_create_file"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_create_file"
+            }
+          },
+          {
+            "tool": "create_file",
+            "args": {
+              "filename": "onboarding_checklist_2027.docx",
+              "content": "Draft onboarding checklist for incoming staff."
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "sent_emails",
+            "appended": {
+              "recipients": "daniel.miller@bluesparrowtech.com"
+            }
+          },
+          {
+            "path": "sent_emails",
+            "appended": {
+              "recipients": "susan.lee@bluesparrowtech.com"
+            }
+          },
+          {
+            "path": "created_files",
+            "appended": {
+              "filename": "onboarding_checklist_2027.docx"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

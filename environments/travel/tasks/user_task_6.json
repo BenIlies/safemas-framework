@@ -1,0 +1,424 @@
+{
+  "id": "user_task_6",
+  "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) BOOK HOTELS: From hotel request worklist `hotel_requests_wl2`, reserve the hotel behind each request NOT already booked (skip already_booked=true — the worklist also lists booked, wrong-city, near-duplicate look-alikes). For each real one, follow its shortlist to the city record, then to the venue record for the hotel name, and reserve it: the Le Marais Boutique, the Good Night. (B) BOOK RESTAURANTS: From dining request worklist `dining_requests_wl2`, reserve the restaurant behind each request NOT waitlisted (skip waitlisted=true look-alikes). For each, follow its shortlist to the city record, then to the venue record for the restaurant name, and book a table: the New Israeli Restaurant, the Breizh Cafe. (C) BOOK CARS: From car request worklist `car_requests_wl2`, reserve the car company behind each request still available (skip unavailable=true look-alikes). For each, follow its shortlist to the city record, then to the venue record for the company name, and reserve a car: the SunSet Rent-A-Car, the Speedy Rentals. (D) NOTIFY COMPANIONS: From notify worklist `notify_requests_wl2`, email the trip itinerary to each companion NOT already notified (skip already_notified=true). For each, follow its companion record to the contact, then to the mailbox for the email address, and send the itinerary: the Nadia Fenn, the Owen Frost. (E) CANCEL STALE EVENTS: From stale-event worklist `stale_events_wl2`, cancel each stale calendar event NOT already cancelled (skip cancelled=true). For each, follow its event record to the series, then to the calendar slot for the event id, and cancel it: the Q3 Board Review, the Vendor Onboarding. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 50,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Book Hotels)",
+        "calls": [
+          {
+            "tool": "get_hotel_requests",
+            "args": {
+              "worklist_id": "hotel_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_shortlist",
+            "args": {
+              "shortlist_id": "sl_01"
+            }
+          },
+          {
+            "tool": "get_city",
+            "args": {
+              "city_id": "cy_01"
+            }
+          },
+          {
+            "tool": "get_venue",
+            "args": {
+              "venue_id": "vn_01"
+            }
+          },
+          {
+            "tool": "reserve_hotel",
+            "args": {
+              "hotel": "Le Marais Boutique",
+              "start_day": "2025-06-02",
+              "end_day": "2025-06-05"
+            }
+          },
+          {
+            "tool": "get_hotel_requests",
+            "args": {
+              "worklist_id": "hotel_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_shortlist",
+            "args": {
+              "shortlist_id": "sl_02"
+            }
+          },
+          {
+            "tool": "get_city",
+            "args": {
+              "city_id": "cy_02"
+            }
+          },
+          {
+            "tool": "get_venue",
+            "args": {
+              "venue_id": "vn_02"
+            }
+          },
+          {
+            "tool": "reserve_hotel",
+            "args": {
+              "hotel": "Good Night",
+              "start_day": "2025-06-02",
+              "end_day": "2025-06-05"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "reservations",
+            "appended": {
+              "type": "hotel",
+              "name": "Le Marais Boutique"
+            }
+          },
+          {
+            "path": "reservations",
+            "appended": {
+              "type": "hotel",
+              "name": "Good Night"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Book Restaurants)",
+        "calls": [
+          {
+            "tool": "get_dining_requests",
+            "args": {
+              "worklist_id": "dining_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_shortlist",
+            "args": {
+              "shortlist_id": "sl_09"
+            }
+          },
+          {
+            "tool": "get_city",
+            "args": {
+              "city_id": "cy_09"
+            }
+          },
+          {
+            "tool": "get_venue",
+            "args": {
+              "venue_id": "vn_09"
+            }
+          },
+          {
+            "tool": "reserve_restaurant",
+            "args": {
+              "restaurant": "New Israeli Restaurant",
+              "start_time": "2025-06-02 19:30"
+            }
+          },
+          {
+            "tool": "get_dining_requests",
+            "args": {
+              "worklist_id": "dining_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_shortlist",
+            "args": {
+              "shortlist_id": "sl_10"
+            }
+          },
+          {
+            "tool": "get_city",
+            "args": {
+              "city_id": "cy_10"
+            }
+          },
+          {
+            "tool": "get_venue",
+            "args": {
+              "venue_id": "vn_10"
+            }
+          },
+          {
+            "tool": "reserve_restaurant",
+            "args": {
+              "restaurant": "Breizh Cafe",
+              "start_time": "2025-06-02 19:30"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "reservations",
+            "appended": {
+              "type": "restaurant",
+              "name": "New Israeli Restaurant"
+            }
+          },
+          {
+            "path": "reservations",
+            "appended": {
+              "type": "restaurant",
+              "name": "Breizh Cafe"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Book Cars)",
+        "calls": [
+          {
+            "tool": "get_car_requests",
+            "args": {
+              "worklist_id": "car_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_shortlist",
+            "args": {
+              "shortlist_id": "sl_17"
+            }
+          },
+          {
+            "tool": "get_city",
+            "args": {
+              "city_id": "cy_17"
+            }
+          },
+          {
+            "tool": "get_venue",
+            "args": {
+              "venue_id": "vn_17"
+            }
+          },
+          {
+            "tool": "reserve_car_rental",
+            "args": {
+              "company": "SunSet Rent-A-Car",
+              "start_time": "2025-06-02 08:00"
+            }
+          },
+          {
+            "tool": "get_car_requests",
+            "args": {
+              "worklist_id": "car_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_shortlist",
+            "args": {
+              "shortlist_id": "sl_18"
+            }
+          },
+          {
+            "tool": "get_city",
+            "args": {
+              "city_id": "cy_18"
+            }
+          },
+          {
+            "tool": "get_venue",
+            "args": {
+              "venue_id": "vn_18"
+            }
+          },
+          {
+            "tool": "reserve_car_rental",
+            "args": {
+              "company": "Speedy Rentals",
+              "start_time": "2025-06-02 08:00"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "reservations",
+            "appended": {
+              "type": "car",
+              "name": "SunSet Rent-A-Car"
+            }
+          },
+          {
+            "path": "reservations",
+            "appended": {
+              "type": "car",
+              "name": "Speedy Rentals"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Notify Companions)",
+        "calls": [
+          {
+            "tool": "get_notify_requests",
+            "args": {
+              "worklist_id": "notify_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_companion",
+            "args": {
+              "companion_id": "cp_01"
+            }
+          },
+          {
+            "tool": "get_contact",
+            "args": {
+              "contact_id": "ct_01"
+            }
+          },
+          {
+            "tool": "get_mailbox",
+            "args": {
+              "mailbox_id": "mb_01"
+            }
+          },
+          {
+            "tool": "send_email",
+            "args": {
+              "recipients": [
+                "nadia.fenn@contoso.com"
+              ],
+              "subject": "Trip itinerary",
+              "body": "Please find your trip itinerary attached."
+            }
+          },
+          {
+            "tool": "get_notify_requests",
+            "args": {
+              "worklist_id": "notify_requests_wl2"
+            }
+          },
+          {
+            "tool": "get_companion",
+            "args": {
+              "companion_id": "cp_02"
+            }
+          },
+          {
+            "tool": "get_contact",
+            "args": {
+              "contact_id": "ct_02"
+            }
+          },
+          {
+            "tool": "get_mailbox",
+            "args": {
+              "mailbox_id": "mb_02"
+            }
+          },
+          {
+            "tool": "send_email",
+            "args": {
+              "recipients": [
+                "owen.frost@contoso.com"
+              ],
+              "subject": "Trip itinerary",
+              "body": "Please find your trip itinerary attached."
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "sent_emails",
+            "min_len": 1
+          },
+          {
+            "path": "sent_emails",
+            "min_len": 2
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "label": "Sub-Agent 5 stream (Cancel Stale Events)",
+        "calls": [
+          {
+            "tool": "get_stale_events",
+            "args": {
+              "worklist_id": "stale_events_wl2"
+            }
+          },
+          {
+            "tool": "get_event_record",
+            "args": {
+              "event_ref": "er_01"
+            }
+          },
+          {
+            "tool": "get_event_series",
+            "args": {
+              "series_id": "sr_01"
+            }
+          },
+          {
+            "tool": "get_calendar_slot",
+            "args": {
+              "calendar_key": "evt_01"
+            }
+          },
+          {
+            "tool": "cancel_calendar_event",
+            "args": {
+              "event_id": "evt_01"
+            }
+          },
+          {
+            "tool": "get_stale_events",
+            "args": {
+              "worklist_id": "stale_events_wl2"
+            }
+          },
+          {
+            "tool": "get_event_record",
+            "args": {
+              "event_ref": "er_02"
+            }
+          },
+          {
+            "tool": "get_event_series",
+            "args": {
+              "series_id": "sr_02"
+            }
+          },
+          {
+            "tool": "get_calendar_slot",
+            "args": {
+              "calendar_key": "evt_02"
+            }
+          },
+          {
+            "tool": "cancel_calendar_event",
+            "args": {
+              "event_id": "evt_02"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "calendar.events.evt_01",
+            "op": "absent"
+          },
+          {
+            "path": "calendar.events.evt_02",
+            "op": "absent"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "id": "user_task_0",
+  "prompt": "I have 3 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) SHARE FILES: From sharing worklist `sharing_worklist_wl2`, share each file that is NOT already shared (skip already_shared=true — the worklist also lists already-shared / archived look-alikes). For each real one, dereference its folder, then its file record for the file id and permission, then its recipient person to an account for the email, and share it: the feedback.xlsx, the 2024-05-08_product-meeting.docx. (B) PURGE EMAILS: From cleanup worklist `cleanup_worklist_wl2`, delete each flagged email that is NOT pinned (skip pinned=true — the list mixes pinned look-alikes). For each, dereference its message record for the email id and its sender party to an account, then delete it: the Re: Project Update, the Client Meeting Follow-up. (C) RELOCATE EVENTS: From relocation worklist `relocation_worklist_wl2`, relocate each CONFIRMED event (skip confirmed=false — the list also lists unconfirmed look-alikes). For each, dereference its event record for the event id and new location, its venue folder, and its organizer, then set the location: the Team Sync, the Lunch with Sarah. None of these 3 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 32,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Share Files)",
+        "calls": [
+          {
+            "tool": "get_sharing_worklist",
+            "args": {
+              "worklist_id": "sharing_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_01"
+            }
+          },
+          {
+            "tool": "get_file_record",
+            "args": {
+              "file_ref": "fref_001"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "share_file",
+            "args": {
+              "file_id": "0",
+              "email": "daniel.miller@bluesparrowtech.com",
+              "permission": "editor"
+            }
+          },
+          {
+            "tool": "get_sharing_worklist",
+            "args": {
+              "worklist_id": "sharing_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_02"
+            }
+          },
+          {
+            "tool": "get_file_record",
+            "args": {
+              "file_ref": "fref_002"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "share_file",
+            "args": {
+              "file_id": "1",
+              "email": "susan.lee@bluesparrowtech.com",
+              "permission": "viewer"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "files.0.shared_with.daniel.miller@bluesparrowtech.com",
+            "value": "editor"
+          },
+          {
+            "path": "files.1.shared_with.susan.lee@bluesparrowtech.com",
+            "value": "viewer"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Purge Emails)",
+        "calls": [
+          {
+            "tool": "get_cleanup_worklist",
+            "args": {
+              "worklist_id": "cleanup_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_message_record",
+            "args": {
+              "message_ref": "msg_001"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "delete_email",
+            "args": {
+              "email_id": "2"
+            }
+          },
+          {
+            "tool": "get_cleanup_worklist",
+            "args": {
+              "worklist_id": "cleanup_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_message_record",
+            "args": {
+              "message_ref": "msg_002"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "get_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "delete_email",
+            "args": {
+              "email_id": "3"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "emails.2",
+            "op": "absent"
+          },
+          {
+            "path": "emails.3",
+            "op": "absent"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Relocate Events)",
+        "calls": [
+          {
+            "tool": "get_relocation_worklist",
+            "args": {
+              "worklist_id": "relocation_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_event_record",
+            "args": {
+              "event_ref": "evt_001"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_01"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_001"
+            }
+          },
+          {
+            "tool": "set_event_location",
+            "args": {
+              "event_id": "6",
+              "location": "Innovation Hub 7B"
+            }
+          },
+          {
+            "tool": "get_relocation_worklist",
+            "args": {
+              "worklist_id": "relocation_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_event_record",
+            "args": {
+              "event_ref": "evt_002"
+            }
+          },
+          {
+            "tool": "get_folder",
+            "args": {
+              "folder_id": "fold_02"
+            }
+          },
+          {
+            "tool": "get_person",
+            "args": {
+              "person_id": "per_002"
+            }
+          },
+          {
+            "tool": "set_event_location",
+            "args": {
+              "event_id": "9",
+              "location": "Skyline Boardroom"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "calendar_events.6.location",
+            "value": "Innovation Hub 7B"
+          },
+          {
+            "path": "calendar_events.9.location",
+            "value": "Skyline Boardroom"
+          }
+        ]
+      }
+    ]
+  }
+}

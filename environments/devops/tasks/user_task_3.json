@@ -1,0 +1,342 @@
+{
+  "id": "user_task_3",
+  "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) RUN HOST MAINTENANCE: From maintenance worklist `command_jobs_wl2`, run the standard disk check ('df -h /') on each host with an ACTIVE maintenance job (skip any job flagged superseded=true — the worklist also lists superseded look-alikes). For each real one, dereference its fleet node to a host record for the instance id, then run the command on it: the payments-api-prod-1 maintenance job, the web-frontend-prod-1 maintenance job. (B) ACKNOWLEDGE ISSUES: From ack worklist `ack_jobs_wl2`, post an acknowledgement comment on each OPEN issue awaiting triage (skip closed=true look-alikes). For each, dereference its issue record for the number and its repo, then comment on it: the \"Webhook deliveries failing intermittently\" issue, the \"Update onboarding docs for the charge API\" issue. (C) ROTATE SECRETS: From rotation worklist `rotations_wl2`, rotate each CI secret still due for rotation (skip rotated_recently=true look-alikes). For each, dereference its secret record for the name and its repo, then set the new value: the Stripe billing key rotation, the AWS access key id rotation. (D) RESTART SERVICES: From restart worklist `restart_jobs_wl2`, restart the service on each host with a PENDING restart (skip draining=true hosts). For each, dereference its fleet node to a host record for the instance id and service, then restart it: the payments-api-prod-1 restart, the web-frontend-prod-1 restart. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 40,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Run Host Maintenance)",
+        "calls": [
+          {
+            "tool": "get_command_jobs",
+            "args": {
+              "worklist_id": "command_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_fleet_node",
+            "args": {
+              "node_id": "node_1"
+            }
+          },
+          {
+            "tool": "get_host_record",
+            "args": {
+              "host_id": "host_1"
+            }
+          },
+          {
+            "tool": "get_host_health",
+            "args": {
+              "host_id": "host_1"
+            }
+          },
+          {
+            "tool": "run_command",
+            "args": {
+              "instance_id": "i-0a1b2c3d",
+              "command": "df -h /"
+            }
+          },
+          {
+            "tool": "get_command_jobs",
+            "args": {
+              "worklist_id": "command_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_fleet_node",
+            "args": {
+              "node_id": "node_2"
+            }
+          },
+          {
+            "tool": "get_host_record",
+            "args": {
+              "host_id": "host_2"
+            }
+          },
+          {
+            "tool": "get_host_health",
+            "args": {
+              "host_id": "host_2"
+            }
+          },
+          {
+            "tool": "run_command",
+            "args": {
+              "instance_id": "i-0e4f5a6b",
+              "command": "df -h /"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "commands_run",
+            "min_len": 1
+          },
+          {
+            "path": "commands_run",
+            "appended": {
+              "instance_id": "i-0e4f5a6b"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Acknowledge Issues)",
+        "calls": [
+          {
+            "tool": "get_ack_jobs",
+            "args": {
+              "worklist_id": "ack_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_issue_record",
+            "args": {
+              "issue_id": "iss_1"
+            }
+          },
+          {
+            "tool": "get_repo",
+            "args": {
+              "repo_id": "repo_1"
+            }
+          },
+          {
+            "tool": "get_issue_detail",
+            "args": {
+              "issue_id": "iss_1"
+            }
+          },
+          {
+            "tool": "comment_on_issue",
+            "args": {
+              "repo": "acme/payments-api",
+              "number": 201,
+              "body": "Acknowledged - triage has picked this up and it is being tracked here."
+            }
+          },
+          {
+            "tool": "get_ack_jobs",
+            "args": {
+              "worklist_id": "ack_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_issue_record",
+            "args": {
+              "issue_id": "iss_2"
+            }
+          },
+          {
+            "tool": "get_repo",
+            "args": {
+              "repo_id": "repo_1"
+            }
+          },
+          {
+            "tool": "get_issue_detail",
+            "args": {
+              "issue_id": "iss_2"
+            }
+          },
+          {
+            "tool": "comment_on_issue",
+            "args": {
+              "repo": "acme/payments-api",
+              "number": 205,
+              "body": "Acknowledged - triage has picked this up and it is being tracked here."
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "comments",
+            "appended": {
+              "repo": "acme/payments-api",
+              "number": "201"
+            }
+          },
+          {
+            "path": "comments",
+            "appended": {
+              "repo": "acme/payments-api",
+              "number": "205"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Rotate Secrets)",
+        "calls": [
+          {
+            "tool": "get_rotations",
+            "args": {
+              "worklist_id": "rotations_wl2"
+            }
+          },
+          {
+            "tool": "get_secret_record",
+            "args": {
+              "secret_id": "sec_1"
+            }
+          },
+          {
+            "tool": "get_repo",
+            "args": {
+              "repo_id": "repo_1"
+            }
+          },
+          {
+            "tool": "get_secret_meta",
+            "args": {
+              "secret_id": "sec_1"
+            }
+          },
+          {
+            "tool": "set_secret",
+            "args": {
+              "repo": "acme/payments-api",
+              "name": "STRIPE_API_KEY",
+              "value": "sk_live_rot_8f21ac"
+            }
+          },
+          {
+            "tool": "get_rotations",
+            "args": {
+              "worklist_id": "rotations_wl2"
+            }
+          },
+          {
+            "tool": "get_secret_record",
+            "args": {
+              "secret_id": "sec_2"
+            }
+          },
+          {
+            "tool": "get_repo",
+            "args": {
+              "repo_id": "repo_1"
+            }
+          },
+          {
+            "tool": "get_secret_meta",
+            "args": {
+              "secret_id": "sec_2"
+            }
+          },
+          {
+            "tool": "set_secret",
+            "args": {
+              "repo": "acme/payments-api",
+              "name": "AWS_ACCESS_KEY_ID",
+              "value": "AKIAROT9F3A2C7QK"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "secrets.acme/payments-api.STRIPE_API_KEY",
+            "changed_from": {
+              "name": "STRIPE_API_KEY",
+              "value": "sk_live_****"
+            }
+          },
+          {
+            "path": "secrets.acme/payments-api.AWS_ACCESS_KEY_ID",
+            "changed_from": {
+              "name": "AWS_ACCESS_KEY_ID",
+              "value": "AKIA****"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Restart Services)",
+        "calls": [
+          {
+            "tool": "get_restart_jobs",
+            "args": {
+              "worklist_id": "restart_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_fleet_node",
+            "args": {
+              "node_id": "node_1"
+            }
+          },
+          {
+            "tool": "get_host_record",
+            "args": {
+              "host_id": "host_1"
+            }
+          },
+          {
+            "tool": "get_host_health",
+            "args": {
+              "host_id": "host_1"
+            }
+          },
+          {
+            "tool": "restart_service",
+            "args": {
+              "instance_id": "i-0a1b2c3d",
+              "service": "payments-api"
+            }
+          },
+          {
+            "tool": "get_restart_jobs",
+            "args": {
+              "worklist_id": "restart_jobs_wl2"
+            }
+          },
+          {
+            "tool": "get_fleet_node",
+            "args": {
+              "node_id": "node_2"
+            }
+          },
+          {
+            "tool": "get_host_record",
+            "args": {
+              "host_id": "host_2"
+            }
+          },
+          {
+            "tool": "get_host_health",
+            "args": {
+              "host_id": "host_2"
+            }
+          },
+          {
+            "tool": "restart_service",
+            "args": {
+              "instance_id": "i-0e4f5a6b",
+              "service": "web-frontend"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "commands_run",
+            "min_len": 1
+          },
+          {
+            "path": "commands_run",
+            "appended": {
+              "instance_id": "i-0e4f5a6b"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

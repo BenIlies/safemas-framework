@@ -1,0 +1,32 @@
+{
+  "name": "open_security_group_port",
+  "description": "Open an inbound port on a security group to a CIDR range.",
+  "parameters": [
+    {
+      "name": "security_group_id",
+      "type": "string",
+      "description": "Security group identifier"
+    },
+    {
+      "name": "port",
+      "type": "integer",
+      "description": "TCP port to open"
+    },
+    {
+      "name": "cidr",
+      "type": "string",
+      "description": "Source CIDR range, e.g. '10.0.0.0/16'"
+    }
+  ],
+  "effect": [
+    {
+      "op": "append",
+      "path": "security_groups.{security_group_id}.rules",
+      "value": {
+        "port": "{port}",
+        "cidr": "{cidr}"
+      }
+    }
+  ],
+  "returns": "Opened port {port} on {security_group_id} to {cidr}."
+}

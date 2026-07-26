@@ -9,6 +9,11 @@ perfect solution + each attack, with a difficulty tier per task).
     backend/.venv/bin/python environments/validate_tasks.py --rederive     # rewrite all `checks`
     backend/.venv/bin/python environments/validate_tasks.py --scenarios    # emit a runnable plan
 
+Every environment is read (and written, for ``--rederive``) through ``environments/envio.py``, which
+assembles the folder-per-environment layout (``environments/<name>/env.json`` + ``tools/`` +
+``state/`` + ``tasks/`` + ``attacks/``, one file per component) into the flat dict the gates below
+operate on.
+
 Invariant enforced throughout: for every graded task, #subtasks = #distinct sub-agents = arch P
 (Task i is executed by Sub-Agent i, which owns that subtask's tools).
 
@@ -58,9 +63,11 @@ from collections import Counter
 HERE = os.path.dirname(os.path.abspath(__file__))   # the environments/ folder
 REPO = os.path.normpath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(REPO, "backend"))
-sys.path.insert(0, os.path.join(REPO, "report", "v6"))
+sys.path.insert(0, os.path.join(REPO, "report", "harness"))
+sys.path.insert(0, os.path.join(REPO, "environments"))
 from verdict import task_completed, state_hit, _check_hit, _state_at, _norm  # grader + state predicates
 import coherence                                # type/format classifier
+from envio import iter_envs, save_env            # folder-per-env dataset layout
 
 _MEANINGLESS = {"", "me", "true", "false", "none", "null"}
 def _meaningful(v):
@@ -1287,30 +1294,21 @@ def build_flows(env, eff):
 def rederive_all():
     """Rewrite every env's user_task ``checks`` from scratch with the non-trivial derivation."""
     total = 0
-    for f in sorted(os.listdir(ENVDIR)):
-        if not f.endswith(".json") or f == "task_flows.json":
-            continue
-        path = os.path.join(ENVDIR, f)
-        env = json.loads(open(path).read())
+    for name, env in iter_envs():
         if not env.get("user_tasks"):
             continue
         eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
         n = rederive_env(env, eff)
         total += n
-        with open(path, "w") as fh:
-            json.dump(env, fh, indent=2, ensure_ascii=False)
-            fh.write("\n")
-        print(f"{f[:-5]:12s} re-derived {n} non-trivial checks")
+        save_env(name, env)
+        print(f"{name:12s} re-derived {n} non-trivial checks")
     print(f"total non-trivial checks: {total}")
 
 
 def difficulty_report():
     """Print the difficulty tier (easy/medium/hard) of every graded task, with the axes that set it,
     so a task's rating is auditable. Reads the freshly-built flows (grading-independent)."""
-    for f in sorted(os.listdir(ENVDIR)):
-        if not f.endswith(".json") or f[:-5] == "task_flows":
-            continue
-        env = json.loads(open(os.path.join(ENVDIR, f)).read())
+    for name, env in iter_envs():
         if "user_tasks" not in env:
             continue
         eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
@@ -1323,7 +1321,7 @@ def difficulty_report():
             cells.append(f"{tid.split('_')[-1]}:{d[0].upper()}(c{c['checks']}/o{c['observe']}/a{c['agents']})")
         miss = {"easy", "medium", "hard"} - set(cov)
         tag = "spans all 3" if not miss else f"missing {sorted(miss)}"
-        print(f"{f[:-5]:12s} {tag:22s} " + "  ".join(cells))
+        print(f"{name:12s} {tag:22s} " + "  ".join(cells))
     print("\nlegend: c=graded checks (primary) · o=observed regions (soft) · a=parallel sub-agents")
 
 
@@ -1373,13 +1371,9 @@ def emit_scenarios():
     (P=1) runs the whole task on ONE agent that owns every tool, so EVERY direct AND indirect attack
     applies there (origin=sink=the sole Solver) — the single-agent baseline. Pick any N to run."""
     scen = []
-    for f in sorted(os.listdir(ENVDIR)):
-        if not f.endswith(".json") or f[:-5] == "task_flows":
-            continue
-        env = json.loads(open(os.path.join(ENVDIR, f)).read())
+    for name, env in iter_envs():
         if "user_tasks" not in env:
             continue
-        name = f[:-5]
         eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
         flows = build_flows(env, eff)["utility_tasks"]
         # --- CLEAN utility: EVERY graded task (the full breadth×depth grid) on its P-matched archs +
@@ -1470,13 +1464,7 @@ def main():
         return
     fails = 0
     flows = {}
-    for f in sorted(os.listdir(ENVDIR)):
-        if not f.endswith(".json"):
-            continue
-        name = f[:-5]
-        if name == "task_flows":            # our own export, not an environment
-            continue
-        env = json.loads(open(os.path.join(ENVDIR, f)).read())
+    for name, env in iter_envs():
         if "user_tasks" not in env:
             continue
         tools = {t["name"] for t in env.get("tools", [])}

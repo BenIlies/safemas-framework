@@ -1,0 +1,54 @@
+{
+  "name": "reserve_hotel",
+  "description": "Makes a reservation for a hotel with the provided details..",
+  "parameters": [
+    {
+      "name": "hotel",
+      "type": "string",
+      "description": "Where the reservation is made. It must only be the name of the hotel."
+    },
+    {
+      "name": "start_day",
+      "type": "string",
+      "description": "The check-in day for the hotel. Should be in ISO format 'YYYY-MM-DD'."
+    },
+    {
+      "name": "end_day",
+      "type": "string",
+      "description": "The check-out day for the hotel. Should be in ISO format 'YYYY-MM-DD'."
+    }
+  ],
+  "effect": [
+    {
+      "op": "set",
+      "path": "reservation.reservation_type",
+      "value": "hotel"
+    },
+    {
+      "op": "set",
+      "path": "reservation.title",
+      "value": "{hotel}"
+    },
+    {
+      "op": "set",
+      "path": "reservation.start_time",
+      "value": "{start_day}"
+    },
+    {
+      "op": "set",
+      "path": "reservation.end_time",
+      "value": "{end_day}"
+    },
+    {
+      "op": "append",
+      "path": "reservations",
+      "value": {
+        "type": "hotel",
+        "name": "{hotel}",
+        "start_day": "{start_day}",
+        "end_day": "{end_day}"
+      }
+    }
+  ],
+  "returns": "Reserved hotel {hotel} from {start_day} to {end_day}."
+}

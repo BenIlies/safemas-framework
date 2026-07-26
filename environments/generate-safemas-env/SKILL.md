@@ -5,13 +5,44 @@ description: Author a new SAFEMAS benchmark environment (the stateful tool/task/
 
 # Generate a SAFEMAS environment
 
-A SAFEMAS environment is one self-contained JSON in `environments/<name>.json`: a domain's
+A SAFEMAS environment is one self-contained JSON dataset in `environments/<name>/`: a domain's
 **tools** (readers + setters), an initial **state** world, a P×K grid of **user_tasks** at three
 difficulty tiers, and a set of **injection_tasks** (attacks). Everything a scenario needs is baked
-into this file — there are no side spec files and no build step. The single source of truth for
+into that folder — there are no side spec files and no build step. The single source of truth for
 whether an environment is well-formed is **`environments/validate_tasks.py`**: it runs ~30
 deterministic gates (no LLM) and exits nonzero on any hard failure. **Authoring = editing the JSON
 until `validate_tasks.py` is green.**
+
+## On-disk layout — one file per component
+
+The environment is **decomposed** so each tool / store / task / attack is its own reviewable file:
+
+```
+environments/<name>/
+├── env.json                  name, title, note, tool_groups, worklist_payable, indirection,
+│                             worklist_tiers  +  the ordered `components` manifest
+├── tools/<tool_name>.json    one tool     (name, description, parameters, returns|effect)
+├── state/<store>.json        one top-level `state` store
+├── tasks/user_task_N.json    one graded task (id, difficulty, prompt, success)
+└── attacks/<attack_id>.json  one injection task
+```
+
+`env.json`'s `components` block lists every component name **in order** (tool order is load-bearing);
+`environments/envio.py` resolves each name to `<subdir>/<name>.json` and assembles the flat dict the
+gates and the backend operate on. **The manifest and the files must agree** — an unlisted file, a
+listed-but-missing file, or a filename that disagrees with the body's `name`/`id` is a hard
+`EnvLayoutError`. When you add a tool/task/attack, write the file **and** add it to `components`.
+
+Useful while authoring (`envio.py` is the layout's source of truth):
+
+```
+backend/.venv/bin/python environments/envio.py --check              # round-trip / drift check
+backend/.venv/bin/python environments/envio.py --collapse <name>    # print the whole env as one JSON
+```
+
+`--collapse` is the fast way to read or grep a whole environment at once; every writer
+(`validate_tasks.py --rederive`, the harness authoring scripts) goes through `envio.save_env`, so the
+manifest is rewritten and orphaned files pruned for you.
 
 > This skill replaced the old `build_worklists.py` / `build_diversity.py` / `build_confused_deputy.py`
 > generators and their `worklist_specs/` `diversity_specs/` inputs. That structure is now authored
@@ -19,7 +50,8 @@ until `validate_tasks.py` is green.**
 
 ## Ground truth — read these first
 
-1. **`environments/blockchain.json`** — the reference environment. Mirror its shape for a new domain.
+1. **`environments/blockchain/`** — the reference environment. Mirror its shape for a new domain
+   (`envio.py --collapse blockchain` to read it as one document).
 2. **`environments/validate_tasks.py`** — the executable contract. Its module docstring lists every
    gate; the gate functions are the precise spec. When in doubt, read the gate, don't guess.
 3. **README.md § "Environment invariants — enforced by `validate_tasks.py`"** — prose for the same rules.
@@ -27,10 +59,12 @@ until `validate_tasks.py` is green.**
 ## Workflow
 
 ```
-1. Copy the shape of an existing env; fill in a new domain's state + tools + tasks + attacks.
-2. backend/.venv/bin/python environments/validate_tasks.py         # run all gates
-3. Read the first hard failure; fix the JSON; repeat until "ALL TASKS DOABLE + GRADED".
-4. Smoke-run one scenario through the backend to confirm it executes end to end.
+1. cp -r environments/blockchain environments/<name>   # then fill in the new domain's
+   state/ + tools/ + tasks/ + attacks/, keeping env.json's `components` manifest in step.
+2. backend/.venv/bin/python environments/envio.py --check          # layout + manifest first
+3. backend/.venv/bin/python environments/validate_tasks.py         # run all gates
+4. Read the first hard failure; fix the JSON; repeat until "ALL TASKS DOABLE + GRADED".
+5. Smoke-run one scenario through the backend to confirm it executes end to end.
 ```
 
 `validate_tasks.py` also (re)writes `environments/task_flows.json`. Use `--rederive` if you change

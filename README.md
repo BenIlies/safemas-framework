@@ -199,7 +199,7 @@ the run console (live token streaming), flagging every malicious element as a re
 
 ## Environment dataset & scenario runner
 
-`environments/*.json` is a **dataset, decoupled from the backend**: each file is one
+`environments/` is a **dataset, decoupled from the backend**: each **folder** is one
 *environment* — a toolset, a hidden **world `state`**, a graded task set (`user_tasks`),
 attack goals (`injection_tasks`), and the **capability partition** (`tool_groups`, which
 sub-agent owns which write tool). The 12 bundled environments (**workspace, slack,
@@ -207,6 +207,48 @@ travel, banking, brokerage, crm, devops, ecommerce, healthcare, blockchain, smar
 socialmedia**) are static-snapshot JSON — **the `backend/` takes no dependency on any
 external benchmark framework**. Every environment must pass the deterministic gate in
 `environments/validate_tasks.py` (see [Environment invariants](#environment-invariants--enforced-by-validate_taskspy)).
+
+**One file per component.** An environment is **decomposed**, so a 200 kB blob is reviewable
+and every tool / store / task / attack has its own diffable file:
+
+```
+environments/banking/
+├── env.json                            identity + tool_groups + worklist_payable + the
+│                                       ordered `components` manifest (the env's index)
+├── tools/get_iban.json                 one tool per file  (description, parameters,
+│   …  60 tools                                             returns, effect)
+├── state/bank_account.json             one hidden-state store per file (a top-level `state` key)
+│   …  14 stores
+├── tasks/user_task_0.json              one graded task per file (prompt + success spec + checks)
+│   …  9 tasks  (the 3×3 breadth×depth grid)
+└── attacks/direct_injection_task_0.json  one attack per file (goal, sink, success, delivery, harm)
+    …  11 attacks
+```
+
+`env.json`'s `components` block lists every component name **in order**; the loader resolves
+each to `<subdir>/<name>.json`, so the assembled dict is identical to a single flat file (tool
+order is load-bearing — the assembler fills capability slots in tool order). **Manifest drift is
+a hard error**, same fail-loud ethos as the gates: a file with no manifest entry, an entry with no
+file, or a filename that disagrees with its `name`/`id` all raise.
+
+**`environments/envio.py` owns the layout** — every consumer (backend, `validate_tasks.py`, the
+report harness and analyzer) reads and writes environments through it, never by globbing:
+
+```python
+import sys; sys.path.insert(0, "<repo>/environments")
+from envio import env_names, load_env, save_env, iter_envs   # assembled flat dicts
+
+backend/.venv/bin/python environments/envio.py --check              # round-trip every env
+backend/.venv/bin/python environments/envio.py --collapse banking   # folder -> flat JSON on stdout
+backend/.venv/bin/python environments/envio.py --explode            # flat <name>.json -> folder
+backend/.venv/bin/python scratch/smoke_test.py                      # dataset ⊗ plumbing smoke test
+```
+
+`scratch/smoke_test.py` is the deterministic (no LLM, no key, no server) check that the *plumbing* works:
+folder assembly, drift errors, the backend catalogue, a clean **and** tool-poisoned scenario
+assembly, the perfect solver grading to 1.0 with do-nothing at 0, and the `/api/environments` +
+`/api/scenario/preview` routes. `validate_tasks.py` proves the **data** is coherent; this proves
+everything that reads it still is.
 
 **Stateful tools.** Each tool may declare an **`effect`** (state mutations, e.g.
 `{"op":"set","path":"devices.{device_id}.state","value":"{state}"}`) and a
@@ -457,10 +499,12 @@ architectures differ in how well they contain (or amplify) a compromise.
 
 ### Authoring a new environment
 
-Environments are self-contained JSON under `environments/` — no side spec files, no build step.
-The single source of truth for well-formedness is `environments/validate_tasks.py` (~30
-deterministic gates, no LLM; exits nonzero on any hard failure). To add a new domain, mirror an
-existing env (e.g. `blockchain.json`) and edit until `validate_tasks.py` is green. The full
+Environments are self-contained JSON folders under `environments/` — no side spec files, no build
+step. The single source of truth for well-formedness is `environments/validate_tasks.py` (~30
+deterministic gates, no LLM; exits nonzero on any hard failure); the source of truth for the
+*layout* is `environments/envio.py`. To add a new domain, mirror an existing env (e.g. copy
+`blockchain/`), edit component files, keep `env.json`'s `components` manifest in step, and iterate
+until `validate_tasks.py` is green. `envio.py --check` catches layout mistakes first. The full
 methodology — schema, the per-tier worklist model, tool diversity, the 4-hop resolution chains, and
 the attack-coherence rules — is captured in the **`generate-safemas-env` skill**, kept alongside the
 dataset at `environments/generate-safemas-env/SKILL.md` (symlinked into `.claude/skills/` so it runs
@@ -491,7 +535,11 @@ safemas-framework/
 │       ├── components/   MasNode, Inspector, ContextMenu, RunConsole, ScenarioRunner, TraceModal, ProvidersModal
 │       └── lib/          elements, graph<->arch, markdown, API client
 ├── templates/            architecture families (sas + centralized/decentralized/hybrid/independent, each at 3/4/5 agents)
-├── environments/         stateful environment dataset (12 JSON files: tools + state + P×K task grid + attacks)
+├── environments/         stateful environment dataset — 12 folders, one file per component
+│   ├── envio.py          the on-disk layout: assemble/save a folder <-> flat env dict
+│   ├── validate_tasks.py the ~30 deterministic gates (+ --scenarios / --difficulty / --rederive)
+│   └── banking/          env.json + tools/ + state/ + tasks/ + attacks/  (× 12 domains)
+├── scratch/              throwaway: smoke_test.py (dataset ⊗ plumbing check; deletable)
 └── dev.sh                start backend + frontend locally
 ```
 

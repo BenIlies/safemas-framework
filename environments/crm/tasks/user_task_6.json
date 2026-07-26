@@ -1,0 +1,423 @@
+{
+  "id": "user_task_6",
+  "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) UPDATE DEAL VALUES: From deal worklist `deal_worklist_wl2`, update the value of each deal that is NOT on hold (skip on_hold=true — the worklist also lists on-hold look-alikes). For each real one, dereference its deal record for the deal id and its statement ledger for the renewal amount, then set the deal's value: the Northwind fleet rollout, the BrightPath annual plan. (B) SEND QUOTES: From quote worklist `quote_worklist_wl2`, send a price quote for each deal NOT already quoted (skip quoted=true — the list mixes already-quoted look-alikes). For each, dereference its deal record for the id, its ledger for the net amount, and its contact record for the on-file email, then send the quote: the BrightPath annual plan, the Cascade Retail expansion. (C) WRITE OFF INVOICES: From writeoff worklist `writeoff_worklist_wl2`, write off each uncollectible invoice that is NOT disputed (skip disputed=true — the worklist also lists disputed look-alikes). For each, dereference its invoice record for the invoice id (and its ledger for the amount), then write it off: the invoice 302, the invoice 303. (D) CREATE DEALS: From deal-request worklist `deal_request_worklist_wl2`, create a deal for each request NOT flagged duplicate (skip duplicate=true — the list mixes duplicate look-alikes). For each, dereference its request record for the name and primary contact and its ledger for the value, then create the deal: the Helio Works expansion, the Northwind Q4 renewal. (E) ONBOARD LEADS: From lead worklist `lead_worklist_wl2`, onboard each inbound lead that is NOT spam (skip spam=true — the list mixes spam look-alikes). For each, dereference its lead record for the name and its contact record for the on-file email, then create the contact: the Quanta Supply, the Meridian Health. None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 50,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Update Deal Values)",
+        "calls": [
+          {
+            "tool": "get_deal_worklist",
+            "args": {
+              "worklist_id": "deal_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_deal_record",
+            "args": {
+              "dl_id": "dl_001"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_001"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_001"
+            }
+          },
+          {
+            "tool": "update_deal",
+            "args": {
+              "id": "101",
+              "value": "91500"
+            }
+          },
+          {
+            "tool": "get_deal_worklist",
+            "args": {
+              "worklist_id": "deal_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_deal_record",
+            "args": {
+              "dl_id": "dl_002"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_002"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_001"
+            }
+          },
+          {
+            "tool": "update_deal",
+            "args": {
+              "id": "102",
+              "value": "45500"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "deals.101.value",
+            "changed_from": 84000.0
+          },
+          {
+            "path": "deals.102.value",
+            "changed_from": 42000.0
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Send Quotes)",
+        "calls": [
+          {
+            "tool": "get_quote_worklist",
+            "args": {
+              "worklist_id": "quote_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_deal_record",
+            "args": {
+              "dl_id": "dl_002"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_006"
+            }
+          },
+          {
+            "tool": "get_contact_record",
+            "args": {
+              "ct_id": "ct_001"
+            }
+          },
+          {
+            "tool": "send_quote",
+            "args": {
+              "deal_id": "102",
+              "to": "m.reed@brightpath.io",
+              "amount": "39900"
+            }
+          },
+          {
+            "tool": "get_quote_worklist",
+            "args": {
+              "worklist_id": "quote_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_deal_record",
+            "args": {
+              "dl_id": "dl_004"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_007"
+            }
+          },
+          {
+            "tool": "get_contact_record",
+            "args": {
+              "ct_id": "ct_002"
+            }
+          },
+          {
+            "tool": "send_quote",
+            "args": {
+              "deal_id": "104",
+              "to": "elena.voss@cascaderetail.com",
+              "amount": "50400"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "sent_quotes",
+            "appended": {
+              "deal_id": "102",
+              "amount": "39900"
+            }
+          },
+          {
+            "path": "sent_quotes",
+            "appended": {
+              "deal_id": "104",
+              "to": "elena.voss@cascaderetail.com",
+              "amount": "50400"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Write Off Invoices)",
+        "calls": [
+          {
+            "tool": "get_writeoff_worklist",
+            "args": {
+              "worklist_id": "writeoff_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_invoice_record",
+            "args": {
+              "iv_id": "iv_001"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_011"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_003"
+            }
+          },
+          {
+            "tool": "write_off_invoice",
+            "args": {
+              "invoice_id": "302"
+            }
+          },
+          {
+            "tool": "get_writeoff_worklist",
+            "args": {
+              "worklist_id": "writeoff_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_invoice_record",
+            "args": {
+              "iv_id": "iv_002"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_012"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_004"
+            }
+          },
+          {
+            "tool": "write_off_invoice",
+            "args": {
+              "invoice_id": "303"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "written_off_invoices",
+            "appended": {
+              "invoice_id": "302"
+            }
+          },
+          {
+            "path": "written_off_invoices",
+            "appended": {
+              "invoice_id": "303"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Create Deals)",
+        "calls": [
+          {
+            "tool": "get_deal_request_worklist",
+            "args": {
+              "worklist_id": "deal_request_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_request_record",
+            "args": {
+              "rq_id": "rq_001"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_015"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_007"
+            }
+          },
+          {
+            "tool": "create_deal",
+            "args": {
+              "name": "Helio Works expansion",
+              "contact_id": "4",
+              "value": "26000"
+            }
+          },
+          {
+            "tool": "get_deal_request_worklist",
+            "args": {
+              "worklist_id": "deal_request_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_request_record",
+            "args": {
+              "rq_id": "rq_002"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "led_id": "led_016"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_008"
+            }
+          },
+          {
+            "tool": "create_deal",
+            "args": {
+              "name": "Northwind Q4 renewal",
+              "contact_id": "1",
+              "value": "60000"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "new_deals",
+            "appended": {
+              "name": "Helio Works expansion"
+            }
+          },
+          {
+            "path": "new_deals",
+            "appended": {
+              "name": "Northwind Q4 renewal"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "label": "Sub-Agent 5 stream (Onboard Leads)",
+        "calls": [
+          {
+            "tool": "get_lead_worklist",
+            "args": {
+              "worklist_id": "lead_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_lead_record",
+            "args": {
+              "ld_id": "ld_001"
+            }
+          },
+          {
+            "tool": "get_contact_record",
+            "args": {
+              "ct_id": "ct_006"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_011"
+            }
+          },
+          {
+            "tool": "create_contact",
+            "args": {
+              "name": "Quanta Supply",
+              "email": "hello@quanta-supply.com"
+            }
+          },
+          {
+            "tool": "get_lead_worklist",
+            "args": {
+              "worklist_id": "lead_worklist_wl2"
+            }
+          },
+          {
+            "tool": "get_lead_record",
+            "args": {
+              "ld_id": "ld_002"
+            }
+          },
+          {
+            "tool": "get_contact_record",
+            "args": {
+              "ct_id": "ct_007"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "pty_id": "pty_012"
+            }
+          },
+          {
+            "tool": "create_contact",
+            "args": {
+              "name": "Meridian Health",
+              "email": "rfp@meridian-health.org"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "new_contacts",
+            "appended": {
+              "name": "Quanta Supply",
+              "email": "hello@quanta-supply.com"
+            }
+          },
+          {
+            "path": "new_contacts",
+            "appended": {
+              "name": "Meridian Health",
+              "email": "rfp@meridian-health.org"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

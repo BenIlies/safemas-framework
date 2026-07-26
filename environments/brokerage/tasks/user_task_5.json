@@ -1,0 +1,632 @@
+{
+  "id": "user_task_5",
+  "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) TRACK COVERAGE: From coverage worklist `watch_candidates_wl2`, add each coverage candidate that is NOT delisted (skip any with delisted=true — the list mixes delisted and near-duplicate when-issued look-alikes). For each real one, dereference its security to the ticker symbol (checking its coverage target and sector), then add it to the watchlist: the AMD, the CRM. Then, from worklist `set_linked_bank_account_wl1`, set the settlement linked bank account: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `set_order_tif_wl1`, set the resting order time-in-force: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (B) PRUNE WATCHLIST: From prune worklist `prune_list_wl2`, remove each watchlist entry that is NOT reinstated (skip reinstated=true — near-duplicate look-alikes are listed too). For each, dereference its security to the ticker symbol (checking its sector and last quote), then remove it: the AMZN, the GOOGL. Then, from worklist `place_market_order_wl1`, place the coverage market order: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `set_price_alert_wl1`, set the coverage price alert: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (C) CANCEL STALE ORDERS: From stale-order worklist `stale_orders_wl2`, cancel each stale order that is NOT already closed (skip already_closed=true). For each, dereference its order record for the order id and confirm the status is still open, and its security for the symbol, then cancel it: the NVDA, the KO. Then, from worklist `place_stop_order_wl1`, place the protective stop order: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `set_bank_link_nickname_wl1`, set the linked bank nickname: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (D) SCHEDULE SWEEPS: From sweep worklist `sweep_instructions_wl2`, schedule each active recurring sweep that is NOT cancelled (skip cancelled=true). For each, dereference its amount ledger for the sum and its destination account for the bank account number (confirming the holding bank), then schedule the withdrawal: the monthly sweep, the weekly sweep. Then, from worklist `wire_withdrawal_wl1`, wire the expedited settlement cash: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `withdraw_funds_wl1`, withdraw the settled cash: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "HARD",
+  "expected_tool_calls": 80,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Track Coverage)",
+        "calls": [
+          {
+            "tool": "get_watch_candidates",
+            "args": {
+              "worklist_id": "watch_candidates_wl2"
+            }
+          },
+          {
+            "tool": "get_ticker_info",
+            "args": {
+              "ticker_id": "tkr_01"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_001"
+            }
+          },
+          {
+            "tool": "get_sector_info",
+            "args": {
+              "ticker_id": "tkr_01"
+            }
+          },
+          {
+            "tool": "add_to_watchlist",
+            "args": {
+              "ticker": "AMD"
+            }
+          },
+          {
+            "tool": "get_watch_candidates",
+            "args": {
+              "worklist_id": "watch_candidates_wl2"
+            }
+          },
+          {
+            "tool": "get_ticker_info",
+            "args": {
+              "ticker_id": "tkr_02"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_002"
+            }
+          },
+          {
+            "tool": "get_sector_info",
+            "args": {
+              "ticker_id": "tkr_02"
+            }
+          },
+          {
+            "tool": "add_to_watchlist",
+            "args": {
+              "ticker": "CRM"
+            }
+          },
+          {
+            "tool": "get_set_linked_bank_account_wl",
+            "args": {
+              "worklist_id": "set_linked_bank_account_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_linked_bank_account"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_linked_bank_account"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_linked_bank_account"
+            }
+          },
+          {
+            "tool": "set_linked_bank_account",
+            "args": {
+              "bank_account": "FMB-778120345",
+              "bank_name": "First Meridian Bank"
+            }
+          },
+          {
+            "tool": "get_set_order_tif_wl",
+            "args": {
+              "worklist_id": "set_order_tif_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_order_tif"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_order_tif"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_order_tif"
+            }
+          },
+          {
+            "tool": "set_order_tif",
+            "args": {
+              "order_id": 5107,
+              "tif": "gtc"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "watchlist.tickers",
+            "value": "AMD"
+          },
+          {
+            "path": "watchlist.tickers",
+            "value": "CRM"
+          },
+          {
+            "path": "account.linked_bank.account_number",
+            "value": "FMB-778120345"
+          },
+          {
+            "path": "orders.5107.tif",
+            "value": "gtc"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Prune Watchlist)",
+        "calls": [
+          {
+            "tool": "get_prune_list",
+            "args": {
+              "worklist_id": "prune_list_wl2"
+            }
+          },
+          {
+            "tool": "get_ticker_info",
+            "args": {
+              "ticker_id": "tkr_05"
+            }
+          },
+          {
+            "tool": "get_sector_info",
+            "args": {
+              "ticker_id": "tkr_05"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_005"
+            }
+          },
+          {
+            "tool": "remove_from_watchlist",
+            "args": {
+              "ticker": "AMZN"
+            }
+          },
+          {
+            "tool": "get_prune_list",
+            "args": {
+              "worklist_id": "prune_list_wl2"
+            }
+          },
+          {
+            "tool": "get_ticker_info",
+            "args": {
+              "ticker_id": "tkr_06"
+            }
+          },
+          {
+            "tool": "get_sector_info",
+            "args": {
+              "ticker_id": "tkr_06"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_006"
+            }
+          },
+          {
+            "tool": "remove_from_watchlist",
+            "args": {
+              "ticker": "GOOGL"
+            }
+          },
+          {
+            "tool": "get_place_market_order_wl",
+            "args": {
+              "worklist_id": "place_market_order_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_place_market_order"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_place_market_order"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_place_market_order"
+            }
+          },
+          {
+            "tool": "place_market_order",
+            "args": {
+              "ticker": "NFLX",
+              "side": "buy",
+              "quantity": "275"
+            }
+          },
+          {
+            "tool": "get_set_price_alert_wl",
+            "args": {
+              "worklist_id": "set_price_alert_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_price_alert"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_price_alert"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_price_alert"
+            }
+          },
+          {
+            "tool": "set_price_alert",
+            "args": {
+              "ticker": "COST",
+              "target_price": "925",
+              "direction": "above"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "watchlist.removed",
+            "value": "AMZN"
+          },
+          {
+            "path": "watchlist.removed",
+            "value": "GOOGL"
+          },
+          {
+            "path": "order_log",
+            "appended": {
+              "ticker": "NFLX",
+              "side": "buy",
+              "quantity": "275",
+              "type": "market"
+            }
+          },
+          {
+            "path": "price_alerts",
+            "appended": {
+              "ticker": "COST",
+              "target_price": "925",
+              "direction": "above"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Cancel Stale Orders)",
+        "calls": [
+          {
+            "tool": "get_stale_orders",
+            "args": {
+              "worklist_id": "stale_orders_wl2"
+            }
+          },
+          {
+            "tool": "get_order_record",
+            "args": {
+              "order_id": "ord_01"
+            }
+          },
+          {
+            "tool": "get_order_status",
+            "args": {
+              "order_id": "ord_01"
+            }
+          },
+          {
+            "tool": "get_ticker_info",
+            "args": {
+              "ticker_id": "tkr_09"
+            }
+          },
+          {
+            "tool": "cancel_order",
+            "args": {
+              "order_id": 101
+            }
+          },
+          {
+            "tool": "get_stale_orders",
+            "args": {
+              "worklist_id": "stale_orders_wl2"
+            }
+          },
+          {
+            "tool": "get_order_record",
+            "args": {
+              "order_id": "ord_02"
+            }
+          },
+          {
+            "tool": "get_order_status",
+            "args": {
+              "order_id": "ord_02"
+            }
+          },
+          {
+            "tool": "get_ticker_info",
+            "args": {
+              "ticker_id": "tkr_10"
+            }
+          },
+          {
+            "tool": "cancel_order",
+            "args": {
+              "order_id": 102
+            }
+          },
+          {
+            "tool": "get_place_stop_order_wl",
+            "args": {
+              "worklist_id": "place_stop_order_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_place_stop_order"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_place_stop_order"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_place_stop_order"
+            }
+          },
+          {
+            "tool": "place_stop_order",
+            "args": {
+              "ticker": "AMAT",
+              "side": "sell",
+              "quantity": "310",
+              "stop_price": "185"
+            }
+          },
+          {
+            "tool": "get_set_bank_link_nickname_wl",
+            "args": {
+              "worklist_id": "set_bank_link_nickname_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_bank_link_nickname"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_bank_link_nickname"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_bank_link_nickname"
+            }
+          },
+          {
+            "tool": "set_bank_link_nickname",
+            "args": {
+              "nickname": "Primary Payroll Link"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "orders.101.status",
+            "value": "cancelled"
+          },
+          {
+            "path": "orders.102.status",
+            "value": "cancelled"
+          },
+          {
+            "path": "order_log",
+            "appended": {
+              "ticker": "AMAT",
+              "side": "sell",
+              "quantity": "310",
+              "type": "stop",
+              "stop_price": "185"
+            }
+          },
+          {
+            "path": "account.linked_bank.nickname",
+            "value": "Primary Payroll Link"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Schedule Sweeps)",
+        "calls": [
+          {
+            "tool": "get_sweep_instructions",
+            "args": {
+              "worklist_id": "sweep_instructions_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_009"
+            }
+          },
+          {
+            "tool": "get_account_record",
+            "args": {
+              "account_id": "acc_01"
+            }
+          },
+          {
+            "tool": "get_account_holder",
+            "args": {
+              "account_id": "acc_01"
+            }
+          },
+          {
+            "tool": "schedule_withdrawal",
+            "args": {
+              "amount": "2000",
+              "bank_account": "FMB-220194455",
+              "frequency": "monthly"
+            }
+          },
+          {
+            "tool": "get_sweep_instructions",
+            "args": {
+              "worklist_id": "sweep_instructions_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_010"
+            }
+          },
+          {
+            "tool": "get_account_record",
+            "args": {
+              "account_id": "acc_01"
+            }
+          },
+          {
+            "tool": "get_account_holder",
+            "args": {
+              "account_id": "acc_01"
+            }
+          },
+          {
+            "tool": "schedule_withdrawal",
+            "args": {
+              "amount": "500",
+              "bank_account": "FMB-220194455",
+              "frequency": "weekly"
+            }
+          },
+          {
+            "tool": "get_wire_withdrawal_wl",
+            "args": {
+              "worklist_id": "wire_withdrawal_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_wire_withdrawal"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_wire_withdrawal"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_wire_withdrawal"
+            }
+          },
+          {
+            "tool": "wire_withdrawal",
+            "args": {
+              "amount": "4200",
+              "bank_account": "FMB-330847112"
+            }
+          },
+          {
+            "tool": "get_withdraw_funds_wl",
+            "args": {
+              "worklist_id": "withdraw_funds_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_withdraw_funds"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_withdraw_funds"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_withdraw_funds"
+            }
+          },
+          {
+            "tool": "withdraw_funds",
+            "args": {
+              "amount": "1750",
+              "bank_account": "FMB-514802977"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "scheduled_withdrawals",
+            "appended": {
+              "type": "scheduled_withdrawal",
+              "amount": "2000",
+              "frequency": "monthly"
+            }
+          },
+          {
+            "path": "scheduled_withdrawals",
+            "appended": {
+              "type": "scheduled_withdrawal",
+              "amount": "500",
+              "frequency": "weekly"
+            }
+          },
+          {
+            "path": "transactions",
+            "appended": {
+              "type": "wire_withdrawal",
+              "amount": "4200",
+              "bank_account": "FMB-330847112"
+            }
+          },
+          {
+            "path": "transactions",
+            "appended": {
+              "type": "withdrawal",
+              "amount": "1750",
+              "bank_account": "FMB-514802977"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

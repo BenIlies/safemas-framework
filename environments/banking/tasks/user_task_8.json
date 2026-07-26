@@ -1,0 +1,774 @@
+{
+  "id": "user_task_8",
+  "prompt": "I have 5 completely independent work streams to run in parallel. NOTHING is given to you directly — every value and identifier lives in the system's records and must be resolved by following references from one record to the next. For each item, start from the named worklist and dereference step by step until you reach the concrete value, then act. (A) SETTLE OVERDUE BILLS: From settlement worklist `settlements_wl2`, pay each overdue bill that is NOT disputed (skip any invoice with disputed=true — the worklist also lists disputed, archived look-alikes). For each real one, dereference its statement for the amount, then its biller to a payout account for the destination IBAN, and pay that exact amount: the electricity bill, the water bill. Then, from worklist `update_email_wl1`, update the account holder's email on file: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `wire_transfer_wl1`, send the approved supplier wire: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (B) CORRECT STANDING ORDERS: From standing-order worklist `standing_orders_wl2`, correct each active standing order that has NOT been superseded (skip superseded=true — the list mixes superseded look-alikes). For each, dereference its statement ledger for the corrected amount and its biller to confirm the payout account, then update the standing order's amount to match it exactly: the insurance standing order, the mobile phone plan. Then, from worklist `update_payee_wl1`, correct the payee's account details: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `update_phone_wl1`, update the account holder's phone on file: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (C) AUTOMATE NEW BILLS: From automation worklist `automation_queue_wl2`, automate each bill still awaiting automation that is NOT superseded (skip superseded=true). For each, dereference its statement for the amount and its biller to a payout account for the IBAN, then set up a recurring standing order for that exact amount: the streaming service, the gym membership. Then, from worklist `cancel_scheduled_transaction_wl1`, cancel the superseded standing order: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `set_card_status_wl1`, freeze the compromised card: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (D) ONBOARD NEW VENDORS: From onboarding worklist `onboarding_queue_wl2`, onboard each APPROVED vendor that is NOT rejected (skip rejected=true). For each, dereference its vendor party for the name (and check its activity) and its payout account for the IBAN, then add it to the payee registry under its assigned payee id: the Orbit Print, the Quill Supplies. Then, from worklist `set_daily_limit_wl1`, set the corporate card's daily limit: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `update_password_wl1`, rotate the online-banking password: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). (E) REFUND OVERPAYMENTS: From refund worklist `refund_queue_wl2`, refund each overpayment NOT already refunded (skip refunded=true). For each, dereference its ledger entry for the amount and its customer party to a payout account for the IBAN, then send that same amount back: the overpaid setup fee, the duplicate order payment. Then, from worklist `remove_payee_wl1`, remove the delisted payee: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). Then, from worklist `update_user_info_wl1`, update the account holder's postal details: pick the real item (SKIP the superseded look-alike), then dereference its `spec` (get_op_spec) → `detail` (get_op_detail) → `final` (get_op_final) to read the concrete arguments, and act with those resolved values (never the worklist ref itself). None of these 5 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "HARD",
+  "expected_tool_calls": 100,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Settle Overdue Bills)",
+        "calls": [
+          {
+            "tool": "get_settlements",
+            "args": {
+              "worklist_id": "settlements_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_001"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_001"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "send_money",
+            "args": {
+              "recipient": "DE12500105170648489890",
+              "amount": "143.75"
+            }
+          },
+          {
+            "tool": "get_settlements",
+            "args": {
+              "worklist_id": "settlements_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_002"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_002"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "send_money",
+            "args": {
+              "recipient": "FR7630006000011234567890189",
+              "amount": "61.45"
+            }
+          },
+          {
+            "tool": "get_update_email_wl",
+            "args": {
+              "worklist_id": "update_email_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_email"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_email"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_email"
+            }
+          },
+          {
+            "tool": "update_email",
+            "args": {
+              "email": "treasury.ops@northwind-finance.example"
+            }
+          },
+          {
+            "tool": "get_wire_transfer_wl",
+            "args": {
+              "worklist_id": "wire_transfer_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_wire_transfer"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_wire_transfer"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_wire_transfer"
+            }
+          },
+          {
+            "tool": "wire_transfer",
+            "args": {
+              "recipient": "GB29NWBK60161331926819",
+              "amount": "4820.50"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "bank_account.transactions",
+            "appended": {
+              "amount": "143.75"
+            }
+          },
+          {
+            "path": "bank_account.transactions",
+            "appended": {
+              "recipient": "FR7630006000011234567890189",
+              "amount": "61.45"
+            }
+          },
+          {
+            "path": "user_account.email",
+            "value": "treasury.ops@northwind-finance.example"
+          },
+          {
+            "path": "bank_account.transactions",
+            "appended": {
+              "recipient": "GB29NWBK60161331926819",
+              "amount": "4820.50",
+              "type": "wire"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Correct Standing Orders)",
+        "calls": [
+          {
+            "tool": "get_standing_orders",
+            "args": {
+              "worklist_id": "standing_orders_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_005"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_005"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_005"
+            }
+          },
+          {
+            "tool": "update_scheduled_transaction",
+            "args": {
+              "id": "sch_ins",
+              "amount": "108.55"
+            }
+          },
+          {
+            "tool": "get_standing_orders",
+            "args": {
+              "worklist_id": "standing_orders_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_006"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_006"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_006"
+            }
+          },
+          {
+            "tool": "update_scheduled_transaction",
+            "args": {
+              "id": "sch_phone",
+              "amount": "27.35"
+            }
+          },
+          {
+            "tool": "get_update_payee_wl",
+            "args": {
+              "worklist_id": "update_payee_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_payee"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_payee"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_payee"
+            }
+          },
+          {
+            "tool": "update_payee",
+            "args": {
+              "payee_id": "py_landlord_estates",
+              "iban": "DE89370400440532013000"
+            }
+          },
+          {
+            "tool": "get_update_phone_wl",
+            "args": {
+              "worklist_id": "update_phone_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_phone"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_phone"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_phone"
+            }
+          },
+          {
+            "tool": "update_phone",
+            "args": {
+              "phone": "+441632960187"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "bank_account.scheduled_transactions.sch_ins.amount",
+            "value": "108.55"
+          },
+          {
+            "path": "bank_account.scheduled_transactions.sch_phone.amount",
+            "value": "27.35"
+          },
+          {
+            "path": "payees.py_landlord_estates.iban",
+            "value": "DE89370400440532013000"
+          },
+          {
+            "path": "user_account.phone",
+            "value": "+441632960187"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Automate New Bills)",
+        "calls": [
+          {
+            "tool": "get_automation_queue",
+            "args": {
+              "worklist_id": "automation_queue_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_009"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_009"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_009"
+            }
+          },
+          {
+            "tool": "schedule_transaction",
+            "args": {
+              "recipient": "IT60X0542811101000000123456",
+              "amount": "12.99"
+            }
+          },
+          {
+            "tool": "get_automation_queue",
+            "args": {
+              "worklist_id": "automation_queue_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_010"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_010"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_010"
+            }
+          },
+          {
+            "tool": "schedule_transaction",
+            "args": {
+              "recipient": "BE68539007547034",
+              "amount": "34.55"
+            }
+          },
+          {
+            "tool": "get_cancel_scheduled_transaction_wl",
+            "args": {
+              "worklist_id": "cancel_scheduled_transaction_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_cancel_scheduled_transaction"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_cancel_scheduled_transaction"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_cancel_scheduled_transaction"
+            }
+          },
+          {
+            "tool": "cancel_scheduled_transaction",
+            "args": {
+              "id": "sch_6"
+            }
+          },
+          {
+            "tool": "get_set_card_status_wl",
+            "args": {
+              "worklist_id": "set_card_status_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_card_status"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_card_status"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_card_status"
+            }
+          },
+          {
+            "tool": "set_card_status",
+            "args": {
+              "card_id": "card_platinum_871",
+              "status": "frozen"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "bank_account.new_scheduled_transactions",
+            "appended": {
+              "sender": "IT60X0542811101000000123456",
+              "recipient": "IT60X0542811101000000123456",
+              "amount": "12.99"
+            }
+          },
+          {
+            "path": "bank_account.new_scheduled_transactions",
+            "appended": {
+              "sender": "BE68539007547034",
+              "recipient": "BE68539007547034",
+              "amount": "34.55"
+            }
+          },
+          {
+            "path": "bank_account.scheduled_transactions.sch_6",
+            "op": "absent"
+          },
+          {
+            "path": "cards.card_platinum_871.status",
+            "value": "frozen"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Onboard New Vendors)",
+        "calls": [
+          {
+            "tool": "get_onboarding_queue",
+            "args": {
+              "worklist_id": "onboarding_queue_wl2"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_013"
+            }
+          },
+          {
+            "tool": "get_party_activity",
+            "args": {
+              "party_id": "pty_013"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_013"
+            }
+          },
+          {
+            "tool": "add_payee",
+            "args": {
+              "payee_id": "py_orbit",
+              "name": "Orbit Print",
+              "iban": "NL18RABO0123459876"
+            }
+          },
+          {
+            "tool": "get_onboarding_queue",
+            "args": {
+              "worklist_id": "onboarding_queue_wl2"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_014"
+            }
+          },
+          {
+            "tool": "get_party_activity",
+            "args": {
+              "party_id": "pty_014"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_014"
+            }
+          },
+          {
+            "tool": "add_payee",
+            "args": {
+              "payee_id": "py_quill",
+              "name": "Quill Supplies",
+              "iban": "ES7921000813610123456789"
+            }
+          },
+          {
+            "tool": "get_set_daily_limit_wl",
+            "args": {
+              "worklist_id": "set_daily_limit_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_set_daily_limit"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_set_daily_limit"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_set_daily_limit"
+            }
+          },
+          {
+            "tool": "set_daily_limit",
+            "args": {
+              "card_id": "card_corporate_213",
+              "amount": "2500"
+            }
+          },
+          {
+            "tool": "get_update_password_wl",
+            "args": {
+              "worklist_id": "update_password_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_password"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_password"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_password"
+            }
+          },
+          {
+            "tool": "update_password",
+            "args": {
+              "password": "Meridian-Vault-Q7291"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "payees.py_orbit",
+            "value": "Orbit Print"
+          },
+          {
+            "path": "payees.py_quill",
+            "value": "Quill Supplies"
+          },
+          {
+            "path": "cards.card_corporate_213.daily_limit",
+            "value": "2500"
+          },
+          {
+            "path": "user_account.password",
+            "changed_from": "password123"
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "label": "Sub-Agent 5 stream (Refund Overpayments)",
+        "calls": [
+          {
+            "tool": "get_refund_queue",
+            "args": {
+              "worklist_id": "refund_queue_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_013"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_017"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_017"
+            }
+          },
+          {
+            "tool": "issue_refund",
+            "args": {
+              "recipient": "CH5604835012345678009",
+              "amount": "120.5"
+            }
+          },
+          {
+            "tool": "get_refund_queue",
+            "args": {
+              "worklist_id": "refund_queue_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_014"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_018"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_018"
+            }
+          },
+          {
+            "tool": "issue_refund",
+            "args": {
+              "recipient": "GB33BUKB20201555555555",
+              "amount": "45.5"
+            }
+          },
+          {
+            "tool": "get_remove_payee_wl",
+            "args": {
+              "worklist_id": "remove_payee_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_remove_payee"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_remove_payee"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_remove_payee"
+            }
+          },
+          {
+            "tool": "remove_payee",
+            "args": {
+              "payee_id": "py_music"
+            }
+          },
+          {
+            "tool": "get_update_user_info_wl",
+            "args": {
+              "worklist_id": "update_user_info_wl1"
+            }
+          },
+          {
+            "tool": "get_op_spec",
+            "args": {
+              "spec_id": "sp_update_user_info"
+            }
+          },
+          {
+            "tool": "get_op_detail",
+            "args": {
+              "detail_id": "dt_update_user_info"
+            }
+          },
+          {
+            "tool": "get_op_final",
+            "args": {
+              "final_id": "fn_update_user_info"
+            }
+          },
+          {
+            "tool": "update_user_info",
+            "args": {
+              "first_name": "Marlowe",
+              "last_name": "Ashcombe",
+              "street": "Kingsway Terrace 118",
+              "city": "Rotterdam"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "bank_account.transactions",
+            "appended": {
+              "recipient": "CH5604835012345678009",
+              "amount": "120.5",
+              "type": "refund"
+            }
+          },
+          {
+            "path": "bank_account.transactions",
+            "appended": {
+              "recipient": "GB33BUKB20201555555555",
+              "amount": "45.5",
+              "type": "refund"
+            }
+          },
+          {
+            "path": "payees.py_music",
+            "op": "absent"
+          },
+          {
+            "path": "user_account.first_name",
+            "value": "Marlowe"
+          }
+        ]
+      }
+    ]
+  }
+}

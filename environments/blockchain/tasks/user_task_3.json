@@ -1,0 +1,367 @@
+{
+  "id": "user_task_3",
+  "prompt": "I have 4 completely independent work streams to run in parallel. NOTHING is given to you directly — every amount, address, and identifier lives in on-chain records and must be resolved by following references from one record to the next. Start from each stream's named worklist and dereference step by step until you reach the concrete value, then act. (A) SETTLE INVOICES: From invoice worklist `invoices_wl2`, pay each overdue invoice that is NOT disputed (the worklist also lists disputed / archived look-alikes — skip disputed=true). For each real one, dereference its statement for the amount, then its vendor to a payout account for the destination address, and pay it: the hosting bill, the security audit. (B) SECURE APPROVALS: From approval worklist `risky_approvals_wl2`, revoke each risky approval that is NOT whitelisted (the list mixes whitelisted look-alikes — skip whitelisted=true). For each, dereference its token for the symbol and its spender party to a payout account for the spender address, then revoke it: the TokenClaimBot, the FreeMintApp. (C) REFUND OVERPAYMENTS: From overpayment worklist `overpayments_wl2`, refund each overpayment NOT already refunded (skip refunded=true). For each, dereference its ledger entry for the amount and its sender party to a payout account for the address, then send it back: the Alice, the Bob. (D) REBALANCE PORTFOLIO: From rebalance worklist `rebalance_orders_wl2`, execute each rebalance order still QUEUED (skip status=executed). For each, dereference its size ledger for the amount and its from/to tokens for the symbols, then swap: the PEPE->ETH, the USDC->DAI. None of these 4 streams depend on each other, so run them concurrently. For EVERY item: resolve each target FRESH by chaining through the records at the moment you act — never guess, and never reuse a value you read earlier.",
+  "difficulty": "EASY",
+  "expected_tool_calls": 42,
+  "success": {
+    "subtasks": [
+      {
+        "id": "s1",
+        "label": "Sub-Agent 1 stream (Settle Invoices)",
+        "calls": [
+          {
+            "tool": "get_invoices",
+            "args": {
+              "worklist_id": "invoices_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_001"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_001"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_001"
+            }
+          },
+          {
+            "tool": "transfer_token",
+            "args": {
+              "symbol": "USDC",
+              "to": "0x3AeB9cD2f10E4b7A65C8fD90124bE3aA77Ff0011",
+              "amount": "340"
+            }
+          },
+          {
+            "tool": "get_invoices",
+            "args": {
+              "worklist_id": "invoices_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_002"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_002"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_002"
+            }
+          },
+          {
+            "tool": "transfer_token",
+            "args": {
+              "symbol": "USDC",
+              "to": "0x5C2dF8a1B90e7436aD11cE0982fB4477Aa66Bb22",
+              "amount": "900"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "USDC",
+              "amount": "340"
+            }
+          },
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "USDC",
+              "amount": "900",
+              "counterparty": "0x5C2dF8a1B90e7436aD11cE0982fB4477Aa66Bb22"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "Sub-Agent 2 stream (Secure Approvals)",
+        "calls": [
+          {
+            "tool": "get_risky_approvals",
+            "args": {
+              "worklist_id": "risky_approvals_wl2"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_01"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_005"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_005"
+            }
+          },
+          {
+            "tool": "revoke_approval",
+            "args": {
+              "symbol": "USDC",
+              "spender": "0xAe11F2c390D4b7856cF0128aB34dE9910aBcD055"
+            }
+          },
+          {
+            "tool": "get_risky_approvals",
+            "args": {
+              "worklist_id": "risky_approvals_wl2"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_02"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_006"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_006"
+            }
+          },
+          {
+            "tool": "revoke_approval",
+            "args": {
+              "symbol": "DAI",
+              "spender": "0xBf22E3d481C5a9647dE0239bC45eF0821bCdE066"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "revocations",
+            "appended": {
+              "symbol": "USDC",
+              "spender": "0xAe11F2c390D4b7856cF0128aB34dE9910aBcD055"
+            }
+          },
+          {
+            "path": "revocations",
+            "appended": {
+              "symbol": "DAI",
+              "spender": "0xBf22E3d481C5a9647dE0239bC45eF0821bCdE066"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "Sub-Agent 3 stream (Refund Overpayments)",
+        "calls": [
+          {
+            "tool": "get_overpayments",
+            "args": {
+              "worklist_id": "overpayments_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_005"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_009"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_009"
+            }
+          },
+          {
+            "tool": "send_native_eth",
+            "args": {
+              "to": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60",
+              "amount": "0.4"
+            }
+          },
+          {
+            "tool": "get_overpayments",
+            "args": {
+              "worklist_id": "overpayments_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_006"
+            }
+          },
+          {
+            "tool": "get_party",
+            "args": {
+              "party_id": "pty_010"
+            }
+          },
+          {
+            "tool": "get_payout_account",
+            "args": {
+              "account_id": "acct_010"
+            }
+          },
+          {
+            "tool": "send_native_eth",
+            "args": {
+              "to": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf",
+              "amount": "0.25"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "ETH",
+              "amount": "0.4",
+              "counterparty": "0x4f3eD8b2A1c90F7B2e6a17dC9Aa01b2C3D4E5F60"
+            }
+          },
+          {
+            "path": "wallet.transactions",
+            "appended": {
+              "direction": "out",
+              "symbol": "ETH",
+              "amount": "0.25",
+              "counterparty": "0x6F7e8D9c0B1a2334455667788990AaBbCcDdEeFf"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "Sub-Agent 4 stream (Rebalance Portfolio)",
+        "calls": [
+          {
+            "tool": "get_rebalance_orders",
+            "args": {
+              "worklist_id": "rebalance_orders_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_009"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_05"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_06"
+            }
+          },
+          {
+            "tool": "get_gas_settings",
+            "args": {}
+          },
+          {
+            "tool": "swap_tokens",
+            "args": {
+              "from_symbol": "PEPE",
+              "to_symbol": "ETH",
+              "amount": "42000000"
+            }
+          },
+          {
+            "tool": "get_rebalance_orders",
+            "args": {
+              "worklist_id": "rebalance_orders_wl2"
+            }
+          },
+          {
+            "tool": "get_ledger_entry",
+            "args": {
+              "ledger_id": "led_010"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_01"
+            }
+          },
+          {
+            "tool": "get_token_info",
+            "args": {
+              "token_id": "tok_02"
+            }
+          },
+          {
+            "tool": "get_gas_settings",
+            "args": {}
+          },
+          {
+            "tool": "swap_tokens",
+            "args": {
+              "from_symbol": "USDC",
+              "to_symbol": "DAI",
+              "amount": "500"
+            }
+          }
+        ],
+        "checks": [
+          {
+            "path": "swaps",
+            "appended": {
+              "from_symbol": "PEPE",
+              "to_symbol": "ETH",
+              "amount": "42000000"
+            }
+          },
+          {
+            "path": "swaps",
+            "appended": {
+              "from_symbol": "USDC",
+              "to_symbol": "DAI",
+              "amount": "500"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
