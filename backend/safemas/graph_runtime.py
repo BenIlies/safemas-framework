@@ -1022,12 +1022,22 @@ class Engine:
                 st["loop_iters"][pick.key] = st["loop_iters"].get(pick.key, 0) + 1
             return [pick] if pick is not None else []
 
-        # FAN OUT — fire EVERY forward edge plus every non-exhausted loop (feedback)
-        # edge. This is what lets one agent both report upward (loop) AND share
-        # laterally (forward peer edge) in the same step — hybrid and decentralized
-        # need both; without it a sub-agent could only do one or the other.
+        # FAN OUT — fire every forward edge plus every non-exhausted loop (feedback) edge, so an
+        # agent can both report upward (loop) AND reach a peer laterally in the same step; hybrid
+        # and decentralized need both.
+        #
+        # PEER edges are the exception: they fire ON DEMAND, not by default. A worker->worker edge
+        # is only taken when the sender actually ADDRESSES that peer by name in its output.
+        # Firing them unconditionally turned every agent's end-of-turn output into a broadcast to
+        # all peers — measured in the archived sweep as 2330 peer messages of which zero asked
+        # anybody for anything, every one byte-identical to its siblings. Undirected traffic is
+        # not coordination; it is cost, and it pollutes each receiver's context. An agent that
+        # needs something from a named peer still gets through, because naming it is exactly the
+        # trigger. Reporting to a coordinator is untouched: that edge is not peer-to-peer.
         result = []
         for ch in outs:
+            if self._is_peer_edge(src=agent, ch=ch) and ch.tgt.label.lower() not in self._peer_directives(output):
+                continue
             if ch.loop:
                 cap = ch.max_iters if ch.max_iters is not None else DEFAULT_MAX_ITERS
                 if st["loop_iters"].get(ch.key, 0) < cap and not self.matches(output, ch.until):
@@ -1037,6 +1047,55 @@ class Engine:
                 result.append(ch)
         return result
 
+    def _is_peer_edge(self, src, ch) -> bool:
+        """A worker -> worker channel: neither end is a coordination role. Reports to an
+        orchestrator/consensus/aggregator are NOT peer edges and always fire."""
+        role = lambda a: (getattr(a, "role", "") or "").lower()
+        return role(src) not in self.COORD_ROLES and role(ch.tgt) not in self.COORD_ROLES
+
+    def _strip_directives(self, output: str) -> str:
+        """The sender's output with its ``@Name: …`` peer directives cut out."""
+        d = self._peer_directives(output)
+        if not d:
+            return output
+        labels = sorted({a.label for a in self.agents if a.label}, key=len, reverse=True)
+        alt = "|".join(re.escape(l) for l in labels)
+        cut = re.sub(rf"^[ \t]*@({alt})[ \t]*:.*?(?=^[ \t]*@(?:{alt})[ \t]*:|\Z)",
+                     "", output, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        return cut.strip() or output
+
+    def _peer_directives(self, output: str) -> dict:
+        """Parse the sender's explicit peer directives out of its output.
+
+        The wire format is one directive per block, starting at the beginning of a line::
+
+            @Sub-Agent 2: what is the settlement total for led_001?
+
+        A block runs until the next ``@<Name>:`` marker or the end of the text, so a request can
+        span several lines. Returns ``{lowercased peer label: message body}``.
+
+        Why a marker rather than "did the output mention the peer": mentioning is not addressing.
+        "Peer B already handled that" names Peer B while asking it nothing, and a substring match
+        would then deliver the sender's whole status report to it — precisely the undirected
+        broadcast this replaces. A marker is unambiguous for the parser, cheap for a model to emit,
+        and it identifies the SEGMENT meant for each peer, so two peers never receive identical text
+        unless the sender actually wrote it twice."""
+        if not output or "@" not in output:
+            return {}
+        labels = sorted({a.label for a in self.agents if a.label}, key=len, reverse=True)
+        if not labels:                      # longest first: "Sub-Agent 2" must win over "Agent 2"
+            return {}
+        alt = "|".join(re.escape(l) for l in labels)
+        marker = re.compile(rf"^[ \t]*@({alt})[ \t]*:[ \t]*", re.IGNORECASE | re.MULTILINE)
+        hits = list(marker.finditer(output))
+        out = {}
+        for i, m in enumerate(hits):
+            end = hits[i + 1].start() if i + 1 < len(hits) else len(output)
+            body = output[m.end():end].strip()
+            if body:                        # an empty directive addresses nobody
+                out[m.group(1).lower()] = body
+        return out
+
     COORD_ROLES = frozenset({"orchestrator", "coordinator", "dispatcher", "aggregator",
                              "consensus", "supervisor", "planner", "manager", "moderator",
                              "router", "lead"})
@@ -1045,7 +1104,22 @@ class Engine:
         """Directed dispatch: when a COORDINATOR fans out to several distinct worker
         agents, send each target only the portion of the output addressed to IT — not
         the whole decomposition broadcast to everyone. Non-coordinators (workers
-        reporting up, peer-to-peer) send their output unchanged."""
+        reporting up, peer-to-peer) send their output unchanged.
+
+        In every case the sender's CHAIN OF THOUGHT is stripped first. A reasoning model's
+        `<think>` block is private deliberation, not a message: shipping it made every
+        recipient absorb the sender's unfiltered reasoning (measured at 100% of peer messages in
+        the archived sweep), which inflates the receiver's context with text the sender never
+        meant to say and makes any context measurement a measurement of leakage."""
+        output = _strip_reasoning(output) or output
+        # A PEER receives only the block the sender addressed to it — never the sender's whole turn.
+        if self._is_peer_edge(src=src, ch=ch):
+            return self._peer_directives(output).get(ch.tgt.label.lower(), output)
+        # Everyone else (a report upward, a coordinator's dispatch) gets the sender's own content with
+        # the peer directives REMOVED: a request meant for a peer is not part of the report, and
+        # leaving it in would refill the coordinator's context with the lateral traffic we just
+        # stopped broadcasting.
+        output = self._strip_directives(output)
         if (getattr(src, "role", "") or "").lower() not in self.COORD_ROLES:
             return output
         peers = [c.tgt for c in self.out_channels.get(src.id, []) if c.tgt.id in self.by_id]

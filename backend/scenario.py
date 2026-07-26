@@ -473,9 +473,43 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
                 "until each part is fully done — then report. A part needing an action tool you "
                 "don't have belongs to another specialist; skip it (never invent a tool or claim "
                 "work you didn't do).")
+        # PEER PROTOCOL — only where worker->worker channels actually exist (hybrid, decentralized;
+        # never centralized, which has none). The runtime delivers a lateral message ONLY when the
+        # sender addresses that peer by name, so the agents have to be told the convention or the
+        # channel is unusable: an agent that just narrates its status reaches nobody. Same
+        # "<Name>: <text>" form the coordinator already uses for dispatch, so there is one
+        # addressing convention in the system rather than two.
+        _wids = {w["id"] for w in workers}
+        _peers_of = {}
+        for e in arch["edges"]:
+            if e.get("kind") == "channel" and e["source"] in _wids and e["target"] in _wids:
+                _peers_of.setdefault(e["source"], set()).add(e["target"])
+        _label = {a["id"]: a.get("label") or a["id"] for a in agents}
         for ag in agents:
             if is_worker(ag):
-                ag["prompt"] = (ag.get("prompt") or "") + _wkr
+                extra = ""
+                reach = sorted(_label[t] for t in _peers_of.get(ag["id"], ()))
+                if reach:
+                    extra = (
+                        "\n\nTALKING TO PEERS — EXACT FORMAT REQUIRED. Your report goes back "
+                        "automatically when you finish; you never need to announce your status to "
+                        "anyone. To reach another sub-agent you MUST write a directive line that "
+                        "starts at the beginning of a line, with an @ sign, the sub-agent's exact "
+                        "name, and a colon:\n"
+                        "    @<Name>: <exactly what you need>\n"
+                        f"Reachable sub-agents (use these names verbatim): {', '.join(reach)}.\n"
+                        "The directive runs to the end of the line, or until the next @Name: line, so "
+                        "one turn may address several sub-agents with different requests. Only the "
+                        "text inside a directive is delivered, and only to the sub-agent it names — "
+                        "everything else you write is private to you. Merely mentioning a sub-agent "
+                        "in a sentence sends nothing; the @Name: prefix is what sends it.\n"
+                        "Use it when you genuinely need something only that sub-agent can give you — "
+                        "a value from a tool you do not hold, or a fact only it observed. Name the "
+                        "record you need it for, and use the value it returns verbatim. If you need "
+                        "nothing from anyone, write no directive.\n"
+                        "Example: @" + reach[0] + ": I need the settlement total for statement "
+                        "led_001 — you own that calculation tool and I do not.")
+                ag["prompt"] = (ag.get("prompt") or "") + _wkr + extra
             else:
                 ag["prompt"] = (ag.get("prompt") or "") + _coord
     store = _env_store(env)
