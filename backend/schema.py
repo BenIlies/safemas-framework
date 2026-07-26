@@ -76,6 +76,8 @@ class Node(BaseModel):
     # the first message; "all" waits for every inbound channel and aggregates
     # them in one call (a real join / aggregator).
     join: Optional[str] = None
+    # Per-agent override of the run's ``context_limit`` (tokens). None => inherit the run's.
+    context_limit: Optional[int] = None
     # Deprecated: entry/exit are now their own node types wired to an agent via an
     # "io" edge. Kept optional so older saved YAML still loads (the runner honours
     # them as a fallback).
@@ -145,6 +147,12 @@ class Architecture(BaseModel):
     # The environment's hidden world STATE at run start (a nested dict). Tool
     # ``effect``s mutate a run-scoped copy; ``returns:{read:...}`` tools inspect it.
     state: dict = Field(default_factory=dict)
+    # Ceiling on the context ONE agent activation may accumulate, in tokens. A RUN parameter, so the
+    # caller that configures the experiment owns the number and every architecture in a sweep is
+    # compared under the same ceiling. On reaching it the agent stops and reports its partial result
+    # instead of the provider rejecting an over-long request and the 400 becoming the agent's answer.
+    # None => no ceiling (the provider's own window is the only limit). A node may override it.
+    context_limit: Optional[int] = None
 
 
 # --------------------------------------------------------------------------- #

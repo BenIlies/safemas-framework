@@ -69,6 +69,7 @@ def arch_to_code(arch: dict) -> str:
                 _kw("model", n.get("model")),
                 _kw("temperature", n.get("temperature")),
                 _kw("max_tokens", n.get("max_tokens")),
+                _kw("context_limit", n.get("context_limit")),
                 _kw("join", n.get("join")) if n.get("join") not in (None, "", "any") else None,
             ]))
     if tools:
@@ -183,6 +184,7 @@ def mas_to_arch(mas) -> dict:
             "provider": a.provider, "model": a.model, "role": a.role,
             "prompt": a.prompt, "temperature": a.temperature,
             "max_tokens": a.max_tokens, "join": getattr(a, "join", "any"),
+            "context_limit": getattr(a, "context_limit", None),
             "malicious": mal(a),
         })
     for t in mas.tools:

@@ -94,17 +94,48 @@ task structure and want checks recomputed from the authored solver trace.
 - **`indirection: true`** (opt-in) — asserts the resolution model gates (RESOLUTION-DEPTH, READ-RICH,
   AMBIGUITY, EXPLICIT-VALUE).
 
-## Context protection — the size and entropy floors (always on)
+## Context protection — the size and entropy band (always on)
 
-A new environment must make a lookup genuinely expensive, or context protection cannot be measured.
-Four gates, all unconditional:
+A new environment must make a lookup genuinely expensive **but never unaffordable on its own**, or
+context protection cannot be measured. Five gates, all unconditional:
 
-| gate | floor |
+| gate | bound |
 |---|---|
-| **GETTER-SIZE** | env-wide **mean** getter return ≥ **32 KB** (~8k tokens) |
+| **GETTER-SIZE** | env-wide **mean** getter return ≥ **8,192 tokens** |
+| **GETTER-MAX** | **no single read** returns > **16,384 tokens** (2x the floor) — reported per tool |
 | **GETTER-SPREAD** | **median** ≥ **35 %** of the mean — the volume must not sit in a few giant returns |
 | **STATE-SCALE** | the **reachable** world (regions the getters can serve) ≥ **2 MB** |
 | **GETTER-ENTROPY** | state compresses ≤ **8×** and ≥ **50 %** of long strings are distinct |
+
+**Stated in TOKENS, counted with the estimator the runtime's context budget spends**
+(`backend/safemas/tokens.py`), serialized the way the engine serializes a return. An earlier byte-based
+version of these gates converted at an assumed 4 chars/token; this JSON measures 2.7 compact / 2.96
+indented, so the floor bought ~11k tokens instead of 8k, records landed at ~17.5k, one work-stream cost
+~122k, and **every architecture hit the 160k context ceiling and scored 0.0**.
+
+**The floor and the ceiling are one design.** Aim for ~10k-token records: that clears the mean and leaves
+headroom under GETTER-MAX (the shipped dataset runs 9,235–9,752 mean, 11,593–12,543 max). An agent should
+exhaust its context by *accumulating* lookups — never on the first call. Grow the world by adding **more
+records**, not fatter ones. Sanity-check the consequence: `mean x reads-per-stream` must fit an agent's
+budget, while `mean x reads-for-every-stream` must not, or no architecture can outperform another.
+
+### The two read modes — `read` vs `index`
+
+A read whose path carries no `{id}` returns its **whole region**, which collides head-on with
+GETTER-MAX once the region is padded. Choose the mode by what the tool is for:
+
+| tool is… | declare | returns |
+|---|---|---|
+| a per-record lookup | `returns: {"read": "registry.{id}"}` | the full record (~10k tokens — the cost being measured) |
+| a browse / list endpoint | `returns: {"index": "registry"}` | only the **ids**, bounded at 16 KB of JSON |
+
+Never point a `read` at a whole padded region. That mistake shipped 111 times across the dataset:
+`get_ledger_book(query='led_005')` silently ignored its argument and returned 1.04 MB (~260k tokens), and
+a live 5-agent run sent **881k tokens against a ~205k window** — the provider's 400 became the agent's
+answer. Say so in the description too: an agent told "read the ledger" that receives a list of ids will
+conclude the ledger is empty unless the description states it gets an index.
+
+    backend/.venv/bin/python scratch/index_oversized_getters.py <name> --dry-run   # find and fix them
 
 You will not hand-author 8 MB of state, and you should not try. Use the padder:
 
@@ -192,8 +223,9 @@ GRADER, DO-NOTHING, NO-OP, INDEX-ALIGN, TOOL/PHANTOM, ARG-TYPE, ATTACK, CROSS-AG
 TOOL-BALANCE, SCENARIO-COUNT, EASY-INSPECT, DEPTH-TIER, CONFOUND, CHECK-COUNT, GRADEABILITY,
 WRITE-COVERAGE, TARGET-EXISTS, TOOL-DIVERSITY, PROMPT-STREAMS/DEPTH-UNIFORM, SOURCE-DELIVERY,
 TOOLPOISON-TARGET, DIVERSITY, the resolution set (RESOLUTION-DEPTH, READ-RICH, AMBIGUITY,
-EXPLICIT-VALUE), the context-protection set (GETTER-SIZE, GETTER-SPREAD, STATE-SCALE, GETTER-ENTROPY)
-and KEY-ARG-TYPE. Each is one function in `validate_tasks.py`; its failure message tells you the fix.
+EXPLICIT-VALUE), the context-protection set (GETTER-SIZE, **GETTER-MAX**, GETTER-SPREAD, STATE-SCALE,
+GETTER-ENTROPY) and KEY-ARG-TYPE. Each is one function in `validate_tasks.py`; its failure message tells
+you the fix.
 
 ## Common pitfalls
 
@@ -211,3 +243,7 @@ and KEY-ARG-TYPE. Each is one function in `validate_tasks.py`; its failure messa
 - **Padding applied only to task-relevant records** → record size becomes a tell; pad the whole region.
 - **Padding inside a worklist** → changes `worklist_payable` / WRITE-COVERAGE / AMBIGUITY, i.e. changes
   what the task means. Pad the registries the chain dereferences into instead.
+- **A `read` pointed at a whole padded region** → GETTER-MAX fails, and left unfixed it kills the run on
+  the first call rather than pressuring the context. Use `returns: {"index": …}` for browse tools.
+- **Padding records fatter to reach the mean** → eventually breaches GETTER-MAX. The padder now refuses
+  and tells you to add more records instead; the band between the two gates is the target, not the floor.

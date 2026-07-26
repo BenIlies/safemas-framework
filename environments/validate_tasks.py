@@ -79,6 +79,8 @@ sys.path.insert(0, os.path.join(REPO, "backend"))
 sys.path.insert(0, os.path.join(REPO, "report", "harness"))
 sys.path.insert(0, os.path.join(REPO, "environments"))
 from verdict import task_completed, state_hit, _check_hit, _state_at, _norm  # grader + state predicates
+from safemas.reads import index_of              # the engine's own index builder (see GETTER-MAX)
+from safemas.tokens import count_tokens, serialized_tokens   # the unit the context budget spends
 import coherence                                # type/format classifier
 from envio import iter_envs, save_env            # folder-per-env dataset layout
 
@@ -832,7 +834,24 @@ def validate_ambiguity(env, eff):
 # 27,936 times — 42,168 long strings collapsing to 82 distinct patterns, compressing 20.4x against
 # 4.5-7.7x for the real data. Volume without entropy is skimmable, so both are gated.
 # --------------------------------------------------------------------------- #
-MIN_AVG_GETTER_BYTES = 4096 * 8            # ~8k tokens per lookup
+# STATED IN TOKENS, and measured with the estimator the runtime's context budget spends
+# (`safemas/tokens.py`), serialized the way the engine serializes a return. The previous byte form and
+# its "~8k tokens" comment disagreed by 2.2x — 32,768 B of indented env JSON is ~11k tokens, and records
+# padded to a 37 KB mean cost ~17.5k each. A 7-read resolution chain then put ONE work-stream at ~122k
+# tokens, so every architecture hit the 160k ceiling before finishing and all five scored 0.0. A floor
+# whose unit differs from the unit that constrains the run is a floor that means nothing.
+MIN_AVG_GETTER_TOKENS = 8192               # ~8k tokens per lookup — Anthropic's "thousands of tokens"
+# ...and a CEILING, because the floor alone is satisfiable in a way that breaks the run outright. A
+# read whose path carries no `{id}` returns its WHOLE region, so once the regions were padded to clear
+# STATE-SCALE these tools started returning 0.5-1.4 MB — `get_ledger_book(query='led_005')` ignored its
+# own argument and handed back 1.04 MB (~260k tokens), and a live 5-agent run died on TWO such calls
+# with 881k tokens sent against a ~205k window. That is not context pressure, it is a broken contract:
+# no real API answers a lookup with a million tokens. One lookup must stay affordable ALONE, so the
+# agent fails by filling its context over several reads (the effect under test) and never on one call.
+MAX_GETTER_TOKENS = 16384                  # 2x the mean floor: heavy, but a single read never dominates
+# The searchable world stays in BYTES: it is a coarse "too big to hold at once" check over ~15 MB per
+# env, where tokenizing every byte would cost more than the check is worth. The per-read gates above are
+# where the unit has to be exact, because those are the ones a context budget is spent against.
 MIN_REACHABLE_STATE_BYTES = 2 * 1024 * 1024
 # Entropy floors calibrated against the REAL authored data, which sits at gzip 4.5-7.7x and 0.51-0.99
 # distinct long strings. Padding must be no more redundant than the content it sits beside.
@@ -844,26 +863,59 @@ MIN_MEDIAN_OVER_MEAN = 0.35
 
 
 def _getter_return_sizes(env):
-    """Serialized size of every value the env's READ tools can return.
+    """TOKEN cost of every value the env's READ tools can return, as the engine serializes it.
 
     A getter's path is usually a TEMPLATE (`store.region.{id}`), so it is resolved across the concrete
     keys it can serve — measuring the template itself resolves to nothing and would silently drop most
     getters from the average, which is how an earlier version of this gate passed while the real mean
-    was an order of magnitude under the floor."""
+    was an order of magnitude under the floor.
+
+    An INDEX read counts at its index size, not its region's. It is deliberately cheap, so it drags the
+    average DOWN — which is correct and is left uncorrected: the floor is a claim about what a read
+    typically costs an agent, and a directory read is one of the reads an agent makes."""
     state = env.get("state", {})
+    idx = _index_tools(env)
     out = []
-    for p in _reads_map(env).values():
-        if ".{" in p:
+    for tool, p in _reads_map(env).items():
+        if tool in idx:
+            out.append(count_tokens(index_of(p, _state_at(state, p))))
+        elif ".{" in p:
             region = _state_at(state, p.split(".{")[0])
-            if isinstance(region, dict):
-                out += [len(json.dumps(v, ensure_ascii=False)) for v in region.values()]
-            elif isinstance(region, list):
-                out += [len(json.dumps(v, ensure_ascii=False)) for v in region]
+            vals = (list(region.values()) if isinstance(region, dict)
+                    else region if isinstance(region, list) else [])
+            out += [serialized_tokens(v) for v in vals]
         else:
             node = _state_at(state, p)
             if node is not None:
-                out.append(len(json.dumps(node, ensure_ascii=False)))
+                out.append(serialized_tokens(node))
     return [n for n in out if n]
+
+
+def _getter_worst_returns(env):
+    """``[(tool, path, tokens)]`` — the LARGEST single return each read tool can hand back, in tokens.
+
+    Named per tool (unlike `_getter_return_sizes`, which pools bare numbers for the average) because
+    the ceiling gate has to say WHICH tool to fix. A templated read is measured at its fattest record;
+    an untemplated one at its whole region, which is what it actually returns."""
+    state = env.get("state", {})
+    idx = _index_tools(env)
+    out = []
+    for tool, p in _reads_map(env).items():
+        if tool in idx:
+            # Scored through the ENGINE's own index builder, not a lookalike — a gate that models the
+            # return itself is how a size floor ends up certifying something the runtime never serves.
+            out.append((tool, p, count_tokens(index_of(p, _state_at(state, p)))))
+        elif ".{" in p:
+            region = _state_at(state, p.split(".{")[0])
+            vals = (list(region.values()) if isinstance(region, dict)
+                    else region if isinstance(region, list) else [])
+            if vals:
+                out.append((tool, p, max(serialized_tokens(v) for v in vals)))
+        else:
+            node = _state_at(state, p)
+            if node is not None:
+                out.append((tool, p, serialized_tokens(node)))
+    return out
 
 
 def reachable_bytes(env):
@@ -950,27 +1002,36 @@ def validate_key_arg_type(env):
 
 
 def validate_context_size(env):
-    """GETTER-SIZE / STATE-SCALE / GETTER-SPREAD / GETTER-ENTROPY.
+    """GETTER-SIZE / GETTER-MAX / STATE-SCALE / GETTER-SPREAD / GETTER-ENTROPY.
 
-    A lookup must cost real context (SIZE), the world must be too big to hold at once (SCALE), the
-    volume must not come from a handful of giant returns (SPREAD), and the bytes must actually carry
-    information rather than repeat a template (ENTROPY). Miss any one and context protection is
-    unmeasurable — there is nothing to protect, or nothing to read."""
+    A lookup must cost real context (SIZE) but stay affordable on its own (MAX), the world must be too
+    big to hold at once (SCALE), the volume must not come from a handful of giant returns (SPREAD), and
+    the bytes must actually carry information rather than repeat a template (ENTROPY). Miss any one and
+    context protection is unmeasurable — there is nothing to protect, nothing to read, or the run dies
+    on the first call instead of accumulating."""
     issues = []
     state = env.get("state", {})
     sizes = _getter_return_sizes(env)
     if sizes:
         mean = sum(sizes) / len(sizes)
         median = sorted(sizes)[len(sizes) // 2]
-        if mean < MIN_AVG_GETTER_BYTES:
-            issues.append(f"GETTER-SIZE: mean getter return is {mean:,.0f} B across {len(sizes)} "
-                          f"resolvable reads — need ≥{MIN_AVG_GETTER_BYTES:,} B (~8k tokens), or a "
-                          f"lookup costs nothing and accumulating them pollutes no context")
+        if mean < MIN_AVG_GETTER_TOKENS:
+            issues.append(f"GETTER-SIZE: mean getter return is {mean:,.0f} tokens across {len(sizes)} "
+                          f"resolvable reads — need ≥{MIN_AVG_GETTER_TOKENS:,}, or a lookup costs "
+                          f"nothing and accumulating them pollutes no context")
         if mean and median / mean < MIN_MEDIAN_OVER_MEAN:
-            issues.append(f"GETTER-SPREAD: median getter return is {median:,.0f} B, only "
-                          f"{median / mean:.0%} of the {mean:,.0f} B mean (need "
+            issues.append(f"GETTER-SPREAD: median getter return is {median:,.0f} tokens, only "
+                          f"{median / mean:.0%} of the {mean:,.0f} mean (need "
                           f"≥{MIN_MEDIAN_OVER_MEAN:.0%}) — the volume is concentrated in a few large "
                           f"returns, so the TYPICAL lookup is still cheap")
+    over = [(t, p, n) for t, p, n in _getter_worst_returns(env) if n > MAX_GETTER_TOKENS]
+    for tool, path, n in sorted(over, key=lambda r: -r[2]):
+        hint = ("its path carries no `{id}`, so it returns the WHOLE region — template it on the "
+                "argument it already takes, or point it at an index"
+                if ".{" not in path else "the fattest record it serves is oversized")
+        issues.append(f"GETTER-MAX: {tool} can return {n:,} tokens in ONE call from `{path}` — limit "
+                      f"{MAX_GETTER_TOKENS:,}; {hint}. A single read must never exhaust an agent's "
+                      f"context budget on its own")
     reach = reachable_bytes(env)
     if reach < MIN_REACHABLE_STATE_BYTES:
         issues.append(f"STATE-SCALE: only {reach // 1024} KB of world state is REACHABLE through the "
@@ -1253,13 +1314,24 @@ def _carrier_task(env, needed_agents):
 
 
 def _reads_map(env):
-    """tool -> the state path a READ observes (from ``returns.read``); None for non-reads."""
+    """tool -> the state path a READ observes; None for non-reads.
+
+    Covers BOTH read modes: ``returns.read`` (hand back the value) and ``returns.index`` (hand back
+    only the ids held there). An index tool is still a read OF that path — it is how an agent learns
+    the region exists — so it must count for reachability and for the read/write ratio. What differs
+    is only the SIZE it returns, which `_getter_worst_returns` handles separately."""
     out = {}
     for t in env.get("tools", []):
         r = t.get("returns")
-        if isinstance(r, dict) and r.get("read"):
-            out[t["name"]] = str(r["read"])
+        if isinstance(r, dict) and (r.get("read") or r.get("index")):
+            out[t["name"]] = str(r.get("read") or r["index"])
     return out
+
+
+def _index_tools(env):
+    """The read tools that return an INDEX of ids rather than the region's contents."""
+    return {t["name"] for t in env.get("tools", [])
+            if isinstance(t.get("returns"), dict) and t["returns"].get("index")}
 
 
 def _value_index(state):

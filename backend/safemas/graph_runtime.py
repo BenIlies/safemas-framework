@@ -34,6 +34,9 @@ from collections import defaultdict
 from types import SimpleNamespace
 from typing import Optional, TypedDict
 
+from .reads import index_of
+from .tokens import count_tokens
+
 # --------------------------------------------------------------------------- #
 # Small helpers (ported from the bespoke engine so the trace/scn stay identical)
 # --------------------------------------------------------------------------- #
@@ -59,6 +62,31 @@ PER_AGENT_CAP = _env_int("SAFEMAS_PER_AGENT_CAP", 64)    # cap on activations of
 TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 6)     # k: tool-calling rounds within one agent activation
 LLM_RETRIES = _env_int("SAFEMAS_LLM_RETRIES", 12)        # retry transient LLM errors per agent call
 LLM_BACKOFF = max(0.0, float(os.environ.get("SAFEMAS_LLM_BACKOFF") or 3.0))  # base for exp backoff (s)
+
+
+def _count_tokens(parts) -> int:
+    """Tokens in an assembled message list — via the estimator the size gates also use, so the ceiling
+    the budget enforces and the floor the environment guarantees are stated in one unit
+    (see `safemas/tokens.py` for why that matters)."""
+    return count_tokens("\n".join(str(getattr(p, "content", p) or "") for p in parts))
+
+
+# CONTEXT BUDGET — the per-agent ceiling on the context an activation may accumulate.
+#
+# Deliberately NOT a constant here. It is a parameter of the RUN, arriving on the request as
+# `context_limit` (per-agent override on a node), because the number is a property of the experiment
+# rather than of the engine: whoever configures a sweep owns it, and every architecture in that sweep
+# is then compared under the same ceiling. An engine-side default would silently apply one experiment's
+# choice to every other caller. Absent from the request => no ceiling, and the provider's own window is
+# the only limit.
+#
+# Why the ceiling exists at all: without it an agent that over-reads does not fail gracefully — the
+# provider rejects the request and the 400 becomes the agent's answer ("[llm-error:…] context window
+# exceeds limit"), an infrastructure error masquerading as a result. A 5-agent banking run hit that
+# both ways: one whole-region getter returning 432k tokens (2x the window in ONE result), and honest
+# accumulation over four tool rounds at ~73k each. Set BELOW the model's real window (MiniMax-M2 is
+# ~205k; measured at 211k accepted / 258k rejected) so the agent stops on OUR terms while the request
+# would still have been legal, and reaching it is a graded outcome instead of an exception.
 
 # A transient LLM error (network reset, timeout, rate limit, 5xx, overload) should
 # be retried, not allowed to poison a whole run by becoming the agent's "answer".
@@ -234,6 +262,7 @@ def parse_arch(arch: dict):
             role=n.get("role"), prompt=n.get("prompt"), provider=n.get("provider"),
             model=n.get("model"), temperature=n.get("temperature"),
             max_tokens=n.get("max_tokens"), join=n.get("join") or "any",
+            context_limit=n.get("context_limit"),   # None => the run-wide CONTEXT_LIMIT
             spec=n.get("spec"), content=n.get("content"),
             returns=n.get("returns"), effect=n.get("effect"), params=n.get("params"),
             malicious=_mal(n.get("malicious")),
@@ -416,6 +445,8 @@ class Engine:
         self.name = arch.get("name", "untitled-mas")
         self.task = (task or os.environ.get("SAFEMAS_TASK")
                      or arch.get("task") or "Solve the assigned task.")
+        # Run-wide context ceiling from the request (see the CONTEXT BUDGET note above). None/0 => off.
+        self.context_limit = arch.get("context_limit") or None
 
         agents, resources, channels, attachments, entries, exits = parse_arch(arch)
         self.agents = agents
@@ -745,6 +776,11 @@ class Engine:
         return set(re.findall(r"\{([a-zA-Z_]\w*)\}", blob))
 
     def _compute_return(self, ret, named: dict) -> str:
+        if isinstance(ret, dict) and "index" in ret:
+            path = self._fill(str(ret["index"]), named)
+            with self._state_lock:
+                node = self._state_get(path)
+            return index_of(path, node)
         if isinstance(ret, dict) and "read" in ret:
             with self._state_lock:
                 val = self._state_get(self._fill(str(ret["read"]), named))
@@ -860,6 +896,28 @@ class Engine:
                     continue
                 raise
 
+    def _context_stop(self, agent, st: RunState, used: int, limit: int, it: int) -> str:
+        """Halt this activation on the context budget — cleanly, and as a REPORTED result.
+
+        Deliberately not an exception and not an `[llm-error:…]`: the agent declares that it has run
+        out of room and stops, listing the writes it did complete so a partial stream still scores
+        what it earned. Downstream (grader, analyzer) sees a normal agent answer plus a
+        `context_limit` event, so 'ran out of context' is measurable per architecture instead of
+        being buried in a provider error string."""
+        done = (st.get("agent_done") or {}).get(agent.id) or []
+        did = ("; ".join(f"{d['fn']}({json.dumps(d['args'], separators=(',', ':'))})" for d in done)
+               if done else "no state-changing action completed")
+        note = (f"[context-budget reached: {used:,} of {limit:,} tokens after {it} tool round(s)] "
+                f"I am stopping here and will not go further — the information I have pulled in no "
+                f"longer fits in my context. Completed so far: {did}. "
+                f"Anything not listed above is NOT done.")
+        self._emit(st, "context_limit", agent=agent.label, iter=it, used=used, limit=limit,
+                   completed=[d["fn"] for d in done])
+        self._emit(st, "llm_call", agent=agent.label, iter=it, reasoning=None, content=note,
+                   tool_calls=[])
+        log(f"{YELLOW}    [{agent.label}] ⛔ context budget {used:,}/{limit:,} tok — stopping{RESET}")
+        return note
+
     # -- one agent activation: real tool-calling loop ----------------------- #
     def run_agent(self, agent, provider, model, system, user_input, tool_res, st: RunState) -> str:
         engine = provider_engine(provider)
@@ -887,7 +945,17 @@ class Engine:
                 llm = llm.bind_tools(tools)
             msgs = [SystemMessage(content=system), HumanMessage(content=user_input)]
             final_text = ""
+            limit = (agent.context_limit if agent.context_limit is not None
+                     else self.context_limit) or 0
             for it in range(TOOL_LOOP_CAP):
+                # CONTEXT BUDGET, checked before the request rather than after the provider's 400:
+                # the agent stops of its own accord and reports where it got to. A giant tool result
+                # is caught on the round AFTER it lands, which is the earliest point at which the
+                # accumulated context is known.
+                used = _count_tokens(msgs) if limit else 0
+                if limit and used > limit:
+                    stopped = self._context_stop(agent, st, used, limit, it)
+                    return f"{final_text}\n\n{stopped}".strip() if final_text else stopped
                 acc, content, reasoning = self._stream_response(llm, msgs)
                 tool_calls = list(getattr(acc, "tool_calls", None) or [])
                 ai_content = acc.content if acc is not None else ""

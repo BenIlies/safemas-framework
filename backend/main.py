@@ -292,6 +292,10 @@ class ScenarioInput(BaseModel):
     aitm_channel: Optional[str] = None       # 'coord2source' | 'coord2sink' | 'source2sink' (semantic AiTM channel)
     provider: Optional[str] = None
     model: Optional[str] = None
+    # Per-agent context ceiling for this run, in tokens (see Architecture.context_limit). Supplied by
+    # the caller that configures the experiment — the harness sends the sweep's value so every
+    # architecture is compared under one ceiling. Omitted => no ceiling.
+    context_limit: Optional[int] = None
 
 
 def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
@@ -354,6 +358,8 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     meta["harm"] = harm                  # state predicate: sink effect landed (harm)
     meta["task_success"] = task_success  # deterministic user-task completion spec
     meta["task_prompt"] = task_prompt
+    if inp.context_limit is not None:
+        arch["context_limit"] = inp.context_limit
     return Architecture(**arch), meta
 
 
