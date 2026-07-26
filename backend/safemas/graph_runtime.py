@@ -102,6 +102,17 @@ def _is_transient(exc: Exception) -> bool:
     return any(t in s for t in _TRANSIENT_ERR)
 
 
+# Rate limiting is separated from the other transient failures because it is the one an OPERATOR acts
+# on: a 429 means the concurrency was set too high, whereas a 502 is the provider's problem. Tagged on
+# the trace event so the analyzer can distinguish "we pushed too hard" from "the network blipped".
+_RATE_LIMIT_ERR = ("rate limit", "ratelimit", "429", "too many requests", "toomanyrequests")
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    s = f"{type(exc).__name__} {exc}".lower()
+    return any(t in s for t in _RATE_LIMIT_ERR)
+
+
 def log(msg: str = "") -> None:
     print(msg, flush=True)
 
@@ -862,11 +873,17 @@ class Engine:
             return f"{value}\n\n{m.payload}", True
         return value, False
 
-    def _stream_response(self, llm, msgs):
+    def _stream_response(self, llm, msgs, st: RunState | None = None, agent=None):
         """Stream one LLM response, retrying transient errors (network reset,
         timeout, rate limit, 5xx) so a single blip doesn't poison the run by
         becoming the agent's answer. Re-raises after exhausting retries, or
-        immediately for non-transient errors (auth, bad request)."""
+        immediately for non-transient errors (auth, bad request).
+
+        Each retry is also EMITTED as a trace event. It used to be logged only, which made throughput
+        loss invisible where it matters: a batch at 6-way concurrency had 20 of 24 runs hit a 429 and
+        every trace looked pristine, so the retries could only be found by grepping per-run log files.
+        Rate-limit pressure changes wall-clock and can change results (a run that exhausts its retries
+        turns a 429 into the agent's answer), so it belongs in the trace beside everything else."""
         # Accumulate (no per-token printing): with the parallel drive, several
         # agents stream at once, so token-level interleaving would shred the log.
         # run_agent logs each agent's complete output as one labelled block instead.
@@ -892,6 +909,11 @@ class Engine:
                     delay = min(LLM_BACKOFF * (2 ** attempt), 120.0) + random.uniform(0, 3.0)
                     log(f"{YELLOW}[llm-retry {attempt + 1}/{LLM_RETRIES}] {type(exc).__name__}: "
                         f"{clip(str(exc), 80)} — sleeping {delay:.1f}s{RESET}")
+                    if st is not None:
+                        self._emit(st, "llm_retry", agent=getattr(agent, "label", None),
+                                   attempt=attempt + 1, of=LLM_RETRIES,
+                                   error=type(exc).__name__, rate_limited=_is_rate_limit(exc),
+                                   detail=clip(str(exc), 200), sleep_s=round(delay, 1))
                     time.sleep(delay)
                     continue
                 raise
@@ -956,7 +978,7 @@ class Engine:
                 if limit and used > limit:
                     stopped = self._context_stop(agent, st, used, limit, it)
                     return f"{final_text}\n\n{stopped}".strip() if final_text else stopped
-                acc, content, reasoning = self._stream_response(llm, msgs)
+                acc, content, reasoning = self._stream_response(llm, msgs, st, agent)
                 tool_calls = list(getattr(acc, "tool_calls", None) or [])
                 ai_content = acc.content if acc is not None else ""
                 # Fallback: recover tool calls a model wrote as text (e.g. MiniMax-M2)
@@ -1228,16 +1250,42 @@ class Engine:
         labels = list({p.label for p in peers})
         if len(labels) < 2:
             return output
-        return self._segment(output, ch.tgt.label, labels) or output
+        seg = self._segment(output, ch.tgt.label, labels)
+        if seg is None:
+            # The coordinator addressed NOBODY — an undirected plan. Nothing singles this worker out,
+            # so passing the plan along is the reasonable default.
+            return output
+        if seg:
+            return seg
+        # The coordinator addressed OTHERS but not this worker. Broadcasting the plan here is what the
+        # old `or output` fallback did, and it was wrong twice over: it contradicts an explicit routing
+        # decision, and it hands the worker the entire multi-stream decomposition — the very context
+        # leak directed dispatch exists to prevent, silently turning a `centralized` run into
+        # "everyone sees everything" while still being labelled centralized. Observed for real when an
+        # orchestrator labelled all four streams "Sub-Agent 1": three workers received the whole
+        # 1,316-char plan and one of them replied "there are no tasks addressed to me in this
+        # dispatch". So say exactly that, in one line, and let the coordination failure stay visible
+        # in the trace instead of being papered over with a broadcast.
+        addressed = sorted({m for m in labels if m != ch.tgt.label and m in output})
+        return (f"[dispatch note] The coordinator's message addressed "
+                f"{', '.join(addressed) if addressed else 'other agents'} but assigned nothing to you. "
+                f"You have no work in this dispatch — report that you were not assigned a stream so "
+                f"the coordinator can re-dispatch. Do NOT take on another agent's stream.")
 
     @staticmethod
-    def _segment(output: str, target: str, labels: list) -> str:
-        """The slice of `output` addressed to `target`: from each mention of the
-        target's label up to the next agent-label mention. '' if never addressed."""
+    def _segment(output: str, target: str, labels: list):
+        """The slice of `output` addressed to `target`: from each mention of the target's label up to
+        the next agent-label mention.
+
+        Three distinct outcomes, because the caller must treat them differently:
+          * ``None`` — no agent label appears at all (an undirected plan)
+          * ``''``   — labels appear, but none of them is ``target`` (addressed to others)
+          * text     — this target's slice(s)
+        """
         pat = re.compile("|".join(re.escape(l) for l in sorted(labels, key=len, reverse=True)))
         ms = list(pat.finditer(output))
         if not ms:
-            return ""
+            return None
         out = []
         for i, m in enumerate(ms):
             if m.group(0) == target:
