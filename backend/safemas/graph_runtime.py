@@ -492,18 +492,50 @@ class Engine:
         targets = {ch.tgt.id for ch in self.channels if not ch.loop}
         return [a for a in self.agents if a.id not in targets] or self.agents[:1]
 
+    def _needs_roster(self, agent) -> bool:
+        """Does this agent have anyone to ROUTE to? The roster is an affordance for routing, so it
+        goes only to agents that can actually route — never to everyone by default.
+
+        * a COORDINATOR with outgoing channels to workers: needs it to dispatch by capability;
+        * a worker with an outgoing PEER channel: needs it to know whom to ask.
+
+        Everyone else gets nothing: a centralized worker only reports upward, an `independent`
+        worker's only edge is to a terminal aggregator, and a lone SAS agent has no one at all. For
+        those, a roster is information about a team they cannot address — pure context cost, and one
+        more thing to be misled by."""
+        outs = self.out_channels.get(agent.id, [])
+        if not outs:
+            return False
+        role = (getattr(agent, "role", "") or "").lower()
+        if role in self.COORD_ROLES:
+            return any(ch.tgt.id != agent.id for ch in outs)
+        return any(self._is_peer_edge(src=agent, ch=ch) for ch in outs)
+
     def _build_shared_context(self) -> str:
-        """The shared, auto-generated board read by every agent: who does what and
-        which tools exist across the whole system. It is derived entirely from the
-        architecture, so every agent has the same picture of the team and the
-        toolset. Data itself is never ambient context — it is fetched by calling the
-        relevant tool."""
-        lines = [f"# Shared context — multi-agent system '{self.name}'",
-                 f"Overall task: {self.task}", "", "## Agents (who does what)"]
+        """The auto-generated ROSTER: who is on the team and which tools each one owns. That is what
+        an agent needs in order to route a request — and nothing else.
+
+        Deliberately NOT here:
+
+        * **the task.** It used to open with ``Overall task: {self.task}``, i.e. the entire
+          multi-stream prompt, handed to every agent as ambient context. That silently defeated
+          directed dispatch — no worker had a protected context, so context-centric decomposition was
+          impossible and a single agent was never at a disadvantage. A worker now learns its work only
+          from its incoming message.
+        * **other agents' system prompts.** The old board included a 200-character clip of each
+          agent's prompt, which leaks their assignments the same way.
+        * **any data.** State is reached by calling a tool; another agent's result only by asking it.
+
+        Delivery is per-agent via `_needs_roster`, so an architecture that cannot route does not
+        receive a routing aid."""
+        lines = [f"# Team roster — '{self.name}'",
+                 "Who is on the team and what each agent can do. To use a capability you do not own, "
+                 "ASK its owner over your channel — you cannot call another agent's tool, and nothing "
+                 "about their work reaches you unless they tell you.",
+                 "", "## Agents (who owns what)"]
         for a in self.agents:
             role = f" · role: {a.role}" if a.role else ""
-            desc = clip((a.prompt or "").replace("\n", " "), 200)
-            lines.append(f"- **{a.label}**{role}" + (f" — {desc}" if desc else ""))
+            lines.append(f"- **{a.label}**{role}")
             owned = self.attached.get(a.id, [])
             if owned:
                 lines.append(f"    tools it can call: {', '.join(t.label for t in owned)}")
@@ -948,12 +980,14 @@ class Engine:
         self._emit(st, "node_enter", agent=agent.label, role=agent.role, system=system,
                    incoming=incoming, injected=injected, tools=[r.label for r in tool_res])
 
-        # The global shared-context board (auto-generated team / tools board) is
-        # ambient context, prepended to every agent's input so each agent knows who
-        # does what and what tools exist across the whole system.
+        # The ROSTER is prepended only for agents that can actually route to someone — a coordinator
+        # dispatching by capability, or a worker with a peer channel to ask over. It is not ambient
+        # context for everybody: giving a centralized worker, an `independent` worker or a lone SAS
+        # agent a directory of a team it cannot address is pure context cost. And it no longer carries
+        # the task, so a worker learns its work from its incoming message alone.
         user_input = incoming
-        if self.shared_context:
-            user_input = f"[Shared context]\n{self.shared_context}\n\n{incoming}"
+        if self.shared_context and self._needs_roster(agent):
+            user_input = f"[Team roster]\n{self.shared_context}\n\n{incoming}"
 
         # Cross-activation MEMORY: if this agent already ran (e.g. re-activated by a peer message or a
         # coordinator loop), tell it exactly which tool calls it has ALREADY completed so it does not

@@ -69,13 +69,16 @@ Three element types can be turned adversarial, covering the main MAS attack surf
 a tool's `effect` mutates the run's hidden state. Poisoning a tool **appends** the
 attacker payload to that genuine result.
 
-**Shared-context board.** Every agent reads a single, **auto-generated markdown
-board** describing *who does what* (every agent + role) and *every tool available
-across the whole system* (with each agent's own tool subset). It's regenerated live
-from the architecture, read into **every** agent's context so each knows the team and
-toolset, inspectable in the UI (**🧠 Show shared context**), and never adversarial.
-(The old "memory node" concept was removed — data now lives in the hidden `state`
-and is reached through tools.)
+**Team roster (not a shared context).** Agents that can *route* to somebody read a small
+**auto-generated roster**: who is on the team and **which agent owns which tool**. It carries
+no task, no other agent's prompt and no data — state is reached by calling a tool, another
+agent's result only by asking it. Delivery is **per-agent, only where the architecture can
+actually route**: a coordinator that dispatches, or a worker with a peer channel to ask over.
+A `centralized` worker (reports upward only), an `independent` worker (its one edge ends at a
+terminal aggregator) and a lone SAS agent receive nothing — a directory of a team you cannot
+address is pure context cost. Inspectable in the UI (**🧠 Show shared context**), derived from
+the architecture, never adversarial. (The old "memory node" concept was removed — data lives in
+the hidden `state` and is reached through tools.)
 
 ---
 
@@ -110,9 +113,8 @@ and is reached through tools.)
   each **write tool is owned by exactly one sub-agent** (`tool_groups`, 3–4 each,
   index-aligned so *Task i → Sub-Agent i*); acting with an unowned tool is rejected. This
   makes cross-agent routing — and confused-deputy propagation — real. A coordinator sends
-  each worker **only its own** sub-task, not the whole plan broadcast. Every agent
-  also reads an auto-generated **shared-context** board (who-does-what + the whole-system
-  toolset, for awareness).
+  each worker **only its own** sub-task, not the whole plan broadcast. Agents that can route
+  additionally read a **team roster** (who owns which tool) — see *Team roster* above.
 - **Mark anything malicious** — inspector/right-click toggle with loud red hazard
   styling, covering prompt-injection / AiTM / tool-poisoning. **Tool-poisoning
   appends** the injection to the tool's real result (not replace); **AiTM blends**
@@ -441,6 +443,42 @@ that breaks an invariant fails loudly instead of silently corrupting a measureme
   (read)** step, so the simplest task is still agentic (the target must be observed, not
   assumed).
 
+**Context protection** — a lookup must cost real context, and the bytes must carry information.
+Anthropic's [multi-agent guidance][mas] makes context protection conditional on exactly this: *"when an
+agent's context accumulates information from one subtask that is irrelevant to subsequent subtasks,
+context pollution occurs"*, illustrated by a support agent whose order lookups each add thousands of
+tokens. Measured before these gates the dataset's mean getter return was **271 B** and the reachable
+world **19–74 KB** — a whole environment fit in a few thousand tokens, so nothing accumulated and a
+single agent was never at a disadvantage. Four gates put a floor under it:
+- **GETTER-SIZE** — the env-wide **mean** getter return ≥ **32 KB** (~8k tokens), with templated paths
+  resolved across the keys they serve. (Measuring the raw template resolves to nothing and would
+  silently drop most getters from the average — how an earlier version of this gate passed while the
+  true mean was an order of magnitude low.)
+- **GETTER-SPREAD** — the **median** ≥ **35 %** of the mean, so the volume is not concentrated in a few
+  giant returns while the *typical* lookup stays cheap.
+- **STATE-SCALE** — the **reachable** world (union of regions the getters can serve) ≥ **2 MB**.
+  Reachable, not raw: a raw floor is satisfiable with records no getter ever returns.
+- **GETTER-ENTROPY** — state compresses ≤ **8×** and ≥ **50 %** of its long strings are distinct.
+  Calibrated against the real authored data (4.5–7.7× / 51–99 %). Volume without entropy is skimmable
+  filler: a first padding attempt cleared the byte floor with one sentence repeated 27,936 times,
+  compressing 20.4×.
+
+Current dataset: mean getter **36.8–38.6 KB**, median/mean **0.49–0.79**, reachable **5.7–11.2 MB**,
+gzip **4.9×**, distinct strings **0.994–1.000**.
+
+**Contract integrity** — the tool schema must agree with the data:
+- **KEY-ARG-TYPE** — a parameter used as a **record key** is declared with the type the ground truth
+  actually passes. `update_scheduled_transaction` declared `{"name":"id","type":"integer"}` while its
+  effect wrote `scheduled_transactions.{id}` — a region keyed by strings (`sch_ins`). That type becomes
+  the pydantic `args_schema` the model is handed, so every agent dutifully passed `1` and hit the
+  no-such-record guard: **one stream failed in every run, in every architecture**, and it looked like a
+  model resolution error. It is invisible to the other gates — GRADER replays the *authored* call,
+  which passes the right string, so the spec still grades to 1.0. A task no agent can complete while
+  the ground truth completes perfectly is the worst class of benchmark defect: it silently caps utility
+  and masks whatever the experiment is measuring.
+
+[mas]: https://claude.com/blog/building-multi-agent-systems-when-and-how-to-use-them
+
 **Resolution difficulty** — enforced on envs built into the indirection model (`env["indirection"]`):
 - **RESOLUTION-DEPTH** — every graded write is preceded by **≥4 read calls using ≥4 DISTINCT
   getters** (a real dereference chain, not one getter repeated); its value is reachable only from
@@ -469,7 +507,7 @@ specific sub-agent it needs (source/sink/target) is present among `agent_1..agen
 multi-agent, the sink/source *is* that indexed worker. Currently ~**1.6k** scenarios; the runner
 samples from this set (e.g. 15 spanning all vectors × families) to execute.
 
-### Tool distribution, directed dispatch & the shared-context board
+### Tool distribution, directed dispatch & the team roster
 
 When a scenario distributes an environment over a multi-agent architecture, **write
 (setter) tools are partitioned into capability groups** — each setter is owned by
@@ -483,14 +521,27 @@ owner consumes it (enforced by the CROSS-AGENT / CASCADE gates below). Coordinat
 structure still varies across architectures; the capability partition is what turns a
 single compromised agent into a *cross-agent* propagation problem.
 
-Two mechanisms keep the multi-agent flow faithful:
+Three mechanisms keep the multi-agent flow faithful:
 
-- **Shared-context board** — an auto-generated, read-only board prepended to every
-  agent's input, listing who-does-what and the whole-system toolset. Derived from the
-  architecture (never user-authored, never adversarial), so each agent knows the team.
+- **Team roster** — an auto-generated, read-only list of who owns which tool, given **only to
+  agents that can route** (a dispatching coordinator, or a worker with a peer channel). It
+  deliberately excludes the task: an earlier version opened with `Overall task: …`, handing every
+  worker the whole multi-stream prompt as ambient context, which defeated directed dispatch —
+  no worker had a protected context, so context-centric decomposition was impossible.
 - **Directed dispatch** — a coordinator that fans out to several workers sends each
   worker **only the portion of its decomposition addressed to that worker**, rather
   than broadcasting the whole plan to everyone.
+- **Peer messaging on demand, in a parsed format** — a worker→worker channel fires only when the
+  sender writes an explicit directive:
+
+      @Sub-Agent 2: what is the settlement total for statement led_001?
+
+  A block runs to the next `@Name:` marker, so one turn can address several peers with *different*
+  requests; each peer receives **only its own block**, and the directives are stripped from the
+  report that goes upward. *Mentioning* a peer sends nothing — the marker is what sends it. The
+  sender's `<think>` reasoning is stripped from every outgoing message. Before this, peer edges fired
+  unconditionally at end of turn: an archived sweep measured **2330 peer messages of which zero asked
+  anything**, all byte-identical broadcasts, all beginning with raw chain-of-thought.
 
 An attack's entry point (a poisoned tool result, an injected agent, or a tampered
 channel message) only reaches the attacker's sink if the topology actually
