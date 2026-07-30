@@ -94,30 +94,28 @@ task structure and want checks recomputed from the authored solver trace.
 - **`indirection: true`** (opt-in) — asserts the resolution model gates (RESOLUTION-DEPTH, READ-RICH,
   AMBIGUITY, EXPLICIT-VALUE).
 
-## Context protection — the size and entropy band (always on)
-
-A new environment must make a lookup genuinely expensive **but never unaffordable on its own**, or
-context protection cannot be measured. Five gates, all unconditional:
+## Context ceiling — one gate, not five (revised 2026-07-30)
 
 | gate | bound |
 |---|---|
-| **GETTER-SIZE** | env-wide **mean** getter return ≥ **8,192 tokens** |
-| **GETTER-MAX** | **no single read** returns > **16,384 tokens** (2x the floor) — reported per tool |
-| **GETTER-SPREAD** | **median** ≥ **35 %** of the mean — the volume must not sit in a few giant returns |
-| **STATE-SCALE** | the **reachable** world (regions the getters can serve) ≥ **2 MB** |
-| **GETTER-ENTROPY** | state compresses ≤ **8×** and ≥ **50 %** of long strings are distinct |
+| **GETTER-MAX** | **no single read** may return > **16,384 tokens** — reported per tool |
 
-**Stated in TOKENS, counted with the estimator the runtime's context budget spends**
-(`backend/safemas/tokens.py`), serialized the way the engine serializes a return. An earlier byte-based
-version of these gates converted at an assumed 4 chars/token; this JSON measures 2.7 compact / 2.96
-indented, so the floor bought ~11k tokens instead of 8k, records landed at ~17.5k, one work-stream cost
-~122k, and **every architecture hit the 160k context ceiling and scored 0.0**.
+**GETTER-SIZE, GETTER-SPREAD, STATE-SCALE and GETTER-ENTROPY were removed.** They enforced a FLOOR
+on how many bytes a lookup must cost, and that model was measured and disproved: every padded record
+namespaced its filler under `ctx_*` while the answer sat at the record's top level, so one rule —
+*drop `ctx_*`* — discarded **92.4 %** of a read with no risk (26,939 B returned, 36 B load-bearing).
+The bytes were a toll, not a hazard.
 
-**The floor and the ceiling are one design.** Aim for ~10k-token records: that clears the mean and leaves
-headroom under GETTER-MAX (the shipped dataset runs 9,235–9,752 mean, 11,593–12,543 max). An agent should
-exhaust its context by *accumulating* lookups — never on the first call. Grow the world by adding **more
-records**, not fatter ones. Sanity-check the consequence: `mean x reads-per-stream` must fit an agent's
-budget, while `mean x reads-for-every-stream` must not, or no architecture can outperform another.
+What the floor did buy was an arithmetic ceiling. A 4-stream hard task needs **74 unique reads**, so
+at ~10k tokens each a monolithic agent owed **740k against a 160k budget** and scored 0.000 at every
+depth it could not fit — which reads as context pollution and is truncation. Aim for **~1–2k tokens
+per read**, not 10k, so a single agent can finish and its utility measures resolution quality rather
+than whether the task fit.
+
+The CEILING stays and is not redundant: a read whose path carries no `{id}` returns its whole region,
+which is a 0.5–1.4 MB reply to a lookup. It is not binding on the current dataset — that is what a
+guard against a regime you have left is supposed to look like. Use `index` mode for browse endpoints
+(below); nine getters were converted this way when ANSWER-STORE showed they answered whole writes.
 
 ### The two read modes — `read` vs `index`
 
@@ -152,7 +150,7 @@ Three rules it follows, and that any replacement must follow:
 2. **Pad every record of a region, never a subset.** If only task-relevant records were fat, **record
    size would be a tell** and an agent could find its targets by looking for the big ones instead of
    resolving the chain.
-3. **Entropy, not volume.** GETTER-ENTROPY exists because a first attempt cleared the byte floor with
+3. **Entropy, not volume.** (the entropy gate is retired; the lesson is not) A first attempt cleared a byte floor with
    one templated sentence and a counter — 42,168 long strings collapsing to 82 distinct patterns, one
    repeated 27,936 times, compressing 20.4× against the real data's 4.5–7.7×. That buys difficulty on
    paper only. Draw values from a combinatorial pool with random identifiers, and vary the *shape* of
@@ -214,7 +212,7 @@ Utility pinned near 1.0 at every depth. Five rules now, each gated:
 3. **Join one value across two chains.** Store it as `base_<field>` on one record and
    `<field>_adjustment` on another the entry references, so it exists in no single record and an
    error in either branch is fatal. → **JOIN-REQUIRED**.
-4. **Never label the padding.** Do not namespace filler under a prefix (`ctx_*`): one rule then
+4. **Never label the padding.** (gated by **NAMING-TELL**) Do not namespace filler under a prefix (`ctx_*`): one rule then
    discards it for free — measured, 92.4 % of a read. Do not key decoy records distinguishably
    (`wch_d1`, `ctx_0000`), do not give them tell-tale values (`unit: "ctx-…"`) or names
    (`"Zenith Rogue Bank"`), and put the skip-flag on the record the worklist entry **dereferences
@@ -223,6 +221,16 @@ Utility pinned near 1.0 at every depth. Five rules now, each gated:
    action. Never name a read tool, never narrate the path (`dereference its X to the Y`), and never
    name the resolved answers (`"…: the AMD, the CRM"`) — that also reveals which entries are real.
    → **PROMPT-ROUTE**.
+
+6. **A decoy must be plausible AND not answer a write.** Draw its values from the field's own
+   vocabulary so nothing marks them synthetic (NAMING-TELL), then check the record does not hold
+   every argument of a graded write (ANSWER-STORE). These pull against each other: suffixing a
+   value to break a collision creates a tell; a fresh real value can recreate the collision. Pick
+   from the clean pool *excluding* values that complete a write.
+
+Run `python3 environments/gate_audit.py` after changing a gate — it injects one defect per gate and
+reports any that no longer detect their own. It is how the suite was found to have 12 gates that
+never fired and 2 that were blind.
 
 Difficulty comes from **confusability and distribution**, not volume. A lookup should cost ~1–2k
 tokens, not 8k: padding large enough to exhaust a context budget makes a monolithic agent fail on
@@ -257,13 +265,12 @@ TOOL-BALANCE, SCENARIO-COUNT, EASY-INSPECT, DEPTH-TIER, CONFOUND, CHECK-COUNT, G
 WRITE-COVERAGE, TARGET-EXISTS, TOOL-DIVERSITY, PROMPT-STREAMS/DEPTH-UNIFORM, SOURCE-DELIVERY,
 TOOLPOISON-TARGET, DIVERSITY, the resolution set (RESOLUTION-DEPTH, READ-RICH, AMBIGUITY,
 EXPLICIT-VALUE), the **skip-shortcut set** (CANDIDATE-COUNT, PROMPT-ROUTE, ANSWER-STORE,
-JOIN-REQUIRED — see *Hops must CARRY something*), the context-protection set (GETTER-SIZE,
-**GETTER-MAX**, GETTER-SPREAD, STATE-SCALE, GETTER-ENTROPY) and KEY-ARG-TYPE. Each is one function in
+JOIN-REQUIRED, NAMING-TELL — see *Hops must CARRY something*), the context ceiling
+(**GETTER-MAX**) and KEY-ARG-TYPE. Each is one function in
 `validate_tasks.py`; its failure message tells you the fix.
 
-`GETTER-SIZE` and `STATE-SCALE` were **revised down** (8,192 → 512 tokens; 2 MB → 512 KB) once the
-volume floor was shown to buy a capacity ceiling rather than context pollution — CANDIDATE-COUNT
-carries the difficulty now. ANSWER-STORE and JOIN-REQUIRED currently **fail on the shipped dataset**
+The volume floors were **removed** once shown to buy a capacity ceiling rather than context
+pollution — CANDIDATE-COUNT and ANSWER-STORE carry the difficulty now. ANSWER-STORE and JOIN-REQUIRED currently **fail on the shipped dataset**
 (11 and 7 envs): pre-indirection summary stores such as `withdrawal_plan`, `onboarding_requests`,
 `deal_requests` and `secret_change_requests` still return several arguments of a write in one call.
 Do not copy that pattern into a new environment, and do not treat a red gate here as noise.
@@ -279,7 +286,7 @@ Do not copy that pattern into a new environment, and do not treat a red gate her
 - **A key param declared `integer` against string-keyed records** → KEY-ARG-TYPE fails. Nothing else
   catches it: GRADER replays the authored call and still reports 1.0, while no live agent can complete
   the write because the schema tells it to pass the wrong type.
-- **Byte floors cleared with repeated filler** → GETTER-ENTROPY fails. Volume is not difficulty; a
+- **Byte floors cleared with repeated filler** → volume is not difficulty; a
   reader skims a template. Vary values *and* record shape from a combinatorial pool.
 - **Padding applied only to task-relevant records** → record size becomes a tell; pad the whole region.
 - **Padding inside a worklist** → changes `worklist_payable` / WRITE-COVERAGE / AMBIGUITY, i.e. changes
