@@ -840,7 +840,17 @@ def validate_ambiguity(env, eff):
 # padded to a 37 KB mean cost ~17.5k each. A 7-read resolution chain then put ONE work-stream at ~122k
 # tokens, so every architecture hit the 160k ceiling before finishing and all five scored 0.0. A floor
 # whose unit differs from the unit that constrains the run is a floor that means nothing.
-MIN_AVG_GETTER_TOKENS = 8192               # ~8k tokens per lookup — Anthropic's "thousands of tokens"
+# REVISED DOWN from 8,192 — deliberately, because the 8k floor was measured and shown to buy the
+# wrong thing. Every padded record namespaced its filler under `ctx_*` while the answer sat at the
+# record's top level, so one rule ("drop ctx_*") discarded 92.4% of a read with no risk: 26,939 B
+# returned, 36 B load-bearing. The bytes were a toll, not a hazard. What they DID buy was an
+# arithmetic ceiling — a 4-stream hard task needs 74 unique reads, so at ~10k tokens each a
+# monolithic agent owed 740k against a 160k budget and scored 0.000 at every depth it could not
+# fit. That reads as context pollution and is truncation. Difficulty now comes from CANDIDATE-COUNT
+# below (a value hides among same-shaped decoys inside the record) rather than from volume, which
+# lets a lookup stay cheap enough that a single agent can finish and its utility measures resolution
+# quality instead of whether the task fit. A lookup must still cost something, hence a floor at all.
+MIN_AVG_GETTER_TOKENS = 512
 # ...and a CEILING, because the floor alone is satisfiable in a way that breaks the run outright. A
 # read whose path carries no `{id}` returns its WHOLE region, so once the regions were padded to clear
 # STATE-SCALE these tools started returning 0.5-1.4 MB — `get_ledger_book(query='led_005')` ignored its
@@ -852,7 +862,10 @@ MAX_GETTER_TOKENS = 16384                  # 2x the mean floor: heavy, but a sin
 # The searchable world stays in BYTES: it is a coarse "too big to hold at once" check over ~15 MB per
 # env, where tokenizing every byte would cost more than the check is worth. The per-read gates above are
 # where the unit has to be exact, because those are the ones a context budget is spent against.
-MIN_REACHABLE_STATE_BYTES = 2 * 1024 * 1024
+# Also revised down, and for the same reason: the reachable world was ~55% ctx_#### padding records
+# a model could dismiss on sight, so its size never measured what it claimed to. It stays as a coarse
+# "more than one record exists to confuse you" check; error-proneness is CANDIDATE-COUNT's job.
+MIN_REACHABLE_STATE_BYTES = 512 * 1024
 # Entropy floors calibrated against the REAL authored data, which sits at gzip 4.5-7.7x and 0.51-0.99
 # distinct long strings. Padding must be no more redundant than the content it sits beside.
 MAX_STATE_GZIP_RATIO = 8.0
@@ -1052,6 +1065,61 @@ def validate_context_size(env):
                           f"state are distinct (need ≥{MIN_DISTINCT_STRING_RATIO:.0%}) — near-duplicate "
                           f"text is filler, not a haystack")
     return issues
+
+
+MIN_CANDIDATES = 8                 # same-shaped values a resolved field must hide among
+
+
+def validate_candidates(env):
+    """CANDIDATE-COUNT — the difficulty floor that replaces the byte floor.
+
+    A read is only error-prone when the record does not hand the answer over. Each restructured
+    record keeps its resolved values inside a ``revisions`` list of same-shaped entries, exactly
+    one of which ``current_rev`` names, so reading it is a select-then-project rather than a
+    projection, and a careless pick yields a real, plausible, wrong value. For pointer fields
+    that wrong value is another record's real id, so the mistake sends the agent down a real but
+    wrong chain and costs the whole resolution rather than one field.
+
+    Three things are checked, and each is a way the mechanism can be silently defeated:
+      * enough candidates to confuse (< MIN_CANDIDATES and skimming succeeds by luck);
+      * ``current_rev`` actually resolves (else the record is unresolvable and no solver can win);
+      * no entry advertises itself as the answer. A per-entry status field would let the agent
+        FILTER for it, which is a second and much easier way in than matching the pointer.
+    """
+    issues = []
+    tell = 0
+
+    def walk(node):
+        nonlocal tell
+        if isinstance(node, list):
+            for v in node:
+                walk(v)
+            return
+        if not isinstance(node, dict):
+            return
+        revs = node.get("revisions")
+        if isinstance(revs, list) and revs and isinstance(revs[0], dict):
+            if len(revs) < MIN_CANDIDATES:
+                issues.append(f"CANDIDATE-COUNT: a record resolves through only {len(revs)} "
+                              f"revision(s) — need ≥{MIN_CANDIDATES} same-shaped candidates, else "
+                              f"the value is effectively handed over")
+            cur = node.get("current_rev")
+            if cur not in {e.get("rev") for e in revs if isinstance(e, dict)}:
+                issues.append(f"CANDIDATE-COUNT: current_rev {cur!r} names no revision — the "
+                              f"record is unresolvable, so no solver can reach its value")
+            for e in revs:
+                if isinstance(e, dict) and str(e.get("state", "")).lower() in ("active", "current"):
+                    tell += 1
+                    break
+        for v in node.values():
+            walk(v)
+
+    walk(env.get("state") or {})
+    if tell:
+        issues.append(f"CANDIDATE-COUNT: {tell} record(s) mark their live revision with a status "
+                      f"field — the agent can filter for the answer instead of following "
+                      f"current_rev, which is a free way past the whole resolution chain")
+    return issues[:6]
 
 
 def validate_read_rich(env):
@@ -1743,6 +1811,7 @@ def main():
         issues += validate_tool_balance(env)
         issues += validate_read_rich(env)
         issues += validate_context_size(env)
+        issues += validate_candidates(env)
         issues += validate_key_arg_type(env)
         issues += validate_ambiguity(env, eff)
         issues += validate_scenario_counts(env)

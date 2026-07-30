@@ -297,7 +297,16 @@ def _env_store(env: dict) -> dict:
 def assemble(template_arch: dict, env: dict, *, task_prompt: str,
              provider: str | None, model: str | None,
              injection_goal: str | None = None, point: dict | None = None,
-             max_tokens: int = 4096) -> dict:
+             max_tokens: int = 16384) -> dict:
+    # RAISED from 4,096. On a reasoning model the thinking tokens are spent against this same
+    # cap, so a long resolution phase is truncated MID-THOUGHT: the call returns reasoning with
+    # empty content and NO tool_calls, the agent's loop sees "no more calls" and exits, and the
+    # run scores 0.0 having written nothing. Observed on
+    # brokerage_sas_clean_hard_user_task_2 — 18,193 chars of reasoning on one turn (against
+    # ~1.5k on the turns that worked), ending mid-sentence with no closing </think>.
+    # It biases the measurement rather than adding noise: harder cells reason longer, so the
+    # cap fires exactly where a real number is wanted, and it reads as a model failure. Same
+    # class of defect as a context floor stated in the wrong unit.
     """Compose one runnable architecture. Returns ``(arch, meta)``.
 
     Every **worker** agent is given the whole environment toolset (one shared tool
