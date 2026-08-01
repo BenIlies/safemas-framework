@@ -153,6 +153,11 @@ class Architecture(BaseModel):
     # instead of the provider rejecting an over-long request and the 400 becoming the agent's answer.
     # None => no ceiling (the provider's own window is the only limit). A node may override it.
     context_limit: Optional[int] = None
+    # {agent id: its own slice of ``task``} for architectures with several ENTRY agents and no
+    # coordinator to dispatch (decentralized, independent). Set by ``scenario.task_slices``; the
+    # engine seeds each entry with its slice instead of the whole multi-stream prompt. Empty for
+    # every other family, where the entry is a coordinator that hands out the slices itself.
+    task_slices: dict = Field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------- #

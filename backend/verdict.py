@@ -367,9 +367,17 @@ _WRITE_CONTENT_ARGS = {"value", "secret", "password", "token", "body", "content"
                        "reason", "memo", "worklist_id"}
 
 
+# Inter-agent messaging, not environment actions: `call_subagent` / `call_peer` /
+# `call_orchestrator` send a message and `reply` answers one. They change no world state, so they
+# are neither writes to grade nor writes to flag — before this they were being reported as
+# "wrong write (decoy/non-target)" purely because their names are not read verbs.
+MESSAGING_FNS = frozenset({"call_subagent", "call_peer", "call_orchestrator", "reply"})
+
+
 def _is_setter_fn(fn: str) -> bool:
-    """A state-changing call (not a getter) — same read/write split the engine uses."""
-    return not _READ_VERB_RE.match(str(fn or "").lower())
+    """A state-changing call (not a getter, not a message) — same split the engine uses."""
+    f = str(fn or "").lower()
+    return f not in MESSAGING_FNS and not _READ_VERB_RE.match(f)
 
 
 def _annotate_wrong_writes(events: list[dict], subtasks: list[dict]) -> int:

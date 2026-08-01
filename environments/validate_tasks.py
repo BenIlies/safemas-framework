@@ -1441,6 +1441,83 @@ def validate_naming_tell(env):
     return issues[:5]
 
 
+
+READ_SIZES = (3, 4, 5)             # architecture sizes read_groups is partitioned for
+
+
+def validate_read_groups(env):
+    """READ-BALANCE / READ-DEMAND — the read partition must be fair and must force communication.
+
+    With every getter universal a peer channel has nothing to carry: INDEX-ALIGN already gives each
+    stream its own setter owner, so the only favour a peer could do you is a write you never need.
+    Measured across every family: **0 peer messages per run**, which is why `hybrid` collapses onto
+    `centralized` and `decentralized` onto `independent`.
+
+    `read_groups` is stored **per architecture size** — `{"3": {...}, "4": {...}, "5": {...}}` — and
+    not as canonical slots collapsed by `slot mod P`. That collapse is not balanced: at P=4 worker 0
+    inherits slots 0 and 4 and holds 20 reads against 12. (`tool_groups` still has that flaw: writes
+    run [7,3,3,3] at P=4. Pre-existing, and a confound in any P<5 result.)
+
+    Per size:
+      * **balance** — every worker owns EXACTLY floor(n_getters / P). Not "within one": an agent
+        holding one extra read is a confound you cannot subtract afterwards. The remainder is
+        UNIVERSAL, held by everyone, so it advantages nobody.
+      * **entry locality** — stream i's ENTRY getter is owned by worker i, so a stream can start
+        without a round-trip. Otherwise you measure overhead, not coordination.
+      * **demand** — every stream needs a getter owned by another worker. That is the property the
+        split exists to create.
+
+    `sas` and `independent` bypass ownership at ASSEMBLY time, not here: SAS owns everything by
+    definition, and `independent` has no channel, so a foreign read would be a structural zero
+    rather than a measurable cost. Their handicap is context load, not capability."""
+    issues = []
+    rg = env.get("read_groups")
+    getters = {t["name"] for t in env.get("tools", []) if not t.get("effect")}
+    if not isinstance(rg, dict) or not rg:
+        return ["READ-BALANCE: no read_groups — every getter is universal, so a peer channel has "
+                "nothing to carry and hybrid/decentralized collapse onto centralized/independent"]
+    if set(rg) != {str(p) for p in READ_SIZES}:
+        return [f"READ-BALANCE: read_groups keys {sorted(rg)} — expected one partition per "
+                f"architecture size {list(READ_SIZES)}; a single partition collapsed by `slot mod P` "
+                f"is not balanced (P=4 gives one worker 20 reads against 12)"]
+
+    for p in READ_SIZES:
+        part = rg[str(p)]
+        sizes = {k: len(v) for k, v in part.items()}
+        if len(part) != p:
+            issues.append(f"READ-BALANCE P{p}: {len(part)} groups for {p} workers")
+            continue
+        if len(set(sizes.values())) != 1:
+            issues.append(f"READ-BALANCE P{p}: unequal read counts {sizes} — every worker must own "
+                          f"exactly floor({len(getters)}/{p})={len(getters)//p}, remainder universal")
+        seen = set()
+        for k, v in part.items():
+            for g in v:
+                if g in seen:
+                    issues.append(f"READ-BALANCE P{p}: '{g}' owned by more than one worker — "
+                                  f"ownership must be exclusive or 'ask the owner' has no referent")
+                seen.add(g)
+                if g not in getters:
+                    issues.append(f"READ-BALANCE P{p}: {k} lists '{g}', not a read tool")
+        owner = {g: i for i, (_k, v) in enumerate(part.items()) for g in v}
+        for t in _graded_tasks(env):
+            subs = (t.get("success") or {}).get("subtasks") or []
+            if len(subs) != p:
+                continue                       # this task runs on a different breadth
+            for i, st in enumerate(subs):
+                reads = [c["tool"] for c in (st.get("calls") or []) if c.get("tool") in getters]
+                if not reads:
+                    continue
+                if owner.get(reads[0], i) != i:
+                    issues.append(f"READ-DEMAND {t['id']} P{p}: stream {i}'s ENTRY read "
+                                  f"'{reads[0]}' is owned by worker {owner[reads[0]]}, not {i} — the "
+                                  f"worker cannot discover its own work without a round-trip")
+                if not any(owner.get(r, i) != i for r in reads):
+                    issues.append(f"READ-DEMAND {t['id']} P{p}: stream {i} reads only getters it "
+                                  f"owns, so no communication is forced")
+    return issues[:6]
+
+
 def validate_read_rich(env):
     """READ-RICH gate: a resolution-heavy env must expose many more READ tools than WRITE tools, so a
     write's target and value can only be reached by chaining getters (list → record → dereference →
@@ -2132,6 +2209,7 @@ def main():
         issues += validate_context_size(env)
         issues += validate_candidates(env)
         issues += validate_naming_tell(env)
+        issues += validate_read_groups(env)
         issues += validate_prompt_route(env)
         issues += validate_answer_store(env, eff)
         join_hard, join_warn = validate_join(env, eff)
