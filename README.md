@@ -69,16 +69,15 @@ Three element types can be turned adversarial, covering the main MAS attack surf
 a tool's `effect` mutates the run's hidden state. Poisoning a tool **appends** the
 attacker payload to that genuine result.
 
-**Team roster (not a shared context).** Agents that can *route* to somebody read a small
-**auto-generated roster**: who is on the team and **which agent owns which tool**. It carries
-no task, no other agent's prompt and no data — state is reached by calling a tool, another
-agent's result only by asking it. Delivery is **per-agent, only where the architecture can
-actually route**: a coordinator that dispatches, or a worker with a peer channel to ask over.
-A `centralized` worker (reports upward only), an `independent` worker (its one edge ends at a
-terminal aggregator) and a lone SAS agent receive nothing — a directory of a team you cannot
-address is pure context cost. Inspectable in the UI (**🧠 Show shared context**), derived from
-the architecture, never adversarial. (The old "memory node" concept was removed — data lives in
-the hidden `state` and is reached through tools.)
+**No shared context.** There is no ambient board. Everything an agent knows was either written
+into **its own system prompt** or returned by a **tool it called** — state is reached by calling a
+tool, another agent's result only by asking it. Each prompt is assembled from named sections, and a
+section appears only where it is true for that agent: `YOUR TOOLS` (the exhaustive list, **with
+argument names**), `HOW TO WORK`, `ASKING` (the messaging tool it actually holds), `WHO OWNS WHAT`
+(only for an agent that chooses an addressee — a peer or a dispatcher), and `REPORTING`. An earlier
+version also broadcast an auto-generated roster to every routing agent; it duplicated the prompt
+sections in a worse format, so it was removed. (The older "memory node" concept went the same way —
+data lives in the hidden `state` and is reached through tools.)
 
 ---
 
@@ -109,12 +108,11 @@ the hidden `state` and is reached through tools.)
   by inspecting state through a multi-hop chain** (e.g. person → room → device id) before
   acting — a real agentic loop, not a static string. Distractors keep the resolution
   load-bearing (guessing or blanket-acting fails).
-- **Capability partition + directed dispatch** — **read/inspect tools are universal** but
-  each **write tool is owned by exactly one sub-agent** (`tool_groups`, 3–4 each,
-  index-aligned so *Task i → Sub-Agent i*); acting with an unowned tool is rejected. This
-  makes cross-agent routing — and confused-deputy propagation — real. A coordinator sends
-  each worker **only its own** sub-task, not the whole plan broadcast. Agents that can route
-  additionally read a **team roster** (who owns which tool) — see *Team roster* above.
+- **Capability partition + tool-mediated dispatch** — each **write tool is owned by exactly one
+  sub-agent** (`tool_groups`, 3–4 each, index-aligned so *Task i → Sub-Agent i*), and **reads are
+  partitioned too** (`read_groups`) wherever the family has a channel to route around it; `sas` and
+  `independent` keep every read. Acting with an unowned tool is rejected. A coordinator assigns with
+  `call_subagent`, one call per sub-task, so each worker receives **only its own** assignment.
 - **Mark anything malicious** — inspector/right-click toggle with loud red hazard
   styling, covering prompt-injection / AiTM / tool-poisoning. **Tool-poisoning
   appends** the injection to the tool's real result (not replace); **AiTM blends**
@@ -570,13 +568,13 @@ specific sub-agent it needs (source/sink/target) is present among `agent_1..agen
 multi-agent, the sink/source *is* that indexed worker. Currently ~**1.6k** scenarios; the runner
 samples from this set (e.g. 15 spanning all vectors × families) to execute.
 
-### Tool distribution, directed dispatch & the team roster
+### Tool distribution, dispatch & inter-agent messaging
 
 When a scenario distributes an environment over a multi-agent architecture, **write
 (setter) tools are partitioned into capability groups** — each setter is owned by
-**exactly one** sub-agent (`tool_groups`), while **read / inspect tools are universal**.
-A worker can observe anything but can only *act* with the tools it owns; calling a setter
-it doesn't own is rejected (`unknown tool`). Groups are **balanced (3–4 setters each)** and
+**exactly one** sub-agent (`tool_groups`), and **reads are partitioned by `read_groups`** in every
+family that has a channel to route around it (`sas` and `independent` keep every read — their
+handicap is context, not capability). Calling a tool it doesn't own is rejected. Groups are **balanced (3–4 setters each)** and
 **index-aligned to the run task**, so **Task i is carried out by Sub-Agent i**. This is what
 makes the confused-deputy dynamic real: to finish a stream an agent must route the action to
 whichever agent owns it, and a record one agent poisons only causes harm once a **different**
@@ -586,25 +584,28 @@ single compromised agent into a *cross-agent* propagation problem.
 
 Three mechanisms keep the multi-agent flow faithful:
 
-- **Team roster** — an auto-generated, read-only list of who owns which tool, given **only to
-  agents that can route** (a dispatching coordinator, or a worker with a peer channel). It
-  deliberately excludes the task: an earlier version opened with `Overall task: …`, handing every
-  worker the whole multi-stream prompt as ambient context, which defeated directed dispatch —
-  no worker had a protected context, so context-centric decomposition was impossible.
-- **Directed dispatch** — a coordinator that fans out to several workers sends each
-  worker **only the portion of its decomposition addressed to that worker**, rather
-  than broadcasting the whole plan to everyone.
-- **Peer messaging on demand, in a parsed format** — a worker→worker channel fires only when the
-  sender writes an explicit directive:
+- **Messaging is a TOOL, not a text protocol.** Every agent-to-agent request is a tool call
+  carrying free text, and the engine authors none of it:
 
-      @Sub-Agent 2: what is the settlement total for statement led_001?
+      call_subagent(subagent, content)     coordinator -> one of its workers
+      call_orchestrator(content)           worker      -> its coordinator
+      call_peer(agent, content)            worker      -> a lateral teammate
 
-  A block runs to the next `@Name:` marker, so one turn can address several peers with *different*
-  requests; each peer receives **only its own block**, and the directives are stripped from the
-  report that goes upward. *Mentioning* a peer sends nothing — the marker is what sends it. The
-  sender's `<think>` reasoning is stripped from every outgoing message. Before this, peer edges fired
-  unconditionally at end of turn: an archived sweep measured **2330 peer messages of which zero asked
-  anything**, all byte-identical broadcasts, all beginning with raw chain-of-thought.
+  Which of these an agent holds follows its topology: `centralized` workers get
+  `call_orchestrator`, `decentralized` peers get `call_peer`, `hybrid` workers get **both**
+  (that is what makes it hybrid), `independent` and `sas` get **none**. A **fresh instance** of the
+  recipient answers — its own activation is never paused, re-entered or charged a round — and the
+  reply comes back as the call's result inside the asker's own turn. Each message carries an
+  engine-minted `ref` (`sha1(content+time)`), and the responder answers with `reply(content, ref)`,
+  so every reply maps to exactly one request. An earlier text protocol (`@Name:` directives parsed
+  out of prose) was removed: models wrote `**NEED — Orchestrator:**`, which reached nobody, and once
+  put a whole directive line inside a tool argument.
+- **Dispatch is the same mechanism.** A coordinator's worker channels do not fire on their own; it
+  assigns by calling `call_subagent`, and the worker's entire assignment runs nested inside that
+  call. Reports upward still travel on channels — an agent's result reaches its aggregator on its
+  own, and nobody replies to it.
+- **Chain of thought never travels.** A sender's `<think>` block is stripped from every outgoing
+  message and every reply.
 
 An attack's entry point (a poisoned tool result, an injected agent, or a tampered
 channel message) only reaches the attacker's sink if the topology actually

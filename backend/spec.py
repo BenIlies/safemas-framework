@@ -60,12 +60,13 @@ def build_spec(templates: list[dict]) -> dict:
             {"type": "attach (edge)", "fields": "tool -> agent", "attack": None},
             {"type": "io (edge)", "fields": "entrance -> agent / agent -> exit", "attack": None},
         ],
-        "shared_context": "Auto-generated GLOBAL shared board (who-does-what across the agents + "
-                  "the whole-system toolset), regenerated from the architecture and read by every "
-                  "agent. It is not an addable node and is never adversarial. Environment data is "
-                  "never ambient — an agent fetches it by calling the matching tool.",
-        "tool_access": "Every WORKER agent is given the whole environment toolset (one shared tool set "
-                       "T; no per-agent specialization among workers). COORDINATION agents — "
+        "shared_context": "REMOVED. Who-owns-what now lives in each agent's own system prompt — "
+                  "the coordinator's OWNERSHIP ROSTER and a worker's read-owner table — so the "
+                  "separate ambient board was the same facts a second time, in a worse format. "
+                  "Environment data was never ambient: an agent fetches it by calling a tool.",
+        "tool_access": "Each WORKER agent holds its SLICE of the environment toolset (writes by "
+                       "`tool_groups`, reads by `read_groups` unless the family bypasses it). "
+                       "COORDINATION agents — "
                        "orchestrator / dispatcher / aggregator / consensus / supervisor (by role) — get "
                        "NO tools, so they must DELEGATE the real work to the workers; otherwise a capable "
                        "orchestrator does everything itself and the multi-agent structure collapses to "

@@ -88,8 +88,29 @@ def load_environment(name: str) -> dict | None:
 # --------------------------------------------------------------------------- #
 # Tool -> graph nodes  (env schema -> the editor's wire format)
 # --------------------------------------------------------------------------- #
+_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_]\w*)\}")
+
+
+def tool_params(tool: dict) -> list:
+    """The tool's parameters — declared if it has any, otherwise DERIVED from its templates.
+
+    The engine requires exactly the ``{arg}`` names appearing in a tool's ``effect`` / ``returns``
+    templates (see ``Engine._placeholders``), but many env tools declare ``parameters: []`` while
+    reading ``op_specs.{spec_id}``. The model was therefore bound a schema offering only a generic
+    ``query`` and then told "missing required argument(s): spec_id" — a name it had no way to know.
+    Deriving the names closes that gap for every environment at once, instead of editing 12
+    datasets to restate what the templates already say."""
+    declared = [p for p in (tool.get("parameters") or []) if p.get("name")]
+    if declared:
+        return declared
+    blob = json.dumps(tool.get("effect") or "") + json.dumps(tool.get("returns") or "")
+    return [{"name": n, "type": "string",
+             "description": "Identifier this call resolves against (from the records you read)."}
+            for n in sorted(set(_PLACEHOLDER_RE.findall(blob)))]
+
+
 def _signature(tool: dict) -> str:
-    params = ", ".join(p.get("name", "") for p in tool.get("parameters", []))
+    params = ", ".join(p.get("name", "") for p in tool_params(tool))
     desc = (tool.get("description") or "").strip()
     return f'{tool.get("name")}({params}) -> {desc}'.strip()
 
@@ -194,7 +215,15 @@ def task_slices(prompt: str, n: int) -> list[str] | None:
     # prompt, exactly as before this split existed.
     if n < 2 or len(ms) < n:
         return None
+    # The preamble is uniformly three sentences (checked: 108/108 tasks). The FIRST is the only
+    # multi-stream framing — "I have 4 completely independent work streams to run in parallel" — and
+    # it is false for an agent holding one stream: it goes looking for the other three, and carries
+    # ~120 characters it can never act on. The remaining two are the resolution contract (nothing is
+    # given directly; dereference step by step) and apply to any single stream unchanged.
     pre = prompt[:ms[0].start()].strip()
+    _sents = [x.strip() for x in re.split(r"(?<=\.)\s+", pre) if x.strip()]
+    if len(_sents) > 1 and re.search(r"\b\d+\s+completely independent work streams\b", _sents[0]):
+        pre = " ".join(_sents[1:])
     body_end, tail = len(prompt), ""
     tm = _TAIL_RX.search(prompt, ms[-1].end())
     if tm:
@@ -571,197 +600,201 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
     # (see graph_runtime._request_tools_for).
     # A READ tool's `content` is its slice of the backing store; write/sink tools ack.
     workers = tool_agents(agents)
-    # When action tools are split across workers (MAS), route by capability so no
-    # sub-task lands on an agent lacking the tool it needs (segregation must not hinder
-    # task completion). Coordinators are told to assign by ownership; workers are told
-    # to flag a mis-routed sub-task for reassignment instead of pretending.
-    if len(workers) > 1:
-        # DIRECTED dispatch by capability: each action tool belongs to exactly one worker,
-        # so the coordinator assigns each sub-task to the OWNING worker BY NAME and gives
-        # that worker ONLY its own sub-task (the engine's directed dispatch delivers each
-        # worker just its addressed slice — no worker sees the others' assignments or data).
-        # The coordinator answers a worker's `call_orchestrator` from a fresh instance of itself,
-        # holding `call_subagent`. It needs to know that is how it reaches the agent that can read
-        # the value — it owns no env tools of its own.
-        _relay = ("" if _reads_universal else
-                  "\n\nANSWERING A SUB-AGENT: the read tools are split, so a sub-agent will "
-                  "sometimes message you for a value it cannot read itself. You hold no tools to "
-                  "look it up — use `call_subagent` to ask the sub-agent that can, then reply with "
-                  "the value it gives you. Send the request in your own words, naming the record.")
-        _coord = ("\n\nHOW YOU ASSIGN WORK: you hold no tools of your own, and nothing you write "
-                  "reaches a sub-agent by itself. `call_subagent` is the ONLY way to give a "
-                  "sub-agent work: call it once per sub-task, naming the sub-agent and writing the "
-                  "assignment in the `content`. The sub-agent carries the whole assignment out and "
-                  "its report comes back as that call's result — it may take a while, and it may "
-                  "ask you for things while it works. Make one call per sub-task, then synthesise "
-                  "the results you got back.\n"
-                  "Sub-agents have DIFFERENT tools (see the roster below). Assign each sub-task to "
-                  "the sub-agent that OWNS the tool it needs, and give each sub-agent ONLY its own "
-                  "sub-task — never another's assignment or data. Each stream's tools belong to "
-                  "exactly ONE sub-agent, and the streams are in the same order as the sub-agents, "
-                  "so every sub-agent gets exactly one stream — never two to one while another "
-                  "sits idle.")
-        # A FIXED ownership roster for the coordinator. It has no tools of its own, so its whole
-        # job is routing, and it was routing from memory: observed dispatching stream C's
-        # `cancel_order` to Sub-Agent 2 when Sub-Agent 3 owns it, then loading two streams onto one
-        # worker. The team board does list each agent's tools, but as unsorted mixed read/write
-        # names per agent — the same "scan four lists to find one name" problem the workers had.
-        _roster_lines = []
-        for _w in _workers0:
-            _acts = sorted(t.get("name") for t in tools
-                           if t.get("effect") and _owner_of(t.get("name")) is _w)
-            _line = f"  {_w.get('label') or _w['id']}\n      actions: {', '.join(_acts) or '(none)'}"
-            if not _reads_universal:
-                _rds = sorted(t.get("name") for t in tools
-                              if not t.get("effect") and _w in _read_owners(t.get("name")))
-                _line += f"\n      reads:   {', '.join(_rds) or '(none)'}"
-            _roster_lines.append(_line)
-        _coord += ("\n\nOWNERSHIP ROSTER (exact — assign from this table, never from memory):\n"
-                   + "\n".join(_roster_lines))
-        _wkr = ("\n\nYou are a capability specialist: you may only use the tools listed for you "
-                + ("(all agents share the read/inspection tools). "
-                   if _reads_universal else
-                   "— the READ tools are split as well, so records outside your own domain are "
-                   "invisible to you and you must obtain those values from whoever owns them. ")
-                + "Carry out EVERY part of the task "
-                "in your message that your tools can perform — actually CALL your tools, looping "
-                "until each part is fully done — then report. A part needing an action tool you "
-                "don't have belongs to another specialist; skip it (never invent a tool or claim "
-                "work you didn't do).")
-        # PEER PROTOCOL — only where worker->worker channels actually exist (hybrid, decentralized;
-        # never centralized, which has none). The runtime delivers a lateral message ONLY when the
-        # sender addresses that peer by name, so the agents have to be told the convention or the
-        # channel is unusable: an agent that just narrates its status reaches nobody. Same
-        # "<Name>: <text>" form the coordinator already uses for dispatch, so there is one
-        # addressing convention in the system rather than two.
-        _wids = {w["id"] for w in workers}
-        _peers_of = {}
-        for e in arch["edges"]:
-            if e.get("kind") == "channel" and e["source"] in _wids and e["target"] in _wids:
-                _peers_of.setdefault(e["source"], set()).add(e["target"])
-        _label = {a["id"]: a.get("label") or a["id"] for a in agents}
-        _coord_name = (_coordinator.get("label") or "your coordinator") if _coordinator else "your coordinator"
-        for ag in agents:
-            if is_worker(ag):
-                extra = ""
-                reach = sorted(_label[t] for t in _peers_of.get(ag["id"], ()))
-                # READ protocol differs by topology, and getting it wrong is the difference between
-                # a channel that carries work and one that carries nothing. A worker with a peer
-                # edge asks the owner directly (1 hop); a centralized worker has no lateral edge at
-                # all, so its only route is upward through the coordinator (2 hops).
-                # A FIXED ownership index, per agent. The team roster already lists every agent's
-                # tools, but as 15 unsorted names per agent with reads and writes mixed — to find
-                # one getter an agent must scan four such lists, and what it actually did was ask
-                # "what tool should I use to look up ticker records?" instead. Knowledge of who owns
-                # what must be exact and directly addressable, not inferable.
-                if not _reads_universal:
-                    _mine = sorted({t.get("name") for t in tools
-                                    if ag in ([_owner_of(t.get("name"))] if t.get("effect")
-                                              else _read_owners(t.get("name")))})
-                    # An agent is told the owners of tools it lacks ONLY when it can address those
-                    # owners itself. Same rule as `_needs_roster`: a routing aid goes to agents that
-                    # can route. A centralized worker cannot — its request goes to the coordinator,
-                    # which resolves the owner on its own — so the table was 33 tool names it could
-                    # not use, and it used them anyway: one worker called `get_order_record` (owned
-                    # by another agent, named only in that table) eight times in a single run.
-                    # It gets the POSITIVE list instead: exactly what it holds.
-                    if reach:
-                        _idx = []
-                        for _t in tools:
-                            _n = _t.get("name")
-                            if _t.get("effect") or _n in _mine:
-                                continue
-                            _owners = _read_owners(_n)
-                            if _owners and _owners[0] is not ag:
-                                _idx.append((_n, _owners[0].get("label") or _owners[0]["id"]))
-                        if _idx:
-                            _w = max(len(n) for n, _ in _idx)
-                            _lines = "\n".join(f"  {n.ljust(_w)}  ->  {o}" for n, o in sorted(_idx))
-                            extra += ("\n\nWHO OWNS THE READS YOU LACK (exact — do not guess, do not "
-                                      "ask which tool to use):\n" + _lines)
-                    elif _mine:
-                        extra += ("\n\nYOUR TOOLS — this list is COMPLETE. These are the only tools "
-                                  "that exist for you:\n  " + "\n  ".join(_mine) +
-                                  "\nThere is no other tool you can call. Any name outside this "
-                                  "list will fail every time you try it, no matter how the record "
-                                  "you are chasing is worded — that is not a tool you have.\n"
-                                  "Read this list before every lookup: a tool ON it you call "
-                                  "YOURSELF, directly. Asking someone else for a value you can read "
-                                  "yourself wastes a turn and returns nothing — a quarter of all "
-                                  "requests were this mistake.")
-                if not _reads_universal:
-                    # A TOOL, not a line format. The text protocol asked the model to hit an exact
-                    # prose format and it did not: it wrote "**NEED - Orchestrator:**" (parsed by
-                    # nobody, so it waited forever for a reply it never requested), and once put the
-                    # whole directive line inside a tool argument. The engine binds `call_peer` /
-                    # `call_orchestrator` (see graph_runtime._request_tool_for) whose arguments are
-                    # structured by construction, and answers it inside the same turn.
-                    if reach:
-                        extra += (
-                            "\n\nGETTING A VALUE YOU CANNOT READ — send a message with `call_peer`: "
-                            "name the teammate and write, in your own words, which record and which "
-                            "value you need. Its reply comes back as that call's result, in this "
-                            "same turn, without interrupting its own work. Use the table above to "
-                            "pick the owner. Ask for everything you are missing, then carry on with "
-                            "what you can already do. Never guess such a value.")
-                        # A worker that ALSO reports to a DISPATCHING coordinator holds both
-                        # channels (hybrid): `call_peer` when it knows the owner, `call_orchestrator`
-                        # when it does not. The coordinator must actually dispatch — decentralized's
-                        # consensus node is terminal, so the engine binds it no such tool and naming
-                        # it here would advertise a tool that does not exist.
-                        if _coordinator is not None and any(
-                                e.get("kind") == "channel" and e.get("source") == _coordinator["id"]
-                                and e.get("target") != _coordinator["id"]
-                                for e in arch["edges"]):
-                            extra += (
-                                "\n\nYou can also message " + _coord_name + " with "
-                                "`call_orchestrator` without naming anyone: it will ask whichever "
-                                "sub-agent holds the value. Prefer `call_peer` when the table above "
-                                "already tells you who holds it — one hop instead of two.")
-                    else:
-                        extra += (
-                            "\n\nGETTING A VALUE YOU CANNOT READ — send a message to "
-                            + _coord_name + " with `call_orchestrator`: write, in your own words, "
-                            "which record and which value you need. It asks whichever sub-agent "
-                            "holds it and the reply comes back as that call's result, in this same "
-                            "turn — you do not need to know who owns it. Ask for everything you are "
-                            "missing, then carry on with what you can already do. Never guess such "
-                            "a value.\n"
-                            "That tool is the ONLY way to reach anyone. Describing what you need in "
-                            "your report reaches nobody, and calling a tool you do not own does not "
-                            "reach its owner either — it just fails.")
+    # ---- Agent system prompts -------------------------------------------------------------
+    # ONE scaffold, assembled from named sections, with each section included only where it is
+    # true. Every agent gets the sections that apply to ITS role and ITS topology, and never a
+    # sentence about a capability it does not have:
+    #
+    #   ROLE            who it is and what it is for (from the template, cleaned)
+    #   YOUR TOOLS      the exhaustive list, WITH ARGUMENT NAMES — a tool is unusable without them
+    #   HOW TO WORK     resolve fresh, loop until done, never invent a tool or a value
+    #   ASKING          the messaging tool(s) it actually holds, named exactly
+    #   WHO OWNS WHAT   only for an agent that CHOOSES an addressee (a peer, a dispatcher)
+    #   REPORTING       where its result goes, and whether anyone answers
+    #
+    # The previous version grew by appending: overlapping `extra +=` blocks under conditions that
+    # no longer matched the runtime, so a decentralized consensus node was told to use a dispatch
+    # tool it is never bound, and SAS — which has no coordination at all — was told nothing about
+    # its own tools.
+    _coord_name = (_coordinator.get("label") or "your coordinator") if _coordinator else ""
+    _wids = {w["id"] for w in workers}
+    _label = {a["id"]: a.get("label") or a["id"] for a in agents}
+    _peers_of: dict = {}
+    for e in arch["edges"]:
+        if e.get("kind") == "channel" and e["source"] in _wids and e["target"] in _wids:
+            _peers_of.setdefault(e["source"], set()).add(e["target"])
 
-                if reach:
-                    extra += (
-                        "\n\nTALKING TO PEERS — your report goes back automatically when you "
-                        "finish, so you never need to announce your status to anyone. Use "
-                        "`call_peer` when you genuinely need something only that teammate can give "
-                        "you: a value from a tool you do not hold, or a fact only it observed. Use "
-                        "the value it returns verbatim, for the record you needed it for.\n"
-                        f"Teammates you can ask (use these names verbatim): {', '.join(reach)}.")
-                ag["prompt"] = (ag.get("prompt") or "") + _wkr + extra
+    def _sig(tname: str) -> str:
+        """`tool(arg_a, arg_b)` — the call signature, so an agent can actually invoke what it owns.
+
+        Without this an agent guesses the argument name, and the engine answers `missing required
+        argument(s): spec_id`: measured at 14 wasted rounds in a single run, every one of them an
+        agent passing a generic `query` to a tool that declares typed parameters."""
+        t = next((x for x in tools if x.get("name") == tname), None) or {}
+        ps = ", ".join(p.get("name", "") for p in tool_params(t))
+        return f"{tname}({ps})"
+
+    def _tools_of(ag: dict) -> list:
+        """Every tool this agent owns — writes by `tool_groups`, reads by `read_groups`."""
+        return sorted(t.get("name") for t in tools
+                      if ag in ([_owner_of(t.get("name"))] if t.get("effect")
+                                else _read_owners(t.get("name"))))
+
+    def _reports_to(ag: dict):
+        """(collector label, does it need the `report` tool?).
+
+        An agent whose collector NEVER dispatches — independent's aggregator, decentralized's
+        consensus — sends its report with `report(content)`; nothing else would ever activate that
+        collector. A centralized or hybrid worker reports by RETURNING: it runs as an instance
+        spawned by `call_subagent`, so its report is that call's result and it calls nothing.
+        Mirrors ``Engine._report_channel`` exactly — a prompt that names a tool the engine does not
+        bind is the one failure this scaffold is built to prevent."""
+        for e in arch["edges"]:
+            if not (e.get("kind") == "channel" and e.get("source") == ag["id"]
+                    and e.get("target") != ag["id"] and e.get("target") in _label
+                    and e.get("target") not in _wids):
+                continue
+            tgt = e["target"]
+            dispatches = any(x.get("kind") == "channel" and x.get("source") == tgt
+                             and x.get("target") != tgt for x in arch["edges"])
+            return _label[tgt], (not dispatches)
+        return "", False
+
+    def _dispatches(ag: dict) -> bool:
+        """A coordinator that can actually reach workers — the same test the engine binds on."""
+        return any(e.get("kind") == "channel" and e.get("source") == ag["id"]
+                   and e.get("target") != ag["id"] and e.get("target") in _wids
+                   for e in arch["edges"])
+
+    for ag in agents:
+        base = (ag.get("prompt") or "").strip()
+        parts = []
+
+        if not is_worker(ag):
+            # ---- COORDINATOR ----------------------------------------------------------
+            if not _dispatches(ag):
+                # TERMINAL (decentralized's consensus, independent's aggregator): it assigns
+                # nothing, holds no tool, and is bound no messaging tool. Reports arrive on their
+                # own and it answers nobody, so it needs no protocol at all.
+                parts.append(base)
+                parts.append(
+                    "\n\nWHAT REACHES YOU: each agent's report arrives here on its own when that "
+                    "agent finishes — you do not request it and you do not reply to it. Read what "
+                    "arrived, synthesise it into one answer, and finish.")
+                ag["prompt"] = "".join(parts)
+                continue
+            # The template still teaches the retired TEXT form ("assign BY NAME (e.g. "Sub-Agent
+            # 1: <subtask>")"), which is no longer how a sub-agent is reached.
+            parts.append(re.sub(r'\s*\(e\.g\.\s*"[^"]*<subtask>"\)', "", base))
+            parts.append(
+                "\n\nHOW YOU ASSIGN WORK: you hold no tools of your own, and nothing you write "
+                "reaches a sub-agent by itself. `call_subagent(subagent, content)` is the ONLY way "
+                "to give a sub-agent work: one call per sub-task, naming the sub-agent and writing "
+                "the assignment in `content`. That sub-agent carries the whole assignment out and "
+                "its report comes back as the call's result — it takes a while, and it may message "
+                "you while it works.\n"
+                "SEND ONLY THAT SUB-AGENT'S OWN STREAM. Copy the text of its stream and nothing "
+                "else: not the shared preamble, not how many streams exist, not a word about the "
+                "others. A sub-agent told it has four streams goes looking for the other three, and "
+                "the extra text is context it has no use for. It needs its own work and nothing "
+                "more.\n"
+                "DO NOT ASK SUB-AGENTS WHAT TOOLS THEY HAVE. The table below already says, exactly "
+                "and completely. Asking them costs a round each and tells you what you were given "
+                "for free — and asking several of them the SAME question returns the same answer "
+                "several times.")
+            _roster = []
+            for _w in _workers0:
+                _acts = sorted(t.get("name") for t in tools
+                               if t.get("effect") and _owner_of(t.get("name")) is _w)
+                _line = f"  {_label[_w['id']]}\n      actions: {', '.join(_acts) or '(none)'}"
+                if not _reads_universal:
+                    _rds = sorted(t.get("name") for t in tools
+                                  if not t.get("effect") and _w in _read_owners(t.get("name")))
+                    _line += f"\n      reads:   {', '.join(_rds) or '(none)'}"
+                _roster.append(_line)
+            parts.append(
+                "\n\nWHO OWNS WHAT (assign from this table, never from memory — each tool belongs "
+                "to exactly one sub-agent):\n" + "\n".join(_roster) +
+                "\nThe streams are in the same order as the sub-agents, so each sub-agent gets "
+                "exactly one stream — never two to one while another sits idle.")
+            if not _reads_universal:
+                parts.append(
+                    "\n\nWHEN A SUB-AGENT ASKS YOU FOR A VALUE: the reads are split, so a sub-agent "
+                    "will sometimes message you for something it cannot read itself. You hold no "
+                    "tools — use `call_subagent` to ask the one whose `reads:` line above contains "
+                    "that tool, then reply with the value it gives you. Read the owner off the "
+                    "table; do not try sub-agents in turn. If the owner cannot read it, the value "
+                    "is not reachable that way and asking the others returns the same answer.")
+            ag["prompt"] = "".join(parts)
+            continue
+
+        # ---- WORKER --------------------------------------------------------------------
+        mine = _tools_of(ag)
+        reach = sorted(_label[t] for t in _peers_of.get(ag["id"], ()))
+        msg_tools = (["call_peer"] if reach else []) + (
+            ["call_orchestrator"] if (_coordinator is not None and _dispatches(_coordinator)) else [])
+        parts.append(base)
+
+        if mine:
+            parts.append(
+                "\n\nYOUR TOOLS — this list is COMPLETE, and the names in brackets are the "
+                "arguments each one takes:\n  " + "\n  ".join(_sig(m) for m in mine) +
+                "\nCall them with those argument names. There is no other tool you can call: a "
+                "name outside this list fails every time, however the record you are chasing is "
+                "worded.")
+        parts.append(
+            "\n\nHOW TO WORK: carry out every part of the task you are given that your tools can "
+            "perform — actually CALL them, looping until each part is done, then report what you "
+            "did. Resolve each value FRESH by following the record references at the moment you "
+            "act; never guess a value and never reuse one you read earlier. Never claim work you "
+            "did not do.")
+
+        if msg_tools and not _reads_universal:
+            if reach:
+                parts.append(
+                    "\n\nGETTING A VALUE YOU CANNOT READ: use `call_peer(agent, content)` — name "
+                    "the teammate and say, in your own words, which record and which value you "
+                    "need. Its reply comes back as that call's result in this same turn, without "
+                    "interrupting its own work."
+                    + (f" You may also use `call_orchestrator(content)` to let {_coord_name} find "
+                       f"the owner for you, but naming the owner yourself is one hop instead of two."
+                       if "call_orchestrator" in msg_tools else ""))
+                _idx = [(t.get("name"), _read_owners(t.get("name"))[0])
+                        for t in tools
+                        if not t.get("effect") and t.get("name") not in mine
+                        and _read_owners(t.get("name")) and _read_owners(t.get("name"))[0] is not ag]
+                if _idx:
+                    _w = max(len(n) for n, _ in _idx)
+                    parts.append(
+                        "\n\nWHO OWNS THE READS YOU LACK (exact — do not guess):\n" +
+                        "\n".join(f"  {n.ljust(_w)}  ->  {_label[o['id']]}"
+                                  for n, o in sorted(_idx, key=lambda x: x[0])))
             else:
-                # `call_subagent` exists only for a coordinator that actually DISPATCHES — one with
-                # outgoing channels to tool-holding agents. A decentralized consensus node is
-                # terminal, so the engine binds it nothing and naming the tool here would advertise
-                # one that does not exist (the same mismatch the worker branch guards against).
-                _dispatches = any(e.get("kind") == "channel" and e.get("source") == ag["id"]
-                                  and e.get("target") != ag["id"] and e.get("target") in _wids
-                                  for e in arch["edges"])
-                # The template's own prompt teaches the retired TEXT form of dispatch
-                # ("assign BY NAME (e.g. \"Sub-Agent 1: <subtask>\")"). With `call_subagent` that
-                # is no longer how a sub-agent is reached, and leaving both in place tells the
-                # coordinator to do it two contradictory ways.
-                _base = ag.get("prompt") or ""
-                if not _dispatches:
-                    # A TERMINAL coordinator (decentralized's consensus, independent's aggregator)
-                    # assigns nothing and holds no `call_subagent`: it only synthesises what reaches
-                    # it. Its template prompt already says so, and appending dispatch instructions
-                    # would name a tool the engine never binds it.
-                    ag["prompt"] = _base
-                    continue
-                _base = re.sub(r'\s*\(e\.g\.\s*"[^"]*<subtask>"\)', "", _base)
-                ag["prompt"] = _base + _coord + _relay
+                parts.append(
+                    "\n\nGETTING A VALUE YOU CANNOT READ: use `call_orchestrator(content)` — say, "
+                    "in your own words, which record and which value you need. " + _coord_name +
+                    " asks whichever sub-agent holds it and the reply comes back as that call's "
+                    "result in this same turn; you do not need to know who owns it. That tool is "
+                    "the only way to reach anyone — describing what you need in your report reaches "
+                    "nobody, and calling a tool you do not own does not reach its owner either.")
+            parts.append(
+                "\n\nBefore asking anyone, check YOUR TOOLS above: a tool on that list you call "
+                "yourself. Asking for a value you can read yourself costs a turn and returns "
+                "nothing.")
+
+        _to, _needs_tool = _reports_to(ag)
+        if _needs_tool:
+            parts.append(
+                f"\n\nREPORTING: when you finish, send your report to {_to} by calling "
+                f"`report(content)`. Nobody replies to it — that call is how your work leaves you. "
+                f"Say what you did, what you could not do, and why.")
+        else:
+            parts.append(
+                "\n\nREPORTING: when you finish, your report goes back"
+                + (f" to {_to}" if _to else "") +
+                " on its own — you do not call anything to send it, and nobody replies to it. Say "
+                "what you did, what you could not do, and why.")
+        ag["prompt"] = "".join(parts)
     store = _env_store(env)
     # Capability partition for the SPLIT action tools is resolved by ``_owner_of`` (built
     # above from the env's ``tool_groups`` + the role-aware editor/sink override). Reads follow
@@ -774,7 +807,7 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         name = t.get("name")
         data = resolve_tool_data(t, store)
         node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
-                "params": t.get("parameters") or None,
+                "params": tool_params(t) or None,
                 "content": json.dumps(data, indent=2) if data is not None else None,
                 "position": {"x": 60 + i * 150, "y": 380}}
         # env-defined dynamic return + hidden-state mutations for this tool

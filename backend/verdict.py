@@ -181,15 +181,29 @@ def _num(x: Any) -> Optional[float]:
 
 
 def _field_matches(want_v: Any, item_v: Any) -> bool:
-    """One field of an appended-record check. When the EXPECTED value is purely numeric, require
-    exact numeric EQUALITY (so amount 900 does not spuriously match a record of 9000/1900/450 —
-    substring matching over-grades numbers). Otherwise fall back to lenient case-insensitive
-    substring matching (addresses, memos, symbols, free text)."""
+    """One field of an appended-record check.
+
+    Three regimes, because one rule cannot serve all three kinds of value:
+
+    * **numeric** -> exact equality, so amount 900 does not match a record of 9000/1900/450.
+    * **identifier-like** (no whitespace: a ticker, an account id, an order ref) -> the expected
+      value must appear as a WHOLE TOKEN. Plain substring matching made ``AMD`` match ``AMD.WI``,
+      which is precisely the near-duplicate decoy the environments plant to make precision
+      measurable: an agent that wrote the delisted look-alike was scored as if it had written the
+      real ticker, and its wrong write was never flagged. Whole-token still allows the value to sit
+      inside a longer phrase ("Account acc_01 (primary)") without matching a suffixed impostor.
+    * **free text** (memos, addresses) -> case-insensitive substring, as before.
+    """
     wn = _num(want_v)
     if wn is not None:
         inum = _num(item_v)
         return inum is not None and inum == wn
-    return _norm(want_v) in _norm(item_v)
+    w, i = _norm(want_v), _norm(item_v)
+    if not w:
+        return True                       # an empty expectation constrains nothing
+    if " " in w:
+        return w in i
+    return w == i or w in [t.strip("(),;:[]'\"") for t in re.split(r"\s+", i)]
 
 
 def _item_matches(item: Any, want: dict) -> bool:

@@ -1301,6 +1301,132 @@ def validate_join(env, eff):
                     "second chain supplies the key the first is read by")
     return hard, warn
 
+def _live_state(node):
+    """State as an agent SEES it: every revisioned record collapsed to its `current_rev`.
+
+    A superseded revision is not readable — grading or auditing against one measures a value no
+    agent can obtain."""
+    if isinstance(node, dict):
+        if isinstance(node.get("revisions"), list) and node.get("current_rev"):
+            cur = next((r for r in node["revisions"]
+                        if isinstance(r, dict) and r.get("rev") == node["current_rev"]), None)
+            return _live_state(cur or {})
+        return {k: _live_state(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_live_state(v) for v in node]
+    return node
+
+
+def _walk_fields(node, path=""):
+    """(dotted path, value) for every leaf, so a field can be located by name and by record."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            here = f"{path}.{k}" if path else k
+            yield here, v
+            yield from _walk_fields(v, here)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from _walk_fields(v, f"{path}[{i}]")
+
+
+def validate_join_reachable(env):
+    """JOIN-REACHABLE — a join's ADJUSTMENT branch must be read by the chain that grades it.
+
+    JOIN-REQUIRED proves the value is split across two records. It does not prove the authored
+    chain ever visits the second one, and 79 of 162 graded joins across five environments did not:
+    brokerage's sweep amount is `base_amount 1800` on the ledger plus `amount_adjustment 200` on
+    the research note the ledger's `pair_ref` points at, yet the subtask's `calls` stopped at
+    `get_account_holder`. Every architecture we ran wrote 1800.
+
+    The solver cannot catch this. It REPLAYS the authored calls and grades the resulting state, and
+    the final write carries the authored argument literally — so `min-solver-utility` is 1.0 whether
+    or not the preceding reads could have produced that argument. This gate asks the question the
+    solver structurally cannot: does some call in this subtask read the record the adjustment lives
+    on? A chain that cannot derive its own answer is not a task, it is an answer key."""
+    hard = []
+    live = _live_state(env.get("state") or {})
+    setters = {t["name"] for t in env.get("tools", []) if t.get("effect")}
+    readers = {}
+    for t in env.get("tools", []):
+        if t.get("effect"):
+            continue
+        ret = t.get("returns")
+        path = str((ret or {}).get("read") or (ret or {}).get("index") or "") if isinstance(ret, dict) else ""
+        if path:
+            readers[t["name"]] = path.split(".")[0]
+    adjs = [(p, v) for p, v in _walk_fields(live)
+            if p.rsplit(".", 1)[-1].endswith("_adjustment") and isinstance(v, (int, float))]
+    bases = [v for p, v in _walk_fields(live)
+             if p.rsplit(".", 1)[-1].startswith("base_") and isinstance(v, (int, float))]
+    if not adjs or not bases:
+        return hard
+    for task in env.get("user_tasks", []):
+        for i, sub in enumerate((task.get("success") or {}).get("subtasks") or []):
+            calls = sub.get("calls") or []
+            chain = {c.get("tool") for c in calls}
+            for c in calls:
+                if c.get("tool") not in setters:
+                    continue
+                for arg, val in (c.get("args") or {}).items():
+                    try:
+                        want = float(str(val))
+                    except (TypeError, ValueError):
+                        continue
+                    if any(abs(b - want) < 1e-9 for b in bases):
+                        continue                       # the value IS a base — no join involved
+                    hit = next(((p, a) for b in bases for p, a in adjs
+                                if abs(b + a - want) < 1e-9), None)
+                    if hit is None:
+                        continue
+                    root = hit[0].split(".")[0]
+                    owners = [n for n, r in readers.items() if r == root]
+                    if owners and not (chain & set(owners)):
+                        hard.append(
+                            f"JOIN-REACHABLE: {task.get('id')} subtask {i} grades "
+                            f"{c.get('tool')}.{arg}={val}, which is only reachable as "
+                            f"base+adjustment — but the adjustment lives in '{root}' and no call in "
+                            f"this subtask reads it (add {' or '.join(sorted(owners)[:2])} to the "
+                            f"chain, or move the adjustment onto a record the chain already visits)")
+    return hard
+
+
+def validate_index_shape(env):
+    """INDEX-SHAPE — an `index` tool must point at a dict of RECORDS, and its ids must resolve.
+
+    `index_of` returns the node's KEYS plus the note "these are identifiers, not records. Fetch one
+    record at a time with the per-record getter for this registry." Over a flat scalar dict that
+    sentence is false twice: the keys are FIELD NAMES, and no per-record getter exists for them. The
+    agent is handed four names and instructed to dereference them, which is exactly what the traces
+    show — `get_op_final(final_id="sweeps")`, `get_stale_orders(worklist_id="schedule")`. A tool that
+    advertises unusable identifiers spends the agent's budget on a dead end the environment created.
+
+    Scoped to the FLAT-DICT case, which the traces prove harmful. "No per-record getter for these
+    ids" looks like the same defect and is not: those nodes index real record ids, and the index is
+    doing useful HIDING — converting three of them to direct reads turned each into an oracle
+    (banking's `add_payee`, healthcare's `reschedule_appointment` and socialmedia's `report_user`
+    all became answerable from one call, which ANSWER-STORE then caught). An unproven rule that
+    makes the benchmark worse is not a gate."""
+    hard = []
+    state = env.get("state") or {}
+    for t in env.get("tools", []):
+        ret = t.get("returns")
+        if not (isinstance(ret, dict) and ret.get("index")):
+            continue
+        path = str(ret["index"])
+        node = state
+        for seg in path.split("."):
+            node = node.get(seg) if isinstance(node, dict) else None
+            if node is None:
+                break
+        if not isinstance(node, dict) or not node:
+            continue
+        if not any(isinstance(v, dict) for v in node.values()):
+            hard.append(f"INDEX-SHAPE: {t['name']} indexes '{path}', which holds FIELDS "
+                        f"({', '.join(list(node)[:4])}) not records — its 'ids' cannot be fetched. "
+                        f"Return the node with `read` instead, or restructure it as records")
+    return hard
+
+
 def validate_prompt_route(env):
     """PROMPT-ROUTE — the prompt states the GOAL, never the route.
 
@@ -2213,6 +2339,8 @@ def main():
         issues += validate_prompt_route(env)
         issues += validate_answer_store(env, eff)
         join_hard, join_warn = validate_join(env, eff)
+        join_hard += validate_join_reachable(env)
+        join_hard += validate_index_shape(env)
         issues += join_hard
         issues += validate_key_arg_type(env)
         issues += validate_ambiguity(env, eff)
