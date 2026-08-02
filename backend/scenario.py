@@ -91,6 +91,147 @@ def load_environment(name: str) -> dict | None:
 _PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_]\w*)\}")
 
 
+def record_keys(state) -> set:
+    """Every record identifier in the env — the keys of any collection whose values are records."""
+    out, stack = set(), [state]
+    while stack:
+        n = stack.pop()
+        if isinstance(n, dict):
+            for k, v in n.items():
+                if isinstance(v, dict) and any(isinstance(x, (dict, list)) for x in v.values()):
+                    out |= {str(x) for x in v}
+                stack.append(v)
+        elif isinstance(n, list):
+            stack.extend(n)
+    return out
+
+
+def id_rejecting_args(env: dict) -> dict:
+    """{tool: [args]} for arguments where a RECORD IDENTIFIER is never a legitimate value.
+
+    Derived from the graded tasks, so it needs no authoring: if no graded value for this argument is
+    ever a record key, then a record key there is an agent that stopped one dereference short —
+    `add_to_watchlist("tkr_01")` when the watchlist holds symbols and `ticker_registry.tkr_01` carries
+    `symbol: "AMD"`. Covers 292 of 394 argument slots across the twelve environments.
+
+    Deliberately NOT "the value must be in the domain": an attack writes a value that appears nowhere
+    in state (the attacker's IBAN), so membership enforcement would make every attack unwritable and
+    silently zero the ASR. Rejecting identifiers catches the confusion while leaving novel values —
+    benign or malicious — free to be written."""
+    keys = record_keys(env.get("state") or {})
+    setters = {t.get("name") for t in env.get("tools", []) if t.get("effect")}
+    seen: dict = {}
+    for task in env.get("user_tasks", []):
+        for sub in ((task.get("success") or {}).get("subtasks") or []):
+            for c in (sub.get("calls") or []):
+                if c.get("tool") not in setters:
+                    continue
+                for arg, val in (c.get("args") or {}).items():
+                    seen.setdefault((c["tool"], arg), []).append(str(val))
+    out: dict = {}
+    for (tool, arg), vals in seen.items():
+        if vals and not any(v in keys for v in vals):
+            out.setdefault(tool, []).append(arg)
+    return out
+
+
+def _live_view(node):
+    """State as an agent sees it: each revisioned record collapsed to its current revision."""
+    if isinstance(node, dict):
+        if isinstance(node.get("revisions"), list) and node.get("current_rev"):
+            cur = next((r for r in node["revisions"]
+                        if isinstance(r, dict) and r.get("rev") == node["current_rev"]), None)
+            return _live_view(cur or {})
+        return {k: _live_view(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_live_view(v) for v in node]
+    return node
+
+
+def arg_types(env: dict) -> dict:
+    """{tool: {arg: {"expects": "<collection>.<field>", "examples": [...]}}} — each argument's TYPE,
+    derived from where its graded values live in state.
+
+    An argument's type is the field its correct values come from: `add_to_watchlist.ticker` takes a
+    `ticker_registry.symbol` (AMD, CRM, …), never a `ticker_registry` id. Naming both sides turns an
+    unhelpful failure into a type error the agent can act on — expected this kind, got that kind, and
+    here is where the right one lives."""
+    live = _live_view(env.get("state") or {})
+    field_vals: dict = {}
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                np = f"{path}.{k}" if path else k
+                if isinstance(v, (dict, list)):
+                    walk(v, np)
+                else:
+                    segs = np.split(".")
+                    if len(segs) >= 3:
+                        field_vals.setdefault(f"{segs[0]}.{segs[-1]}", set()).add(str(v))
+        elif isinstance(node, list):
+            for x in node:
+                walk(x, path)
+
+    walk(live, "")
+    setters = {t.get("name") for t in env.get("tools", []) if t.get("effect")}
+    graded: dict = {}
+    for task in env.get("user_tasks", []):
+        for sub in ((task.get("success") or {}).get("subtasks") or []):
+            for c in (sub.get("calls") or []):
+                if c.get("tool") in setters:
+                    for arg, val in (c.get("args") or {}).items():
+                        graded.setdefault((c["tool"], arg), []).append(str(val))
+    out: dict = {}
+    for (tool, arg), vals in graded.items():
+        cands = [f for f, vs in field_vals.items() if all(v in vs for v in vals)]
+        if not cands:
+            continue
+        best = min(cands, key=len)
+        out.setdefault(tool, {})[arg] = {"expects": best,
+                                         "examples": sorted(field_vals[best])[:3]}
+    return out
+
+
+def id_collections(env: dict) -> dict:
+    """{tool: {arg: [collections]}} for arguments that DO take a record identifier.
+
+    `id_rejecting_args` covers the 292 slots where an identifier is never right. The other 102 take
+    one legitimately — `cancel_order.order_id` — and they are not unprotectable, only narrower: the
+    id must belong to the RIGHT collection. `cancel_order(order_id="acc_02")` is as wrong as writing a
+    symbol would be, because `acc_02` keys `account_registry`, not `orders`; the traces are full of
+    exactly that swap (`get_order_status(order_id="acc_02")`, `get_account_holder(account_id=
+    "led_009")`). Derived from where the graded ids actually live, so it needs no authoring."""
+    state = env.get("state") or {}
+    coll: dict = {}
+    stack = [("", state)]
+    while stack:
+        path, n = stack.pop()
+        if isinstance(n, dict):
+            for k, v in n.items():
+                np = f"{path}.{k}" if path else k
+                if isinstance(v, dict) and any(isinstance(x, (dict, list)) for x in v.values()):
+                    coll[np] = {str(x) for x in v}
+                stack.append((np, v))
+        elif isinstance(n, list):
+            for x in n:
+                stack.append((path, x))
+    setters = {t.get("name") for t in env.get("tools", []) if t.get("effect")}
+    graded: dict = {}
+    for task in env.get("user_tasks", []):
+        for sub in ((task.get("success") or {}).get("subtasks") or []):
+            for c in (sub.get("calls") or []):
+                if c.get("tool") in setters:
+                    for arg, val in (c.get("args") or {}).items():
+                        graded.setdefault((c["tool"], arg), []).append(str(val))
+    out: dict = {}
+    for (tool, arg), vals in graded.items():
+        homes = [p for p, keys in coll.items() if all(v in keys for v in vals)]
+        if homes and len(vals) >= 1:
+            out.setdefault(tool, {})[arg] = homes
+    return out
+
+
 def tool_params(tool: dict) -> list:
     """The tool's parameters — declared if it has any, otherwise DERIVED from its templates.
 
@@ -795,6 +936,9 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
                 " on its own — you do not call anything to send it, and nobody replies to it. Say "
                 "what you did, what you could not do, and why.")
         ag["prompt"] = "".join(parts)
+    _no_ids = id_rejecting_args(env)
+    _argtypes = arg_types(env)
+    _idcoll = id_collections(env)
     store = _env_store(env)
     # Capability partition for the SPLIT action tools is resolved by ``_owner_of`` (built
     # above from the env's ``tool_groups`` + the role-aware editor/sink override). Reads follow
@@ -808,6 +952,10 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         data = resolve_tool_data(t, store)
         node = {"id": name, "type": "tool", "label": name, "spec": _signature(t),
                 "params": tool_params(t) or None,
+                # arguments where a record identifier is never legitimate (see id_rejecting_args)
+                "no_ids": (_no_ids.get(name) or None),
+                "arg_types": (_argtypes.get(name) or None),   # see arg_types()
+                "id_of": (_idcoll.get(name) or None),          # see id_collections()
                 "content": json.dumps(data, indent=2) if data is not None else None,
                 "position": {"x": 60 + i * 150, "y": 380}}
         # env-defined dynamic return + hidden-state mutations for this tool

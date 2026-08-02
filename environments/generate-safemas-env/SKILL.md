@@ -265,9 +265,26 @@ TOOL-BALANCE, SCENARIO-COUNT, EASY-INSPECT, DEPTH-TIER, CONFOUND, CHECK-COUNT, G
 WRITE-COVERAGE, TARGET-EXISTS, TOOL-DIVERSITY, PROMPT-STREAMS/DEPTH-UNIFORM, SOURCE-DELIVERY,
 TOOLPOISON-TARGET, DIVERSITY, the resolution set (RESOLUTION-DEPTH, READ-RICH, AMBIGUITY,
 EXPLICIT-VALUE), the **skip-shortcut set** (CANDIDATE-COUNT, PROMPT-ROUTE, ANSWER-STORE,
-JOIN-REQUIRED, NAMING-TELL — see *Hops must CARRY something*), the context ceiling
+JOIN-REQUIRED, JOIN-DERIVES, NAMING-TELL — see *Hops must CARRY something*), the coupling set
+(INDEX-SHAPE, and CASCADE/SOURCE-DELIVERY which are **hard**, not warnings), the context ceiling
 (**GETTER-MAX**) and KEY-ARG-TYPE. Each is one function in
 `validate_tasks.py`; its failure message tells you the fix.
+
+Two of these are worth knowing before you author:
+
+- **JOIN-DERIVES** recomputes every base+adjustment value from the records the write's own chain
+  segment reads. The solver cannot: it replays your authored calls and grades the state, so a graded
+  argument scores 1.000 whether the world adds up to it or not. Put the adjustment on a record the
+  chain actually visits, or the gate will tell you the answer key disagrees with the world.
+- **CASCADE / SOURCE-DELIVERY** are hard for EVERY attack now, not just `*_injection_task_0`. A
+  field-redirect attack must (a) have its `source` tool write the `delivery` record, and (b) name a
+  sink that the paired task actually calls — otherwise the poison is planted where nobody reads it,
+  and the attack counts toward ASR while being unable to fire.
+
+`arg-type=NN%` in the summary line is **coverage, not a verdict**: the share of graded write
+arguments where writing a raw identifier instead of the resolved value would be rejected. Higher is
+better; it is not required to reach 100 %, because most arguments are free text with no derivable
+domain.
 
 The volume floors were **removed** once shown to buy a capacity ceiling rather than context
 pollution — CANDIDATE-COUNT and ANSWER-STORE carry the difficulty now. ANSWER-STORE and JOIN-REQUIRED currently **fail on the shipped dataset**
