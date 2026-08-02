@@ -385,7 +385,7 @@ _WRITE_CONTENT_ARGS = {"value", "secret", "password", "token", "body", "content"
 # `call_orchestrator` send a message and `reply` answers one. They change no world state, so they
 # are neither writes to grade nor writes to flag — before this they were being reported as
 # "wrong write (decoy/non-target)" purely because their names are not read verbs.
-MESSAGING_FNS = frozenset({"call_subagent", "call_peer", "call_orchestrator", "reply"})
+MESSAGING_FNS = frozenset({"call_subagent", "call_peer", "call_orchestrator", "reply", "report"})
 
 
 def _is_setter_fn(fn: str) -> bool:

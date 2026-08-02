@@ -1427,6 +1427,77 @@ def validate_index_shape(env):
     return hard
 
 
+def validate_join_derives(env):
+    """JOIN-DERIVES — recompute every graded join FROM THE RECORDS THE CHAIN READS.
+
+    The solver cannot do this. It replays the authored calls and grades the resulting state, so a
+    graded `amount="2000"` scores 1.0 whether the records add to 2000, 1999, or nothing at all: the
+    answer is asserted by the author and never derived. This gate does the arithmetic an agent would
+    have to do, and fails when the answer key disagrees with the world.
+
+    Scoped to the write's own CHAIN SEGMENT — the reads between the previous write and this one.
+    Two looser versions were wrong: comparing a value against every base record in the environment
+    produced 280 false positives on blockchain ("deriving" 4.2e+07 for a 340-token transfer), and
+    comparing against every record in the subtask still crossed two writes that each have their own
+    ledger entry. The segment is what one write can actually have read.
+
+    Both authored join shapes satisfy the same rule at this scope: brokerage reaches its adjustment
+    through a `pair_ref` on the ledger record, blockchain through the party the chain reads next.
+
+    Also asserts the base is not itself presented as the answer: a record offering a bare `<field>`
+    beside `base_<field>` makes two readings defensible, and an agent picking the wrong one would be
+    marked wrong for the environment's ambiguity rather than its own error."""
+    hard = []
+    live = _live_state(env.get("state") or {})
+    setters = {t["name"] for t in env.get("tools", []) if t.get("effect")}
+    records = {p: v for p, v in _walk_fields(live) if isinstance(v, dict)}
+    by_id = {}
+    for path, rec in records.items():
+        by_id.setdefault(path.rsplit(".", 1)[-1], []).append((path, rec))
+
+    for task in env.get("user_tasks", []):
+        for i, sub in enumerate((task.get("success") or {}).get("subtasks") or []):
+            seen = []                                  # ids read since the previous write
+            for c in (sub.get("calls") or []):
+                args = c.get("args") or {}
+                if c.get("tool") not in setters:
+                    seen += [str(v) for v in args.values() if isinstance(v, (str, int))]
+                    continue
+                seg = [(p, r) for k in seen for p, r in by_id.get(k, [])]
+                for arg, val in args.items():
+                    try:
+                        want = float(str(val))
+                    except (TypeError, ValueError):
+                        continue
+                    bases = [(p, r[f"base_{arg}"]) for p, r in seg
+                             if isinstance(r.get(f"base_{arg}"), (int, float))]
+                    adjs = [(p, r[f"{arg}_adjustment"]) for p, r in seg
+                            if isinstance(r.get(f"{arg}_adjustment"), (int, float))]
+                    if not bases:
+                        continue
+                    bp, bv = bases[0]
+                    if abs(bv - want) < 1e-9:
+                        continue                       # the graded value IS the base — no join
+                    if arg in dict(seg).get(bp, {}):
+                        hard.append(f"JOIN-DERIVES: {task.get('id')} subtask {i}: record '{bp}' "
+                                    f"offers BOTH '{arg}' and 'base_{arg}' — two defensible "
+                                    f"readings, so a wrong answer would be the environment's fault")
+                    elif not adjs:
+                        hard.append(f"JOIN-DERIVES: {task.get('id')} subtask {i} grades "
+                                    f"{c.get('tool')}.{arg}={val}, and its chain reaches "
+                                    f"'base_{arg}'={bv:g} at '{bp}' — but nothing that chain reads "
+                                    f"carries an '{arg}_adjustment'. The graded value is not "
+                                    f"derivable from what the agent can see")
+                    elif not any(abs(bv + av - want) < 1e-9 for _, av in adjs):
+                        ap, av = adjs[0]
+                        hard.append(f"JOIN-DERIVES: {task.get('id')} subtask {i} grades "
+                                    f"{c.get('tool')}.{arg}={val}, but its chain derives "
+                                    f"{bv + av:g} (base {bv:g} at '{bp}' + {av:g} at '{ap}'). "
+                                    f"The answer key disagrees with the world")
+                seen = []
+    return hard
+
+
 def validate_prompt_route(env):
     """PROMPT-ROUTE — the prompt states the GOAL, never the route.
 
@@ -2339,8 +2410,8 @@ def main():
         issues += validate_prompt_route(env)
         issues += validate_answer_store(env, eff)
         join_hard, join_warn = validate_join(env, eff)
-        join_hard += validate_join_reachable(env)
         join_hard += validate_index_shape(env)
+        join_hard += validate_join_derives(env)
         issues += join_hard
         issues += validate_key_arg_type(env)
         issues += validate_ambiguity(env, eff)
