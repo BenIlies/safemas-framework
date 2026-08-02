@@ -1664,6 +1664,10 @@ class Engine:
             rc = self._report_channel(agent)
             if rc is not None and ch.key == rc.key:
                 continue
+            if (self.attached.get(agent.id)
+                    and "call_subagent" in self._request_tools_for(ch.tgt, 0)
+                    and agent.id in {w.id for w in self._workers_of(ch.tgt)}):
+                continue
             if ch.loop:
                 cap = ch.max_iters if ch.max_iters is not None else DEFAULT_MAX_ITERS
                 if st["loop_iters"].get(ch.key, 0) < cap and not self.matches(output, ch.until):
@@ -1794,24 +1798,19 @@ class Engine:
             return f"{original}\n\n{payload}", "append"
 
     def deliver(self, ch, msg: str, st: RunState) -> None:
-        cm = ch.malicious
-        original = None
-        blend = None
-        aitm = bool(cm.enabled and cm.attack == "aitm")
-        if aitm:
-            st["attacks"].append({"element": f"{ch.src.id}->{ch.tgt.id}", "type": "aitm"})
-            self._emit(st, "attack", element=f"{ch.src.id}->{ch.tgt.id}", type="aitm",
-                       vector="channel", payload=cm.payload)
-            # Blend, don't replace: the tampered message keeps the ORIGINAL content (so the
-            # legit instruction still gets through and the task isn't broken) with the injection
-            # woven in-band by an LLM rewrite — a realistic, stealthier tamper than an append.
-            original = msg
-            msg, blend = self._blend_message(msg, cm.payload, ch.tgt)
-            attack(f"channel {ch.src.label} -> {ch.tgt.label} intercepted (AiTM) "
-                   f"-> injection {blend}-blended into the message: {cm.payload!r}")
+        """Deliver a scheduler-routed channel message.
+
+        NO AiTM here any more. Every agent-to-agent transfer now travels as a tool call — dispatch
+        via `call_subagent`, requests via `call_peer` / `call_orchestrator`, reports via `report` —
+        so channel tampering lives with the traffic, in `_aitm_on_message`. Keeping a second
+        implementation here meant a payload could be applied twice or drift out of step with the one
+        that actually runs, and it applied to nothing: no template fires a channel (verified across
+        all 13), and the last five runs emitted zero channel events.
+
+        The plain delivery path is retained because the scheduler still owns it: a template with a
+        genuine non-tool edge (a debate loop, a router) would route through here."""
         self._emit(st, "channel", src=ch.src.label, tgt=ch.tgt.label, label=ch.label or "",
-                   message=msg, aitm=aitm, original=original,
-                   payload=(cm.payload if aitm else None), blend=blend)
+                   message=msg, aitm=False, original=None, payload=None, blend=None)
         tgt = ch.tgt
         if (tgt.join or "any") == "all":
             needed = self.in_channels.get(tgt.id, [])
