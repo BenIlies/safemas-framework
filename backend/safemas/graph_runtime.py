@@ -1362,14 +1362,25 @@ class Engine:
                 # observed: Sub-Agent 4 produced 2,710 blocked calls across 36 responses, drowning
                 # the run. TOOL_LOOP_CAP bounds the ROUNDS, not the width of a round; this bounds
                 # the width. A legitimate batch of parallel reads is well under the cap.
-                if len(tool_calls) > TOOL_BATCH_CAP:
-                    dropped = len(tool_calls) - TOOL_BATCH_CAP
-                    tool_calls = tool_calls[:TOOL_BATCH_CAP]
-                    msgs.append(HumanMessage(
-                        content=f"[{dropped} of your tool calls this turn were dropped — you may "
-                                f"issue at most {TOOL_BATCH_CAP} per turn. Re-issue only the ones "
-                                f"you still need, a few at a time.]"))
-                for tc in tool_calls:
+                # Over the cap, the surplus calls are REFUSED — but each one still gets its own
+                # ToolMessage. The provider requires every declared tool_call to be answered, and
+                # answered immediately: an earlier version truncated the list and inserted a
+                # HumanMessage advisory between the AIMessage and the results, which broke the
+                # protocol twice over and cost 45 hard 400s ("tool call result does not follow tool
+                # call"), 39 of them in SAS — the family that batches widest because it holds every
+                # tool. The advisory now rides the refused results themselves.
+                over = max(0, len(tool_calls) - TOOL_BATCH_CAP)
+                for idx, tc in enumerate(tool_calls):
+                    if idx >= TOOL_BATCH_CAP:
+                        note = (f"[refused: {over} of your {len(tool_calls)} calls this turn exceed "
+                                f"the limit of {TOOL_BATCH_CAP}. Re-issue only what you still need, "
+                                f"a few at a time.]")
+                        self._emit(st, "tool_call", agent=agent.label, function=tc["name"],
+                                   args=tc.get("args", {}) or {}, result=note,
+                                   poisoned=False, error=True)
+                        msgs.append(ToolMessage(content=note,
+                                                tool_call_id=tc.get("id") or tc["name"]))
+                        continue
                     # The request tool is served by the engine, not by the environment: resolve the
                     # owner, run a fresh instance of it, and hand the value straight back as this
                     # call's result. Structured arguments, so nothing depends on the model
