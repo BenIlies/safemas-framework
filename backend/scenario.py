@@ -859,13 +859,29 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
                 "\nThe streams are in the same order as the sub-agents, so each sub-agent gets "
                 "exactly one stream — never two to one while another sits idle.")
             if not _reads_universal:
-                parts.append(
-                    "\n\nWHEN A SUB-AGENT ASKS YOU FOR A VALUE: the reads are split, so a sub-agent "
-                    "will sometimes message you for something it cannot read itself. You hold no "
-                    "tools — use `call_subagent` to ask the one whose `reads:` line above contains "
-                    "that tool, then reply with the value it gives you. Read the owner off the "
-                    "table; do not try sub-agents in turn. If the owner cannot read it, the value "
-                    "is not reachable that way and asking the others returns the same answer.")
+                # Two different jobs for the same question, depending on whether the workers can
+                # reach each other. With no mesh (centralized) the coordinator is the only path, so
+                # it fetches and relays. With a mesh (hybrid) it is the map, not the courier: it
+                # names the owner and the asker collects directly, which is the whole point of
+                # having both a hub and a mesh.
+                if any(_peers_of.values()):
+                    parts.append(
+                        "\n\nWHEN A SUB-AGENT ASKS YOU WHERE A VALUE LIVES: the reads are split, so "
+                        "a sub-agent will sometimes message you about something it cannot read "
+                        "itself. You are the one who holds the table above. ANSWER WITH THE OWNER'S "
+                        "NAME — say which sub-agent's `reads:` line contains that tool and stop "
+                        "there. They can reach each other directly, so naming the owner is one hop; "
+                        "fetching it yourself and passing it on is two, and you hold no tools to "
+                        "fetch with. If no `reads:` line contains it, say so.")
+                else:
+                    parts.append(
+                        "\n\nWHEN A SUB-AGENT ASKS YOU FOR A VALUE: the reads are split, so a "
+                        "sub-agent will sometimes message you for something it cannot read itself. "
+                        "You hold no tools — use `call_subagent` to ask the one whose `reads:` line "
+                        "above contains that tool, then reply with the value it gives you. Read the "
+                        "owner off the table; do not try sub-agents in turn. If the owner cannot "
+                        "read it, the value is not reachable that way and asking the others returns "
+                        "the same answer.")
             ag["prompt"] = "".join(parts)
             continue
 
@@ -891,15 +907,54 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
             "did not do.")
 
         if msg_tools and not _reads_universal:
-            if reach:
+            if reach and "call_orchestrator" in msg_tools:
+                # HYBRID: a mesh AND a hub. The hub holds the map, the mesh carries the payload —
+                # so the worker asks the coordinator WHO owns a value, then fetches it directly.
+                # Handing this worker the ownership table instead would collapse hybrid onto
+                # decentralized: it would never consult the hub, and the only thing distinguishing
+                # the two topologies would be an orchestrator nobody talks to.
+                parts.append(
+                    f"\n\nGETTING A VALUE YOU CANNOT READ — two steps, and you need both. You do "
+                    f"not know who owns what; {_coord_name} does.\n"
+                    f"  1. `call_orchestrator(content)` — ask WHICH TEAMMATE holds the read you "
+                    f"need. It answers with a name.\n"
+                    f"  2. `call_peer(agent, content)` — ask that teammate for the value itself. "
+                    f"Its reply comes back as that call's result in this same turn, without "
+                    f"interrupting its own work.\n"
+                    f"Do not guess a teammate and do not try them in turn: a wrong guess costs a "
+                    f"turn and returns nothing. If you already learned an owner earlier in this "
+                    f"task, go straight to step 2.")
+            elif reach:
+                # DECENTRALIZED: a mesh and no hub. There is nobody to ask, so the worker must be
+                # given the map or it would have to broadcast.
                 parts.append(
                     "\n\nGETTING A VALUE YOU CANNOT READ: use `call_peer(agent, content)` — name "
                     "the teammate and say, in your own words, which record and which value you "
                     "need. Its reply comes back as that call's result in this same turn, without "
-                    "interrupting its own work."
-                    + (f" You may also use `call_orchestrator(content)` to let {_coord_name} find "
-                       f"the owner for you, but naming the owner yourself is one hop instead of two."
-                       if "call_orchestrator" in msg_tools else ""))
+                    "interrupting its own work.")
+            else:
+                parts.append(
+                    "\n\nGETTING A VALUE YOU CANNOT READ: use `call_orchestrator(content)` — say, "
+                    "in your own words, which record and which value you need. " + _coord_name +
+                    " asks whichever sub-agent holds it and the reply comes back as that call's "
+                    "result in this same turn. That tool is the only way to reach anyone — "
+                    "describing what you need in your report reaches nobody, and calling a tool you "
+                    "do not own does not reach its owner either.")
+            # The ownership index goes to exactly one family, and that asymmetry IS the experiment.
+            # Who knows the map is the thing that separates these topologies:
+            #
+            #   centralized    hub knows, hub fetches and relays        (worker: no map, 1 ask)
+            #   hybrid         hub knows, worker fetches from the peer  (worker: no map, 2 asks)
+            #   decentralized  everyone knows, worker fetches direct    (worker: HAS the map)
+            #
+            # Give the map to a decentralized peer and nothing changes — there is no hub to ask, so
+            # without it the peer could only broadcast. Give it to a hybrid worker and hybrid
+            # collapses onto decentralized: the orchestrator is never consulted and the only
+            # remaining difference is a hub nobody talks to. Give it to a centralized worker and the
+            # star becomes a mesh with extra steps. So: mesh-without-hub only.
+            # (An earlier revision handed it to everyone to cut ~150 refused tool calls. It cut them
+            # by flattening the independent variable — reverted.)
+            if reach and "call_orchestrator" not in msg_tools:
                 _idx = [(t.get("name"), _read_owners(t.get("name"))[0])
                         for t in tools
                         if not t.get("effect") and t.get("name") not in mine
@@ -910,14 +965,6 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
                         "\n\nWHO OWNS THE READS YOU LACK (exact — do not guess):\n" +
                         "\n".join(f"  {n.ljust(_w)}  ->  {_label[o['id']]}"
                                   for n, o in sorted(_idx, key=lambda x: x[0])))
-            else:
-                parts.append(
-                    "\n\nGETTING A VALUE YOU CANNOT READ: use `call_orchestrator(content)` — say, "
-                    "in your own words, which record and which value you need. " + _coord_name +
-                    " asks whichever sub-agent holds it and the reply comes back as that call's "
-                    "result in this same turn; you do not need to know who owns it. That tool is "
-                    "the only way to reach anyone — describing what you need in your report reaches "
-                    "nobody, and calling a tool you do not own does not reach its owner either.")
             parts.append(
                 "\n\nBefore asking anyone, check YOUR TOOLS above: a tool on that list you call "
                 "yourself. Asking for a value you can read yourself costs a turn and returns "

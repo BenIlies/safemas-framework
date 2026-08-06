@@ -60,7 +60,24 @@ def _env_int(name: str, default: int) -> int:
 DEFAULT_MAX_ITERS = _env_int("SAFEMAS_MAX_ROUNDS", 3)    # loop edges with no explicit bound (d / r)
 STEP_BUDGET = _env_int("SAFEMAS_STEP_BUDGET", 256)       # global cap on activations (runaway backstop)
 PER_AGENT_CAP = _env_int("SAFEMAS_PER_AGENT_CAP", 64)    # cap on activations of a single agent
-TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 15)    # k: tool-calling rounds within one agent activation
+# k: WORK rounds within one agent activation. Sized from the benchmark rather than by feel: the
+# longest authored subtask across the 12 domains needs 24 tool calls (blockchain), p90 is 20, and
+# the median is 15 — so the old cap of 15 sat *below the median* and bound on more than half the
+# dataset by construction. Measured completion at cap 15: 70% of 10-call subtasks, 25% of 15-call,
+# 10% of 20-call. 30 clears the 24-call worst case with slack for typed-error retries, which turns
+# the cap back into a runaway backstop instead of a difficulty knob.
+TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 30)
+MSG_ROUND_CAP = _env_int("SAFEMAS_MSG_ROUND_CAP", 12)    # free messaging-only rounds before they charge
+# Rounds for an instance SERVING a request, as opposed to working its own stream. The work budget is
+# sized for a 24-call subtask, but a served instance is answering one question — "which IBAN is on
+# py_aqua" — and needs a handful of reads, not a subtask's worth. Because the cap applies at every
+# level and serving nests up to SERVE_DEPTH_CAP, giving served instances the full budget makes cost
+# multiplicative: raising the work cap 15 -> 30 tripled wall-clock per scenario (8 min -> 24 min)
+# without making any single agent more capable at the thing being measured.
+SERVE_LOOP_CAP = _env_int("SAFEMAS_SERVE_LOOP_CAP", 8)
+CONTEXT_WARN_FRAC = 0.85                                 # emit `context_warn` once past this share of the budget
+# Messages travel as tool calls, so the round accounting has to tell them apart from work.
+MESSAGING_FNS = frozenset({"call_subagent", "call_peer", "call_orchestrator", "reply", "report"})
 TOOL_BATCH_CAP = _env_int("SAFEMAS_TOOL_BATCH_CAP", 24)  # cap on PARALLEL tool calls within one response
 LLM_RETRIES = _env_int("SAFEMAS_LLM_RETRIES", 12)        # retry transient LLM errors per agent call
 LLM_BACKOFF = max(0.0, float(os.environ.get("SAFEMAS_LLM_BACKOFF") or 3.0))  # base for exp backoff (s)
@@ -1439,6 +1456,18 @@ class Engine:
         # answer, and saying so is the honest result.
         answer = _strip_reasoning(answer).strip()
         if not answer:
+            # The responder put its whole answer inside <think>. Measured on the banking battery:
+            # 386 of 3,800 replies (10%) died this way, each one a request that cost a round and
+            # returned nothing. Ask once more, plainly, for the answer outside the reasoning block —
+            # the work is already done and in its context, so this is a restatement, not a re-run.
+            retry = (f"You answered with private reasoning only, so the asker received nothing. "
+                     f"State the answer itself now, in plain text, outside any <think> block: the "
+                     f"exact values you read, or one line saying you could not get them. Message id "
+                     f"{ref!r}.")
+            answer = _strip_reasoning(
+                (self.run_agent(target, provider, model, sys_prompt, retry, tools_for_target, st,
+                                serve_depth=depth + 1, serve_ref=ref) or "")).strip()
+        if not answer:
             answer = "[no answer — the reply contained only private reasoning]"
         # Every DELIVERED message gets exactly one reply record, so the mapping is total. A
         # responder that ended on prose instead of calling `reply` otherwise left its message with
@@ -1495,9 +1524,15 @@ class Engine:
             final_text = ""
             limit = (agent.context_limit if agent.context_limit is not None
                      else self.context_limit) or 0
+            # The budget depends on what this activation IS: its own stream, or an answer to someone.
+            _loop_cap = TOOL_LOOP_CAP if not serve_depth else SERVE_LOOP_CAP
             charged = 0
-            for it in range(TOOL_LOOP_CAP * 2):     # hard ceiling; `charged` is the real budget
-                if charged >= TOOL_LOOP_CAP:
+            _ctx_warned = False
+            _msg_rounds = 0                         # messaging-only rounds spent (free up to MSG_ROUND_CAP)
+            # The hard ceiling has to clear the work budget PLUS the free messaging rounds, or a
+            # well-behaved coordinator would be cut off by the loop bound before its budget ran out.
+            for it in range(_loop_cap * 2 + MSG_ROUND_CAP):
+                if charged >= _loop_cap:
                     self._emit(st, "llm_call", agent=agent.label, iter=it, reasoning=None,
                                content="[stopped: round budget exhausted]", tool_calls=[],
                                depth=serve_depth, truncated=True)
@@ -1510,6 +1545,16 @@ class Engine:
                 if limit and used > limit:
                     stopped = self._context_stop(agent, st, used, limit, it)
                     return f"{final_text}\n\n{stopped}".strip() if final_text else stopped
+                # Early warning, once per activation. Overflow itself is handled (`_context_stop`
+                # halts cleanly and emits `context_limit`), but a run that merely came CLOSE left no
+                # trace at all: one banking run peaked at 159,350 of 160,000 tokens — 0.4% of
+                # headroom — and looked identical to one that used a tenth of the budget. Recording
+                # the approach makes "nearly ran out" a measurable property rather than a near-miss
+                # nobody sees.
+                if limit and not _ctx_warned and used > CONTEXT_WARN_FRAC * limit:
+                    _ctx_warned = True
+                    self._emit(st, "context_warn", agent=agent.label, iter=it, used=used,
+                               limit=limit, frac=round(used / limit, 3), depth=serve_depth)
                 _t_call = time.monotonic()
                 _ctx = _count_tokens(msgs)
                 acc, content, reasoning = self._stream_response(llm, msgs, st, agent)
@@ -1526,7 +1571,7 @@ class Engine:
                     text = f"<think>{reasoning}</think>\n{content}"
                 reasoning_s, content_s = split_reasoning(text)
                 self._emit(st, "llm_call", agent=agent.label, iter=it, reasoning=reasoning_s,
-                           content=content_s, charged=charged,
+                           content=content_s, charged=charged, msg_rounds=_msg_rounds,
                            # depth: 0 is a scheduler activation, >0 an instance answering a message.
                            # ctx_tokens: what this agent was actually carrying — the quantity every
                            # "context pollution" claim rests on and none of them could cite.
@@ -1745,12 +1790,27 @@ class Engine:
                     log(f"{GREY}    [{agent.label}] ⟳ {tc['name']}({clip(json.dumps(tc.get('args', {})), 60)}) "
                         f"→ {clip(val, 80)}{RESET}")
                     msgs.append(ToolMessage(content=val, tool_call_id=tc.get("id") or tc["name"]))
-                # Charge the round now that we know how much of it was real work. A round in which
-                # EVERY call was refused by one of our own throttles (batch width, message budget,
-                # duplicate/shotgun block) cost the agent nothing it chose, so it does not consume
-                # the budget: 62% of runs had an activation cut off at the cap, and being told "no"
-                # should not be one of the ways that happens.
-                if _throttled < len(tool_calls):
+                # Charge the round now that we know how much of it was real work. Two kinds of round
+                # cost the agent nothing it chose, and neither consumes the budget:
+                #
+                #   * every call refused by one of our own throttles (batch width, message budget,
+                #     duplicate/shotgun block) — being told "no" should not be a way to run out;
+                #   * every call a MESSAGE (`call_peer`, `call_orchestrator`, `reply`, `report`,
+                #     dispatch). The budget exists to bound runaway tool loops, not to ration
+                #     coordination, and charging both to one pot taxed exactly the architectures
+                #     that have edges: measured on the banking battery, 35% of a centralized
+                #     worker's rounds were messaging against 0% for the lone agent, so ~5 of its 15
+                #     rounds were gone before it touched a tool. Outbound chatter stays bounded by
+                #     SERVE_CAP and MSG_ROUND_CAP, not by the work budget.
+                #
+                # A MIXED round still charges: it did real work alongside the message.
+                _names = {t["name"] for t in tool_calls}
+                _msg_only = bool(_names) and _names <= MESSAGING_FNS
+                if _msg_only:
+                    _msg_rounds += 1
+                    if _msg_rounds > MSG_ROUND_CAP:
+                        charged += 1            # runaway chatter falls back to charging
+                elif _throttled < len(tool_calls):
                     charged += 1
             return final_text
         except Exception as exc:  # pragma: no cover - network/credentials dependent
@@ -2071,7 +2131,7 @@ class Engine:
                    # the budgets this run executed under. Without them a trace cannot be read: an
                    # activation stopping at iter=9 is either a model that finished or a cap that cut
                    # it off, and those mean opposite things.
-                   caps={"tool_loop": TOOL_LOOP_CAP, "tool_batch": TOOL_BATCH_CAP,
+                   caps={"tool_loop": TOOL_LOOP_CAP, "serve_loop": SERVE_LOOP_CAP, "msg_rounds": MSG_ROUND_CAP, "tool_batch": TOOL_BATCH_CAP,
                          "serve": self.SERVE_CAP, "serve_depth": self.SERVE_DEPTH_CAP,
                          "dispatch": self.DISPATCH_CAP, "per_agent": PER_AGENT_CAP,
                          "steps": STEP_BUDGET, "context_limit": self.context_limit},
