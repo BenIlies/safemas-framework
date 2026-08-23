@@ -31,7 +31,7 @@ sys.path.insert(0, HERE)
 import environments.envio as envio                                    # noqa: E402
 import environments.validate_tasks as V                               # noqa: E402
 
-ENV = "brokerage"
+ENV = "banking"
 NOISE = {"ONE", "TOKEN", "SINGLE", "COUNT", "NOOP", "TOOL", "DEPTH", "BALANCE",
          "DISTRACTORS", "COVERAGE", "AGENTIC-EASY"}
 
@@ -433,7 +433,8 @@ def run_suite(env):
                   # them. An audit that silently runs a subset of the suite is worse than none: it
                   # certifies coverage it did not measure.
                   (V.validate_payload_diversity, (env,)), (V.validate_payload_coherent, (env,)),
-                  (V.validate_pretext_diversity, (env,)), (V.validate_payload_innocuous, (env,)),
+                  (V.validate_pretext_uniform, (env,)), (V.validate_payload_innocuous, (env,)),
+                  (V.validate_aitm_resolvable, (env,)),
                   (V.validate_confound, (env, eff))):
         try:
             msgs += fn(*a) or []
