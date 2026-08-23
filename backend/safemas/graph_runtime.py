@@ -60,13 +60,15 @@ def _env_int(name: str, default: int) -> int:
 DEFAULT_MAX_ITERS = _env_int("SAFEMAS_MAX_ROUNDS", 3)    # loop edges with no explicit bound (d / r)
 STEP_BUDGET = _env_int("SAFEMAS_STEP_BUDGET", 256)       # global cap on activations (runaway backstop)
 PER_AGENT_CAP = _env_int("SAFEMAS_PER_AGENT_CAP", 64)    # cap on activations of a single agent
-# k: WORK rounds within one agent activation. Sized from the benchmark rather than by feel: the
-# longest authored subtask across the 12 domains needs 24 tool calls (blockchain), p90 is 20, and
-# the median is 15 — so the old cap of 15 sat *below the median* and bound on more than half the
-# dataset by construction. Measured completion at cap 15: 70% of 10-call subtasks, 25% of 15-call,
-# 10% of 20-call. 30 clears the 24-call worst case with slack for typed-error retries, which turns
-# the cap back into a runaway backstop instead of a difficulty knob.
-TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 30)
+# k: WORK rounds within one agent activation. Sized from the benchmark rather than by feel: it must
+# clear the longest authored subtask with slack for the typed-error retries the resolution mechanic
+# depends on, without becoming a difficulty knob (below the median it bounds most of the dataset by
+# construction — measured completion at cap 15: 70% of 10-call subtasks, 25% of 15-call, 10% of
+# 20-call). With the dataset cut to six domains the worst-case subtask is 22 tool calls (workspace),
+# p90 20, median 15, so 26 clears the worst case with ~4 rounds of retry slack while trimming the
+# runaway tail that dominated wall-clock (raising it 15->30 tripled per-scenario time). Was 30 when
+# blockchain's 24-call subtask set the ceiling.
+TOOL_LOOP_CAP = _env_int("SAFEMAS_TOOL_LOOP_CAP", 26)
 MSG_ROUND_CAP = _env_int("SAFEMAS_MSG_ROUND_CAP", 12)    # free messaging-only rounds before they charge
 # Rounds for an instance SERVING a request, as opposed to working its own stream. The work budget is
 # sized for a 24-call subtask, but a served instance is answering one question — "which IBAN is on

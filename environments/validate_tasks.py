@@ -1687,7 +1687,7 @@ def validate_naming_tell(env):
 
 
 
-READ_SIZES = (3, 4, 5)             # architecture sizes read_groups is partitioned for
+READ_SIZES = (3, 4)                # architecture sizes read_groups is partitioned for (size-5 dropped)
 
 
 def validate_read_groups(env):

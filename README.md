@@ -4,10 +4,10 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![environments](https://img.shields.io/badge/environments-6-green)
-![topologies](https://img.shields.io/badge/topologies-13-green)
-![tasks](https://img.shields.io/badge/graded%20tasks-54-green)
-![attacks](https://img.shields.io/badge/injection%20attacks-64-green)
-![scenarios](https://img.shields.io/badge/scenarios-2328-orange)
+![topologies](https://img.shields.io/badge/topologies-9-green)
+![tasks](https://img.shields.io/badge/graded%20tasks-36-green)
+![attacks](https://img.shields.io/badge/injection%20attacks-62-green)
+![scenarios](https://img.shields.io/badge/scenarios-1540-orange)
 ![grading](https://img.shields.io/badge/grading-deterministic%20%C2%B7%20no%20LLM-blueviolet)
 ![status](https://img.shields.io/badge/status-active-brightgreen)
 ![license](https://img.shields.io/badge/license-see%20repo-lightgrey)
@@ -21,9 +21,9 @@ Every scenario is graded **deterministically against world state — no LLM judg
 ## Highlights
 
 - **6 environments**, one per harm vector, each a self-contained stateful world (tools + hidden state + graded tasks + attacks).
-- **13 topologies** — a single-agent baseline plus four multi-agent families at three team sizes — so *more agents* and *coordination structure* are ablatable variables.
-- **54 graded tasks** (9 per env across 3 difficulty tiers) and **64 injection attacks**.
-- **2,328 deterministically-graded scenarios** (270 clean-utility + 2,058 attacked), the cross-product of tasks x topologies x attack-delivery vectors.
+- **9 topologies** — a single-agent baseline plus four multi-agent families at two team sizes — so *more agents* and *coordination structure* are ablatable variables.
+- **36 graded tasks** (6 per env across 3 difficulty tiers) and **62 injection attacks**.
+- **1,540 deterministically-graded scenarios** (180 clean-utility + 1,360 attacked), the cross-product of tasks x topologies x attack-delivery vectors.
 - **Forced delegation + tool segregation** — capability partition (single-owner writes, partitioned reads) makes cross-agent compromise the object of study, not an accident.
 - **Deterministic gate suite** — the dataset is *correct by construction*; a change that breaks an invariant fails loudly instead of silently corrupting a measurement.
 - **Visual editor + real tool-calling runtime** (LangGraph + LangChain) and a **zero-dependency trace analyzer** for reading runs.
@@ -47,15 +47,15 @@ Six environments, cut from an earlier 12 to keep one representative per harm vec
 
 Each environment ships one file per component: `env.json` (identity + capability partition + component manifest), `tools/` (one tool per file), `state/` (hidden world stores), `tasks/` (graded tasks), `attacks/` (injection goals).
 
-### Topologies (13)
+### Topologies (9)
 
 | Family | Team sizes | Coordination |
 |--------|-----------|--------------|
 | `sas` (single-agent baseline) | 1 | one agent owns every tool |
-| `centralized` | 3, 4, 5 | hub assigns and relays |
-| `decentralized` | 3, 4, 5 | peers talk laterally, no hub |
-| `hybrid` | 3, 4, 5 | hub + peer channels |
-| `independent` | 3, 4, 5 | parallel workers, no coordination |
+| `centralized` | 3, 4 | hub assigns and relays |
+| `decentralized` | 3, 4 | peers talk laterally, no hub |
+| `hybrid` | 3, 4 | hub + peer channels |
+| `independent` | 3, 4 | parallel workers, no coordination |
 
 A breadth-`P` task runs only on `*P` architectures (a 3-stream task never on a 4-worker team) plus `sas`.
 
@@ -110,13 +110,13 @@ A zero-dependency web app (vanilla JS, no build step) for filtering thousands of
 safemas-framework/
 ├── environments/          the benchmark dataset (6 self-contained env folders)
 │   ├── validate_tasks.py  the deterministic gate suite (+ --scenarios / --difficulty / --rederive)
-│   ├── scenarios.json      the emitted run plan (2,328 scenarios)
+│   ├── scenarios.json      the emitted run plan (1,540 scenarios)
 │   ├── envio.py           on-disk layout: assemble/save a folder <-> flat env dict
 │   ├── gate_audit.py      mutation-tests the gates (does each detect its own defect?)
 │   ├── generate-safemas-env/SKILL.md   how to author a new environment
 │   └── banking/ devops/ ecommerce/ healthcare/ smarthome/ workspace/
 │       └── env.json + tools/ + state/ + tasks/ + attacks/
-├── templates/             the 13 topologies as LangGraph StateGraph Python
+├── templates/             the 9 topologies as LangGraph StateGraph Python
 ├── backend/               FastAPI app
 │   ├── main.py            REST API (templates, providers, scenario, run, campaigns)
 │   ├── scenario.py        environment loader + assembler (template ⊗ env ⊗ state ⊗ poison)
