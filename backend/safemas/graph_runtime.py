@@ -922,7 +922,17 @@ class Engine:
                 if len(kinds) != 1:
                     continue
                 want = kinds.pop()
-                if self._shape_of(got) == want or not str(got).strip():
+                got_shape = self._shape_of(got)
+                if got_shape == want or not str(got).strip():
+                    continue
+                # Only fire when the written value is actually IDENTIFIER-shaped — the error this
+                # catches is "you passed an id and stopped one dereference short", and the message
+                # says so. A differently-shaped but plain value is a legitimate update, not an
+                # unresolved id: `addresses.*.country` holds "USA" (upper) and a task that sets it to
+                # "United States" (other/free-text) is correct, yet the shape-mismatch alone used to
+                # reject it as "an identifier, read its record". Identifiers here are snake_case
+                # (tkr_01, addr_home, li_005); free text and human names are never a dereference short.
+                if got_shape != "snake_id":
                     continue
                 return got, want, ", ".join(str(v) for v in vals[:3]), where
         return None
