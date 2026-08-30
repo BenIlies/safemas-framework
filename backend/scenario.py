@@ -618,7 +618,12 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
     # than a measurable cost — its handicap is context load (it must pull everything itself), not
     # capability. Any other family reads only its own domain and must ask for the rest.
     _fam = str(template_arch.get("name") or "").lower()
-    _reads_universal = _fam.startswith(("sas", "independent")) or len(_workers0) <= 1
+    # `segregate=False` lifts the READ partition (every worker holds ALL reads — see `_tools_of`), so
+    # reads are universal exactly as for sas/independent. This flag MUST flip with that tool grant: it
+    # also gates `_read_owners`, the coordinator's ownership roster, the "ask who owns this value"
+    # worker scaffolding, and the universality gate below. Leave it False under no-seg and workers hold
+    # every read yet are still told the reads are split, so they escalate for values they can read.
+    _reads_universal = (not segregate) or _fam.startswith(("sas", "independent")) or len(_workers0) <= 1
     # `read_groups` is stored PER ARCHITECTURE SIZE ({"3":…,"4":…,"5":…}) and indexed by the number
     # of workers present — never collapsed by `slot mod P`, which is not balanced (at P=4 worker 0
     # would inherit slots 0 and 4 and hold 20 reads against 12).
