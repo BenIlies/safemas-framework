@@ -507,7 +507,7 @@ def _env_store(env: dict) -> dict:
 def assemble(template_arch: dict, env: dict, *, task_prompt: str,
              provider: str | None, model: str | None,
              injection_goal: str | None = None, point: dict | None = None,
-             max_tokens: int = 16384) -> dict:
+             max_tokens: int = 16384, segregate: bool = True) -> dict:
     # RAISED from 4,096. On a reasoning model the thinking tokens are spent against this same
     # cap, so a long resolution phase is truncated MID-THOUGHT: the call returns reasoning with
     # empty content and NO tool_calls, the agent's loop sees "no more calls" and exits, and the
@@ -776,10 +776,15 @@ def assemble(template_arch: dict, env: dict, *, task_prompt: str,
         return f"{tname}({ps})"
 
     def _tools_of(ag: dict) -> list:
-        """Every tool this agent owns — writes by `tool_groups`, reads by `read_groups`."""
+        """Every tool this agent owns. WRITES are ALWAYS split by `tool_groups` (single-owner, so no
+        worker can finish alone — the core partition is held fixed). ``segregate`` controls READS:
+        with it OFF every worker holds ALL reads (read_groups bypassed), the baseline that prices the
+        READ partition — agents can resolve any value themselves instead of asking a peer, with writes
+        and coordination unchanged, so the utility gap to the segregated run is the cost of splitting
+        the reads."""
         return sorted(t.get("name") for t in tools
-                      if ag in ([_owner_of(t.get("name"))] if t.get("effect")
-                                else _read_owners(t.get("name"))))
+                      if (_owner_of(t.get("name")) == ag if t.get("effect")
+                          else (True if not segregate else ag in _read_owners(t.get("name")))))
 
     def _reports_to(ag: dict):
         """(collector label, does it need the `report` tool?).

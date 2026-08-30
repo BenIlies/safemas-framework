@@ -296,6 +296,11 @@ class ScenarioInput(BaseModel):
     # the caller that configures the experiment — the harness sends the sweep's value so every
     # architecture is compared under one ceiling. Omitted => no ceiling.
     context_limit: Optional[int] = None
+    # Read segregation. Default True = the SAFEMAS partition (writes by tool_groups, reads by
+    # read_groups, so no worker can finish alone). False = writes STAY split by tool_groups but every
+    # worker holds ALL reads (read_groups bypassed) — the baseline that prices the READ partition:
+    # agents resolve any value themselves instead of asking a peer, coordination held fixed (clean runs).
+    segregate: bool = True
 
 
 def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
@@ -349,7 +354,7 @@ def _build_scenario(inp: ScenarioInput) -> tuple[Architecture, dict]:
     try:
         arch, meta = scenario_store.assemble(
             template, env, task_prompt=task_prompt, provider=inp.provider,
-            model=inp.model, injection_goal=goal, point=point)
+            model=inp.model, injection_goal=goal, point=point, segregate=inp.segregate)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     meta["breach_signal"] = scenario_store.default_breach_signal(env)
