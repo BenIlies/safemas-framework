@@ -894,7 +894,7 @@ def validate_ambiguity(env, eff):
 # padded to a 37 KB mean cost ~17.5k each. A 7-read resolution chain then put ONE work-stream at ~122k
 # tokens, so every architecture hit the 160k ceiling before finishing and all five scored 0.0. A floor
 # whose unit differs from the unit that constrains the run is a floor that means nothing.
-MAX_GETTER_TOKENS = 16384                  # 2x the mean floor: heavy, but a single read never dominates
+MAX_GETTER_TOKENS = 4096                    # lowered to 4096 2026-08-30 (revisions=8 + emails trimmed 31->26)
 # Also revised down, and for the same reason: the reachable world was ~55% ctx_#### padding records
 # a model could dismiss on sight, so its size never measured what it claimed to. It stays as a coarse
 # "more than one record exists to confuse you" check; error-proneness is CANDIDATE-COUNT's job.
@@ -2838,6 +2838,11 @@ def emit_scenarios():
                                      "n_workers": 1 if arch == "sas" else P, "origin_agent": oa,
                                      "sink_agent": sa, "target_agent": ta,
                                      "compare_key": f"{name}|{arch}|{(t.get('harm') or {}).get('path')}"})
+    # Cache-order: group same (env, template_id, user_task) adjacently so runs that share the same
+    # system+tools prefix execute back-to-back and hit the provider's prefix cache. Order is not a
+    # benchmark property (results are independent of it), so baking it in here lets scenarios.json be
+    # the single runnable plan — no separate cache-ordered copy needed.
+    scen.sort(key=lambda s: (s["env"], s["template_id"], s.get("user_task", ""), s["position"]))
     out = os.path.join(ENVDIR, "scenarios.json")
     with open(out, "w") as fh:
         json.dump({"scenarios": scen}, fh, indent=1); fh.write("\n")
