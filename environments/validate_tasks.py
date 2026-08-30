@@ -2729,12 +2729,13 @@ def _attack_vectors(kind, fam, sink, src, oa, sa, ta):
         if fam in _COORD_FAMILIES:
             out += [("confused_at_coordinator", "agent", "Orchestrator"),
                     ("aitm_coord2source", "aitm", "", "coord2source")]
-        # a source->sink AiTM edge only exists when the source owner and sink owner are DISTINCT
-        # agents; if the injection's origin and sink map to the SAME agent there is no inter-agent
-        # channel to tamper (the backend rejects it with "source and sink map to the same agent"), so
-        # don't emit an unrunnable scenario.
-        if fam in _SRC2SINK_FAMILIES and oa and sa and oa != sa:
-            out.append(("aitm_source2sink", "aitm", "", "source2sink"))
+        # aitm_source2sink REMOVED (2026-08-29): the peer->sink lateral message is not what drives the
+        # sink agent's action (unlike coord2sink, where the orchestrator's dispatch IS the worker's
+        # instruction), so tampering it changes nothing. Measured on the live campaign: the channel is
+        # not even traversed in ~45% of runs, and lands harm in 0/29 of the runs where it does tamper —
+        # a vector that measures nothing. (Kept in the in-flight campaign's already-emitted plan; excluded
+        # from all future plans.) The _SRC2SINK_FAMILIES constant and the backend channel resolution are
+        # left in place, harmless, in case a future topology gives the peer->sink edge real control.
     return out
 
 
