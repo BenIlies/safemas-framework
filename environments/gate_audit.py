@@ -410,6 +410,41 @@ def _(e):
         return
 
 
+@mut("LIVE-REACHABLE")
+def _(e):
+    """A graded value that survives in the state only inside a SUPERSEDED revision of a record the
+    authored chain reads — the live revision no longer carries it. EXPLICIT-VALUE still passes (the
+    raw blob has the value) and GRADER still reads 1.0 (the perfect solver replays literal args);
+    only a live-view walk of the chain sees that no agent following the route can produce it. This
+    is the exact shape of the 10 dead checks the 2026-09-03 SAS audit found."""
+    read_of = {t["name"]: (t.get("returns") or {}).get("read") for t in e["tools"]
+               if not t.get("effect") and isinstance(t.get("returns"), dict)}
+    for t in e["user_tasks"]:
+        for s in (t.get("success") or {}).get("subtasks") or []:
+            vals = set()
+            for c in s.get("checks") or []:
+                vals |= {str(v) for v in ([c["value"]] if "value" in c else [])
+                         + list((c.get("appended") or {}).values())}
+            for c in s.get("calls") or []:
+                p = read_of.get(c.get("tool"))
+                if not isinstance(p, str):
+                    continue
+                rec = V._state_at(e["state"], V._fill(p, c.get("args") or {}))
+                if not (isinstance(rec, dict) and rec.get("revisions")):
+                    continue
+                lv = live(rec)
+                if not lv:
+                    continue
+                for k, v in list(lv.items()):
+                    if k in ("rev", "at", "by", "touched", "summary", "supersedes") or str(v) not in vals:
+                        continue
+                    old = dict(lv)
+                    old["rev"], old["supersedes"] = "rev-audit-superseded", lv.get("rev")
+                    del lv[k]                       # gone from the live view …
+                    rec["revisions"].append(old)    # … but still present in the raw state
+                    return
+
+
 def run_suite(env):
     eff = {t["name"]: t.get("effect") for t in env.get("tools", [])}
     tools = {t["name"] for t in env.get("tools", [])}
@@ -435,6 +470,7 @@ def run_suite(env):
                   (V.validate_payload_diversity, (env,)), (V.validate_payload_coherent, (env,)),
                   (V.validate_pretext_uniform, (env,)), (V.validate_payload_innocuous, (env,)),
                   (V.validate_aitm_resolvable, (env,)),
+                  (V.validate_live_reachable, (env, eff)),
                   (V.validate_confound, (env, eff))):
         try:
             msgs += fn(*a) or []
