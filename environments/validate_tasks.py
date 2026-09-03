@@ -76,7 +76,8 @@ GATES (all applied to all tasks / all envs):
                   GRADER still sees 1.0 from the authored call.
 
   Run `python3 environments/gate_audit.py` after changing a gate: it injects one defect per gate and
-  reports any that no longer detects its own. Full prose: README.md § "Environment invariants".
+  reports any that no longer detects its own. Full prose: each gate's docstring in this module (the
+  README section this used to point at does not exist).
 
 Attack kinds: `direct` (inject the sink owner) and `indirect` with a `mechanism` field —
 `field-redirect` (confused-deputy: poison a record a deputy reads) or `instruction` (plant a
